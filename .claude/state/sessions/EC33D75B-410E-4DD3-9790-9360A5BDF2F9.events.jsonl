@@ -1,9 +1,0 @@
-{"id":"event-000001","type":"session.start","ts":"2026-06-05T14:40:52Z","state":"initialized"}
-{"id":"event-000002","type":"session.resume","ts":"2026-06-05T14:44:20Z","state":"initialized"}
-{"id":"event-000003","type":"session.resume","ts":"2026-06-05T14:47:30Z","state":"initialized"}
-{"id":"event-000004","type":"tool.bash","ts":"2026-06-05T14:53:43Z","state":"initialized","data":{"command":"ls -la "/Users/byunginsong/Documents/projects/memsum/projectmd/주차별" 2>/dev/null; echo "---ROOT---"; ls -la "/Users/byunginsong/Documents/projects/memsum"; echo "---WC---"; wc -l /Users/byunginsong/Doc"}}
-{"id":"event-000005","type":"tool.bash","ts":"2026-06-05T14:54:50Z","state":"initialized","data":{"command":"echo "=== ARCH/OS ==="; uname -m; sw_vers 2>/dev/null | head -2
-echo "=== node ==="; node -v 2>/dev/null || echo "NO node"
-echo "=== pnpm ==="; pnpm -v 2>/dev/null || echo "NO pnpm"
-echo "=== npm ===""}}
-{"id":"event-000006","type":"session.stop","ts":"2026-06-05T15:09:39Z","state":"stopped"}

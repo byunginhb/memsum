@@ -1,98 +1,302 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMemo } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Button } from '@/design/components/Button/Button';
+import type { ButtonSize, ButtonVariant } from '@/design/components/Button/Button';
+import { Card } from '@/design/components/Card/Card';
+import { Icon } from '@/design/icons/Icon';
+import { haptic } from '@/design/theme/platform';
+import { useThemeStore } from '@/design/theme/theme-store';
+import type { ThemeMode } from '@/design/theme/theme-store';
+import { useTheme } from '@/design/theme/useTheme';
+import { spacing, typography } from '@/design/tokens';
+import { useScreenshotWatcher } from '@/hooks/use-screenshot-watcher';
+import type { ScreenshotEvent } from '@/hooks/use-screenshot-watcher';
+import { t } from '@/i18n';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+const BUTTON_VARIANTS: ButtonVariant[] = [
+  'primary',
+  'secondary',
+  'ghost',
+  'destructive',
+  'accent',
+];
+
+const BUTTON_SIZES: ButtonSize[] = ['sm', 'md', 'lg'];
+
+const THEME_MODES: ThemeMode[] = ['system', 'light', 'dark'];
+
+const THEME_LABEL_KEY: Record<ThemeMode, string> = {
+  system: 'demo.theme.system',
+  light: 'demo.theme.light',
+  dark: 'demo.theme.dark',
+};
+
+/**
+ * 디자인 시스템 데모 화면 — 디자인시스템.md §3, §10
+ * Button/Card 쇼케이스 + 테마 토글 + 스크린샷 로그 패널.
+ */
+export default function DemoScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { events } = useScreenshotWatcher();
+  const mode = useThemeStore((state) => state.mode);
+  const setMode = useThemeStore((state) => state.setMode);
+
+  const contentStyle = useMemo(
+    () => ({
+      paddingTop: insets.top + spacing.lg,
+      paddingBottom: insets.bottom + spacing['4xl'],
+      paddingHorizontal: spacing.xl,
+      gap: spacing['3xl'],
+    }),
+    [insets.top, insets.bottom],
+  );
+
+  const handleSelectMode = async (next: ThemeMode): Promise<void> => {
+    await haptic('light');
+    setMode(next);
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <ScrollView
+      style={{ backgroundColor: colors.bgBase }}
+      contentContainerStyle={contentStyle}
+    >
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>{t('demo.title')}</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          {t('demo.subtitle')}
+        </Text>
+      </View>
+
+      <ThemeSection mode={mode} onSelect={handleSelectMode} />
+      <ButtonsSection />
+      <CardsSection />
+      <ScreenshotLogSection events={events} />
+    </ScrollView>
   );
 }
 
-export default function HomeScreen() {
+type ThemeSectionProps = {
+  mode: ThemeMode;
+  onSelect: (mode: ThemeMode) => void;
+};
+
+function ThemeSection({ mode, onSelect }: ThemeSectionProps) {
+  const { colors } = useTheme();
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <Section titleKey="demo.section.theme">
+      <View style={styles.row}>
+        {THEME_MODES.map((m) => (
+          <View key={m} style={styles.flexItem}>
+            <Button
+              variant={mode === m ? 'primary' : 'secondary'}
+              size="md"
+              onPress={() => onSelect(m)}
+              accessibilityLabel={t(THEME_LABEL_KEY[m])}
+            >
+              {t(THEME_LABEL_KEY[m])}
+            </Button>
+          </View>
+        ))}
+      </View>
+      <Text style={[styles.caption, { color: colors.textSecondary }]}>{mode}</Text>
+    </Section>
+  );
+}
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+function ButtonsSection() {
+  return (
+    <Section titleKey="demo.section.buttons">
+      {BUTTON_VARIANTS.map((variant) => (
+        <View key={variant} style={styles.buttonRow}>
+          {BUTTON_SIZES.map((size) => (
+            <View key={size} style={styles.flexItem}>
+              <Button
+                variant={variant}
+                size={size}
+                onPress={() => undefined}
+                accessibilityLabel={`${variant} ${size}`}
+                leftIcon={<Icon name="camera" size={16} color="onPrimary" />}
+              >
+                {variant}
+              </Button>
+            </View>
+          ))}
+        </View>
+      ))}
+      <View style={styles.buttonRow}>
+        <View style={styles.flexItem}>
+          <Button variant="primary" size="md" loading onPress={() => undefined}>
+            {t('button.capture')}
+          </Button>
+        </View>
+        <View style={styles.flexItem}>
+          <Button variant="primary" size="md" disabled onPress={() => undefined}>
+            {t('button.capture')}
+          </Button>
+        </View>
+      </View>
+    </Section>
+  );
+}
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+function CardsSection() {
+  const { colors } = useTheme();
+  return (
+    <Section titleKey="demo.section.cards">
+      <Card variant="flat">
+        <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>flat</Text>
+      </Card>
+      <Card variant="elevated">
+        <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>elevated</Text>
+      </Card>
+      <Card variant="outlined">
+        <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>outlined</Text>
+      </Card>
+      <Card variant="highlight">
+        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+          {t('demo.card.sample.title')}
+        </Text>
+        <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
+          {t('demo.card.sample.body')}
+        </Text>
+      </Card>
+    </Section>
+  );
+}
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+type ScreenshotLogSectionProps = {
+  events: ScreenshotEvent[];
+};
+
+function ScreenshotLogSection({ events }: ScreenshotLogSectionProps) {
+  const { colors } = useTheme();
+  return (
+    <Section titleKey="demo.section.screenshotLog">
+      {events.length === 0 ? (
+        <Card variant="outlined">
+          <View style={styles.emptyState}>
+            <Icon name="images" size={32} color="textSecondary" />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {t('demo.screenshot.empty')}
+            </Text>
+          </View>
+        </Card>
+      ) : (
+        events.map((event) => (
+          <Card key={event.id} variant="flat" compact>
+            <View style={styles.logRow}>
+              <Icon name="camera" size={20} color="primary" />
+              <View style={styles.logText}>
+                <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>
+                  {event.platform}
+                </Text>
+                <Text style={[styles.caption, { color: colors.textSecondary }]}>
+                  {new Date(event.createdAt * 1000).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        ))
+      )}
+    </Section>
+  );
+}
+
+type SectionProps = {
+  titleKey: string;
+  children: React.ReactNode;
+};
+
+function Section({ titleKey, children }: SectionProps) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t(titleKey)}</Text>
+      <View style={styles.sectionBody}>{children}</View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+  header: {
+    gap: spacing.xs,
   },
   title: {
+    fontSize: typography.display.size,
+    lineHeight: typography.display.line,
+    fontWeight: typography.display.weight,
+  },
+  subtitle: {
+    fontSize: typography.body.size,
+    lineHeight: typography.body.line,
+    fontWeight: typography.body.weight,
+  },
+  section: {
+    gap: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: typography.title.size,
+    lineHeight: typography.title.line,
+    fontWeight: typography.title.weight,
+  },
+  sectionBody: {
+    gap: spacing.md,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  flexItem: {
+    flex: 1,
+  },
+  caption: {
+    fontSize: typography.caption.size,
+    lineHeight: typography.caption.line,
+    fontWeight: typography.caption.weight,
+  },
+  cardLabel: {
+    fontSize: typography.bodyMd.size,
+    lineHeight: typography.bodyMd.line,
+    fontWeight: typography.bodyMd.weight,
+  },
+  cardTitle: {
+    fontSize: typography.title.size,
+    lineHeight: typography.title.line,
+    fontWeight: typography.title.weight,
+  },
+  cardBody: {
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodySm.weight,
+    marginTop: spacing.xs,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing['2xl'],
+  },
+  emptyText: {
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodySm.weight,
     textAlign: 'center',
   },
-  code: {
-    textTransform: 'uppercase',
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  logText: {
+    flex: 1,
+    gap: spacing.xs,
   },
 });

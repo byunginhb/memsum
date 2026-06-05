@@ -10,7 +10,10 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "app.memsum",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "스크린샷 자동 감지를 위해 사진 접근이 필요해요. Memsum은 스크린샷만 인식하고 다른 사진은 보지 않습니다."
+      }
     },
     "android": {
       "package": "app.memsum",
@@ -20,7 +23,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.READ_MEDIA_IMAGES"]
     },
     "web": {
       "output": "static",

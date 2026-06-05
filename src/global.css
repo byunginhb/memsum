@@ -1,9 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * 의미 색 토큰을 CSS 변수(RGB triplet)로 정의 — 디자인시스템.md §2.1, §5
+ * <alpha-value> 패턴(`rgb(var(--color-x) / <alpha-value>)`)을 위해 공백 구분 RGB로 둔다.
+ * :root = light, .dark = dark. NativeWind useColorScheme이 .dark 클래스를 토글한다.
+ */
 :root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-    Segoe UI Symbol, Noto Color Emoji;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+  --color-primary: 124 111 232;
+  --color-primary-muted: 229 225 249;
+  --color-primary-hover: 90 79 204;
+  --color-on-primary: 255 255 255;
+  --color-bg-base: 255 248 240;
+  --color-bg-surface: 255 255 255;
+  --color-bg-elevated: 255 255 255;
+  --color-bg-muted: 245 239 228;
+  --color-text-primary: 45 45 61;
+  --color-text-secondary: 109 109 128;
+  --color-text-on-accent: 255 255 255;
+  --color-text-disabled: 212 212 220;
+  --color-border: 242 242 245;
+  --color-border-strong: 212 212 220;
+  --color-accent: 255 184 77;
+  --color-success: 34 197 94;
+  --color-danger: 239 68 68;
+  --color-warning: 245 158 11;
+  --color-info: 59 130 246;
+}
+
+.dark {
+  --color-primary: 181 171 238;
+  --color-primary-muted: 42 37 87;
+  --color-primary-hover: 124 111 232;
+  --color-on-primary: 45 45 61;
+  --color-bg-base: 22 22 30;
+  --color-bg-surface: 30 30 42;
+  --color-bg-elevated: 38 38 53;
+  --color-bg-muted: 42 42 58;
+  --color-text-primary: 245 245 248;
+  --color-text-secondary: 160 160 181;
+  --color-text-on-accent: 45 45 61;
+  --color-text-disabled: 74 74 90;
+  --color-border: 46 46 62;
+  --color-border-strong: 63 63 80;
+  --color-accent: 255 184 77;
+  --color-success: 52 211 153;
+  --color-danger: 248 113 113;
+  --color-warning: 251 191 36;
+  --color-info: 96 165 250;
 }

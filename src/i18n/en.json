@@ -1,0 +1,22 @@
+{
+  "common.ok": "OK",
+  "common.cancel": "Cancel",
+  "common.save": "Save",
+  "demo.title": "Memsum Design System",
+  "demo.subtitle": "Just capture. Memsum handles the rest.",
+  "demo.section.buttons": "Buttons",
+  "demo.section.cards": "Cards",
+  "demo.section.theme": "Theme",
+  "demo.theme.system": "System",
+  "demo.theme.light": "Light",
+  "demo.theme.dark": "Dark",
+  "demo.section.screenshotLog": "Screenshot Log",
+  "demo.screenshot.empty": "Take a screenshot and it will appear here",
+  "demo.card.sample.title": "Coca-Cola Global Campaign",
+  "demo.card.sample.body": "A new formula combining localization + ESG",
+  "button.capture": "Capture",
+  "button.addToCalendar": "Add to Calendar",
+  "capture.title": "Save this capture?",
+  "capture.addToCalendar": "Add to Calendar",
+  "capture.discard": "Discard"
+}

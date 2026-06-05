@@ -37,3 +37,7 @@ yarn-error.*
 
 # 테스트/커버리지
 coverage/
+
+# 하네스 런타임 상태 (커밋 제외)
+.claude/
+.omc/
