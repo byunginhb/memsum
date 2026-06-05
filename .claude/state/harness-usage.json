@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "updatedAt": "2026-06-05T15:12:24.726Z",
+  "skills": {},
+  "commands": {
+    "superpowers:brainstorming": {
+      "count": 2,
+      "lastUsed": "2026-06-05T14:53:26.867Z"
+    },
+    "superpowers:executing-plans": {
+      "count": 2,
+      "lastUsed": "2026-06-05T15:12:24.725Z"
+    }
+  },
+  "agents": {},
+  "hooks": {
+    "session-init": {
+      "triggered": 3,
+      "blocked": 0,
+      "lastTriggered": "2026-06-05T14:47:30.758Z"
+    }
+  }
+}

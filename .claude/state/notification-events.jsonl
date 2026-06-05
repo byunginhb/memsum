@@ -1,0 +1,5 @@
+{"event":"notification","notification_type":"idle_prompt","session_id":"4c87ea28-1a6a-46b2-84cb-3a594a8f83fa","agent_type":"","timestamp":"2026-06-05T14:48:51Z"}
+{"event":"notification","notification_type":"permission_prompt","session_id":"4c87ea28-1a6a-46b2-84cb-3a594a8f83fa","agent_type":"","timestamp":"2026-06-05T14:56:21Z"}
+{"event":"notification","notification_type":"permission_prompt","session_id":"4c87ea28-1a6a-46b2-84cb-3a594a8f83fa","agent_type":"","timestamp":"2026-06-05T15:01:08Z"}
+{"event":"notification","notification_type":"permission_prompt","session_id":"4c87ea28-1a6a-46b2-84cb-3a594a8f83fa","agent_type":"","timestamp":"2026-06-05T15:08:24Z"}
+{"event":"notification","notification_type":"idle_prompt","session_id":"4c87ea28-1a6a-46b2-84cb-3a594a8f83fa","agent_type":"","timestamp":"2026-06-05T15:10:39Z"}

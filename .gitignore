@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.expo-shared/
+
+# Native: 소스(ios/ android/)는 커밋(CLAUDE.md 지시), 빌드 산출물만 제외
+ios/Pods/
+ios/build/
+ios/.xcode.env.local
+ios/*.xcworkspace/xcuserdata/
+android/.gradle/
+android/build/
+android/app/build/
+android/.cxx/
+*.keystore
+!debug.keystore
+
+# 환경 변수 (시크릿)
+.env
+.env*.local
+
+# 로그
+*.log
+npm-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+
+# Metro
+.metro-health-check*
+
+# 테스트/커버리지
+coverage/

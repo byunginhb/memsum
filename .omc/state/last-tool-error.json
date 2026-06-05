@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"echo \\\"=== temp contents ===\\\"; ls -A1 /tmp/memsum-init\\necho \\\"=== has .git? ===\\\"; [ -d /tmp/memsum-init/.git ] && echo \\\"YES temp has .git\\\" || echo \\\"no temp git\\\"\\necho \\\"=== package....",
+  "error": "Exit code 1\n=== temp contents ===\n.claude\n.git\n.gitignore\n.vscode\nAGENTS.md\napp.json\nassets\nCLAUDE.md\nLICENSE\npackage.json\nREADME.md\nscripts\nsrc\ntsconfig.json\n=== has .git? ===\nYES temp has .git\n=== package.json name/version/expo ===\nname: memsum-init\nexpo: ~56.0.8\nmain: expo-router/entry\nscripts: ['start', 'reset-project', 'android', 'ios', 'web', 'lint']\n=== app dir ===",
+  "timestamp": "2026-06-05T15:14:46.785Z",
+  "retry_count": 1
+}
