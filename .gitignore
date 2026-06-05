@@ -8,15 +8,18 @@ web-build/
 expo-env.d.ts
 .expo-shared/
 
-# Native: 소스(ios/ android/)는 커밋(CLAUDE.md 지시), 빌드 산출물만 제외
-ios/Pods/
-ios/build/
-ios/.xcode.env.local
-ios/*.xcworkspace/xcuserdata/
-android/.gradle/
-android/build/
-android/app/build/
-android/.cxx/
+# Native: CNG 생성 디렉토리는 expo prebuild로 재생성 (modules/의 네이티브 소스가 SSOT)
+# 참고: projectmd 문서는 ios/android 커밋을 권장하나, 모던 Expo CNG 관행에 따라 제외한다.
+# `expo run:ios` / `expo run:android` 실행 시 자동 prebuild로 재생성됨.
+# (커밋을 원하면 아래 /ios/ /android/ 두 줄을 제거하고 빌드 산출물만 따로 무시할 것.)
+/ios/
+/android/
+
+# 로컬 네이티브 모듈 빌드 산출물
+modules/*/android/build/
+modules/*/android/.gradle/
+modules/*/android/.cxx/
+modules/*/ios/build/
 *.keystore
 !debug.keystore
 
