@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -89,6 +89,7 @@ export function Button({
 }: ButtonProps): ReactNode {
   const { colors } = useTheme();
   const isInactive = disabled || loading;
+  const [pressed, setPressed] = useState(false);
   const vc = useMemo(() => variantColors(variant, colors), [variant, colors]);
 
   const containerStyle = useMemo<StyleProp<ViewStyle>>(
@@ -116,12 +117,16 @@ export function Button({
   return (
     <Pressable
       onPress={handlePress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
       disabled={isInactive}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: isInactive, busy: loading }}
       android_ripple={{ color: colors.primaryMuted }}
-      style={({ pressed }) => [
+      // NativeWind로 래핑된 Pressable은 함수형 style에서 배경색이 누락된다.
+      // Card와 동일하게 정적 배열 style을 사용하고 pressed는 상태로 처리한다.
+      style={[
         styles.base,
         containerStyle,
         Platform.OS === 'ios' && pressed && !isInactive ? styles.pressed : null,
