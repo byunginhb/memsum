@@ -5,6 +5,36 @@
 
 ---
 
+## ✅ 현재 상태 (Week 1 검증 완료 — 2026-06-06)
+
+iOS 시뮬레이터 · Android 에뮬레이터 양쪽에서 **빌드·실행·렌더 확인 완료**.
+
+| 검증 항목 | 결과 | 증거 |
+|---|---|---|
+| iOS 빌드·실행 (iPhone 16) | ✅ | Build Succeeded + app.memsum 설치·실행, 디자인 시스템 렌더 |
+| Android 빌드·실행 (API 36) | ✅ | BUILD SUCCESSFUL + 디자인 시스템 라이트/다크 렌더 |
+| 디자인 시스템 (Button 5종·Card 4종·다크모드·Pretendard) | ✅ | 라이트/다크 캡처 |
+| Android 스크린샷 감지 `[Screenshot]` 로그 | ✅ | Metro 로그에 uri·displayName·createdAt 출력 확인 |
+| iOS 네이티브 모듈 로드 + 사진 권한 문구 | ✅ | 첫 실행 권한 다이얼로그에 커스텀 문구 표시 |
+
+### 로컬 실행 방법 (당신 터미널에서)
+```bash
+# 1) Metro 한 번만 띄우기
+pnpm start            # 또는 npx expo start
+
+# 2) iOS 시뮬레이터 (별도 터미널)
+pnpm ios              # = expo run:ios  (첫 빌드 5~10분, 이후 Metro만)
+
+# 3) Android 에뮬레이터 (에뮬레이터 먼저 부팅 후)
+pnpm android          # = expo run:android
+```
+> 코드(특히 화면·디자인) 수정은 Metro가 Fast Refresh로 즉시 반영. 네이티브(modules/ Swift·Kotlin) 수정 시에만 `expo run:*` 재빌드 필요.
+
+### iOS 스크린샷 감지 직접 확인 (시뮬레이터 한계)
+- iOS 시뮬레이터는 Cmd+S 스크린샷이 게스트 사진 보관함에 들어가지 않아 자동 검증이 안 됩니다. **실기기**에서 사진 권한 허용 후 스크린샷을 찍으면 `[Screenshot]` 로그가 뜹니다. (Android는 에뮬레이터에서 검증 완료.)
+
+---
+
 ## 🔴 지금 필요한 일 (Week 1 완료를 위해)
 
 ### 1. Supabase 프로젝트 생성 + 키 입력  ← 가장 중요
@@ -42,6 +72,10 @@
 | Google Play Console ($25) | Android 출시 1~2주 전 | 지금 불필요 |
 | Google Cloud (Calendar OAuth) | Week 9 캘린더 연동 | |
 
+### 기술 후속 과제 (코드 — Claude가 다음에 처리)
+- **Android 런타임 권한 요청**: `READ_MEDIA_IMAGES`는 Android 13+에서 런타임 권한. 현재 모듈은 ContentObserver만 등록하고 권한을 요청하지 않아, 실기기 첫 실행 시 사용자가 허용하기 전엔 스크린샷 쿼리가 비어 있음(검증은 `adb`로 권한 부여 후 진행). 온보딩에 권한 요청 UX 추가 필요 (iOS는 모듈이 `PHPhotoLibrary.requestAuthorization`으로 자동 요청 중).
+- iOS 다크모드 클린 스크린샷은 첫 실행 권한 모달에 가려 자동 캡처가 막힘(Android에서 다크모드 검증 완료). 실기기에서 권한 1회 허용 후 정상.
+
 ---
 
 ## 📌 진행 중 내린 기술 결정 (참고)
@@ -54,6 +88,12 @@
 | 디자인 라이브러리 | **NativeWind 채택, gluestack-ui v2 보류** | RN0.85/React19 호환 리스크. 디자인 문서가 요구하는 커스텀 Button/Card는 토큰+NativeWind로 그대로 구현 |
 | Supabase | 클라우드, **사용자 키 직접 제공**(MCP 미사용) | 사용자 선택 |
 | bundleId/package | `app.memsum` | 문서의 App Group `group.app.memsum.*`와 정합 |
+| `ios/` `android/` 커밋 | **gitignore (제외)** — `expo prebuild`로 재생성 | projectmd 문서는 커밋 권장이나 모던 CNG 관행 채택. `expo run`이 자동 prebuild. **되돌리려면 `.gitignore`에서 `/ios/` `/android/` 두 줄 제거.** 네이티브 소스는 `modules/`에 커밋됨 |
+
+### 진행 중 고친 버그 (참고)
+- iOS Swift: Expo `Module`이 `PHPhotoLibraryChangeObserver`(NSObject 기반)를 직접 conform 불가 → 별도 `NSObject` 옵저버로 분리 (W1 문서 코드의 컴파일 에러 수정).
+- Android Kotlin: `MediaStore` 쿼리의 `"... DESC LIMIT 1"` 정렬 인자가 Android 11+에서 거부되어 스크린샷 시 앱 크래시 → API 30+ Bundle `QUERY_ARG_LIMIT`로 교체 + try-catch 방어.
+- 디자인 Button: NativeWind 래핑 Pressable의 함수형 style에서 배경색 누락 → 정적 배열 style로 수정.
 
 ---
 
