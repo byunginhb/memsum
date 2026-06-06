@@ -10,9 +10,12 @@ import { haptic } from '@/design/theme/platform';
 import { useThemeStore } from '@/design/theme/theme-store';
 import type { ThemeMode } from '@/design/theme/theme-store';
 import { useTheme } from '@/design/theme/useTheme';
-import { spacing, typography } from '@/design/tokens';
-import { useScreenshotWatcher } from '@/hooks/use-screenshot-watcher';
-import type { ScreenshotEvent } from '@/hooks/use-screenshot-watcher';
+import { radius, spacing, typography } from '@/design/tokens';
+import type { SemanticColorName } from '@/design/tokens';
+import { useImageOcr } from '@/hooks/use-image-ocr';
+import type { ImageOcrState } from '@/hooks/use-image-ocr';
+import { useScreenshotOcr } from '@/hooks/use-screenshot-ocr';
+import type { OcrItem, OcrStatus } from '@/hooks/use-screenshot-ocr';
 import { t } from '@/i18n';
 
 const BUTTON_VARIANTS: ButtonVariant[] = [
@@ -40,7 +43,8 @@ const THEME_LABEL_KEY: Record<ThemeMode, string> = {
 export default function DemoScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { events } = useScreenshotWatcher();
+  const { items } = useScreenshotOcr();
+  const { state: sampleOcr, run: runSampleOcr } = useImageOcr();
   const mode = useThemeStore((state) => state.mode);
   const setMode = useThemeStore((state) => state.setMode);
 
@@ -74,7 +78,7 @@ export default function DemoScreen() {
       <ThemeSection mode={mode} onSelect={handleSelectMode} />
       <ButtonsSection />
       <CardsSection />
-      <ScreenshotLogSection events={events} />
+      <OcrSection items={items} sampleOcr={sampleOcr} onRunSample={runSampleOcr} />
     </ScrollView>
   );
 }
@@ -168,41 +172,161 @@ function CardsSection() {
   );
 }
 
-type ScreenshotLogSectionProps = {
-  events: ScreenshotEvent[];
+// OCR 인식 텍스트 표시 최대 줄 수(긴 결과 잘림 처리).
+const OCR_TEXT_MAX_LINES = 8;
+
+const OCR_STATUS_LABEL_KEY: Record<OcrStatus, string> = {
+  pending: 'demo.ocr.pending',
+  done: 'demo.ocr.done',
+  error: 'demo.ocr.error',
 };
 
-function ScreenshotLogSection({ events }: ScreenshotLogSectionProps) {
+// status별 의미 색 토큰 매핑(하드코딩 금지).
+const OCR_STATUS_COLOR: Record<OcrStatus, SemanticColorName> = {
+  pending: 'textSecondary',
+  done: 'primary',
+  error: 'danger',
+};
+
+type OcrSectionProps = {
+  items: OcrItem[];
+  sampleOcr: ImageOcrState;
+  onRunSample: () => void;
+};
+
+function OcrSection({ items, sampleOcr, onRunSample }: OcrSectionProps) {
   const { colors } = useTheme();
+  const isSampleLoading = sampleOcr.status === 'pending';
+  const isEmpty = items.length === 0 && sampleOcr.status === 'idle';
+
   return (
-    <Section titleKey="demo.section.screenshotLog">
-      {events.length === 0 ? (
+    <Section titleKey="demo.section.ocr">
+      <Button
+        variant="accent"
+        size="md"
+        loading={isSampleLoading}
+        onPress={onRunSample}
+        accessibilityLabel={t('demo.ocr.test')}
+        leftIcon={<Icon name="images" size={16} color="textOnAccent" />}
+      >
+        {t('demo.ocr.test')}
+      </Button>
+
+      {sampleOcr.status !== 'idle' ? (
+        <SampleOcrCard state={sampleOcr} />
+      ) : null}
+
+      {isEmpty ? (
         <Card variant="outlined">
           <View style={styles.emptyState}>
             <Icon name="images" size={32} color="textSecondary" />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {t('demo.screenshot.empty')}
+              {t('demo.ocr.empty')}
             </Text>
           </View>
         </Card>
       ) : (
-        events.map((event) => (
-          <Card key={event.id} variant="flat" compact>
-            <View style={styles.logRow}>
-              <Icon name="camera" size={20} color="primary" />
-              <View style={styles.logText}>
-                <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>
-                  {event.platform}
-                </Text>
-                <Text style={[styles.caption, { color: colors.textSecondary }]}>
-                  {new Date(event.createdAt * 1000).toLocaleString()}
-                </Text>
-              </View>
-            </View>
-          </Card>
-        ))
+        items.map((item) => <OcrItemCard key={item.id} item={item} />)
       )}
     </Section>
+  );
+}
+
+type StatusBadgeProps = {
+  status: OcrStatus;
+};
+
+function StatusBadge({ status }: StatusBadgeProps) {
+  const { colors } = useTheme();
+  const color = colors[OCR_STATUS_COLOR[status]];
+  return (
+    <View
+      style={[styles.badge, { borderColor: color }]}
+      accessibilityRole="text"
+      accessibilityLabel={t(OCR_STATUS_LABEL_KEY[status])}
+    >
+      <Text style={[styles.badgeText, { color }]}>{t(OCR_STATUS_LABEL_KEY[status])}</Text>
+    </View>
+  );
+}
+
+type OcrItemCardProps = {
+  item: OcrItem;
+};
+
+function OcrItemCard({ item }: OcrItemCardProps) {
+  const { colors } = useTheme();
+  const hasText = item.status === 'done' && !!item.text && item.text.trim().length > 0;
+  const bodyText =
+    item.status === 'error'
+      ? item.error
+      : hasText
+        ? item.text
+        : item.status === 'done'
+          ? t('demo.ocr.noText')
+          : undefined;
+
+  return (
+    <Card variant="flat" compact>
+      <View style={styles.logRow}>
+        <Icon name="camera" size={20} color="primary" />
+        <View style={styles.logText}>
+          <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>{item.platform}</Text>
+          <Text style={[styles.caption, { color: colors.textSecondary }]}>
+            {new Date(item.createdAt * 1000).toLocaleString()}
+          </Text>
+        </View>
+        <StatusBadge status={item.status} />
+      </View>
+      {bodyText ? (
+        <Text
+          style={[styles.ocrText, { color: colors.textSecondary }]}
+          numberOfLines={OCR_TEXT_MAX_LINES}
+        >
+          {bodyText}
+        </Text>
+      ) : null}
+    </Card>
+  );
+}
+
+type SampleOcrCardProps = {
+  state: ImageOcrState;
+};
+
+function SampleOcrCard({ state }: SampleOcrCardProps) {
+  const { colors } = useTheme();
+  const status: OcrStatus = state.status === 'idle' ? 'pending' : state.status;
+  const hasText = state.status === 'done' && !!state.text && state.text.trim().length > 0;
+  const bodyText =
+    state.status === 'error'
+      ? state.error
+      : hasText
+        ? state.text
+        : state.status === 'done'
+          ? t('demo.ocr.noText')
+          : undefined;
+
+  return (
+    <Card variant="highlight" compact>
+      <View style={styles.logRow}>
+        <Icon name="file-text" size={20} color="accent" />
+        <View style={styles.logText}>
+          <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>
+            {t('demo.ocr.testTitle')}
+          </Text>
+        </View>
+        <StatusBadge status={status} />
+      </View>
+      {bodyText ? (
+        <Text
+          style={[styles.ocrText, { color: colors.textSecondary }]}
+          numberOfLines={OCR_TEXT_MAX_LINES}
+        >
+          {bodyText}
+        </Text>
+      ) : null}
+    </Card>
   );
 }
 
@@ -298,5 +422,22 @@ const styles = StyleSheet.create({
   logText: {
     flex: 1,
     gap: spacing.xs,
+  },
+  badge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  badgeText: {
+    fontSize: typography.caption.size,
+    lineHeight: typography.caption.line,
+    fontWeight: typography.bodyMd.weight,
+  },
+  ocrText: {
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodySm.weight,
+    marginTop: spacing.md,
   },
 });
