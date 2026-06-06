@@ -24,7 +24,18 @@
   "demo.card.sample.body": "A new formula combining localization + ESG",
   "button.capture": "Capture",
   "button.addToCalendar": "Add to Calendar",
-  "capture.title": "Save this capture?",
-  "capture.addToCalendar": "Add to Calendar",
-  "capture.discard": "Discard"
+  "demo.section.capture": "Capture Flow",
+  "demo.capture.simulate": "Simulate Sample Capture",
+  "demo.capture.hint": "Runs the full upload → OCR → cleanup flow with a sample screenshot",
+  "capture.sheet.title": "Save this capture?",
+  "capture.preview.label": "Capture image preview",
+  "capture.stage.uploading": "Uploading image",
+  "capture.stage.ocr": "Recognizing text",
+  "capture.stage.processing": "Summarizing content",
+  "capture.ocr.label": "Recognized text",
+  "capture.error.generic": "Something went wrong while processing the capture",
+  "capture.action.save": "Save Only",
+  "capture.action.addToCalendar": "Add to Calendar",
+  "capture.action.close": "Close",
+  "capture.action.retry": "Retry"
 }

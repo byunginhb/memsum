@@ -6,12 +6,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
+import { AuthProvider } from '@/providers/AuthProvider';
 
 import '@/global.css';
 
 /**
  * 루트 레이아웃 — 디자인시스템.md §4, §5
- * GestureHandlerRootView > SafeAreaProvider > ThemeProvider > Stack.
+ * GestureHandlerRootView > SafeAreaProvider > ThemeProvider > AuthProvider
+ *   > (StatusBar + Stack).
+ * - AuthProvider: 마운트 시 익명 세션 보장(비차단). 로딩/에러 중에도 앱은 뜸.
+ * - 캡처 Sheet는 RN 내장 Modal 기반이라 별도 root provider가 필요 없다(@gorhom 제거).
  * Pretendard Variable 로드 시도. 실패해도 시스템 폰트 폴백으로 진행(빌드/렌더 막지 않음).
  */
 export default function RootLayout() {
@@ -25,8 +29,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <ThemedStatusBar />
-          <Stack screenOptions={{ headerShown: false }} />
+          <AuthProvider>
+            <ThemedStatusBar />
+            <Stack screenOptions={{ headerShown: false }} />
+          </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

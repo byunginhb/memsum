@@ -5,6 +5,21 @@
 
 ---
 
+## 🔴 지금 필요한 일 — 익명 로그인 토글 1회 (Week 3 검증용)
+
+캡처 저장 흐름은 RLS 때문에 로그인 세션이 필요해서, 정식 온보딩 전까지 **익명 로그인**으로
+세션을 보장한다. 현재 프로젝트에 **익명 로그인이 꺼져 있다**(`anonymous_provider_disabled` 확인).
+
+### 할 일 (대시보드 토글 1회)
+1. Supabase 대시보드 → 프로젝트 `memsum` → **Authentication → Sign In / Providers**
+2. **"Anonymous sign-ins"** (익명 로그인) 토글 → **켜기(Enable)** → 저장
+3. 켰다고 알려주면, 내가 캡처 저장 흐름 end-to-end 재검증(샘플 캡처 → 업로드 → OCR → GPT → captures 기록)
+
+> 익명 로그인 = 앱 첫 실행 시 자동으로 임시 세션 생성. 나중에 Apple/Google 정식 로그인으로 업그레이드.
+> 토글 없이도 앱 빌드·렌더·UI는 동작하지만, 실제 "저장"은 세션이 있어야 한다.
+
+---
+
 ## ✅ Week 2 완전 완료 (2026-06-06) — 지금 필요한 일 없음
 
 Phase 2a(온디바이스 OCR) + Phase 2b(OpenAI 후처리 Edge Function) 모두 **실측 검증 완료**.

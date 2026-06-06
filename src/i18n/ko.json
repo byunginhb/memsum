@@ -24,7 +24,18 @@
   "demo.card.sample.body": "지역화 + ESG 결합 새 공식",
   "button.capture": "캡처",
   "button.addToCalendar": "캘린더에 추가",
-  "capture.title": "이 캡처 저장할까요?",
-  "capture.addToCalendar": "캘린더에 추가",
-  "capture.discard": "버리기"
+  "demo.section.capture": "캡처 흐름",
+  "demo.capture.simulate": "샘플 캡처 시뮬레이션",
+  "demo.capture.hint": "샘플 스크린샷으로 업로드 → OCR → 정리 전체 흐름을 시연합니다",
+  "capture.sheet.title": "이 캡처 저장할까요?",
+  "capture.preview.label": "캡처 이미지 미리보기",
+  "capture.stage.uploading": "이미지 업로드 중",
+  "capture.stage.ocr": "텍스트 인식 중",
+  "capture.stage.processing": "내용 정리 중",
+  "capture.ocr.label": "인식된 텍스트",
+  "capture.error.generic": "캡처 처리 중 오류가 발생했습니다",
+  "capture.action.save": "저장만",
+  "capture.action.addToCalendar": "캘린더 추가",
+  "capture.action.close": "닫기",
+  "capture.action.retry": "다시 시도"
 }

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Asset } from 'expo-asset';
 
 import { Button } from '@/design/components/Button/Button';
 import type { ButtonSize, ButtonVariant } from '@/design/components/Button/Button';
@@ -12,11 +13,24 @@ import type { ThemeMode } from '@/design/theme/theme-store';
 import { useTheme } from '@/design/theme/useTheme';
 import { radius, spacing, typography } from '@/design/tokens';
 import type { SemanticColorName } from '@/design/tokens';
+import { CaptureSheet } from '@/features/capture/CaptureSheet';
 import { useImageOcr } from '@/hooks/use-image-ocr';
 import type { ImageOcrState } from '@/hooks/use-image-ocr';
 import { useScreenshotOcr } from '@/hooks/use-screenshot-ocr';
 import type { OcrItem, OcrStatus } from '@/hooks/use-screenshot-ocr';
+import { useScreenshotWatcher } from '@/hooks/use-screenshot-watcher';
+import type { ScreenshotEvent } from '@/hooks/use-screenshot-watcher';
 import { t } from '@/i18n';
+import { useCaptureStore } from '@/stores/capture-store';
+
+// 샘플 스크린샷(시뮬레이션용). use-image-ocr와 동일 에셋을 캡처 흐름에도 재사용.
+const SAMPLE_KO = require('@/assets/ocr-test/sample-ko.png');
+
+// 캡처 OCR source 추출용 raw 페이로드(iOS assetId / Android uri).
+type ScreenshotRaw = {
+  assetId?: string;
+  uri?: string;
+};
 
 const BUTTON_VARIANTS: ButtonVariant[] = [
   'primary',
@@ -47,6 +61,7 @@ export default function DemoScreen() {
   const { state: sampleOcr, run: runSampleOcr } = useImageOcr();
   const mode = useThemeStore((state) => state.mode);
   const setMode = useThemeStore((state) => state.setMode);
+  const { onSimulate, isSimulating } = useCaptureFlow();
 
   const contentStyle = useMemo(
     () => ({
@@ -64,22 +79,121 @@ export default function DemoScreen() {
   };
 
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.bgBase }}
-      contentContainerStyle={contentStyle}
-    >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>{t('demo.title')}</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {t('demo.subtitle')}
-        </Text>
-      </View>
+    <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
+      <ScrollView contentContainerStyle={contentStyle}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('demo.title')}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            {t('demo.subtitle')}
+          </Text>
+        </View>
 
-      <ThemeSection mode={mode} onSelect={handleSelectMode} />
-      <ButtonsSection />
-      <CardsSection />
-      <OcrSection items={items} sampleOcr={sampleOcr} onRunSample={runSampleOcr} />
-    </ScrollView>
+        <CaptureSection onSimulate={onSimulate} isSimulating={isSimulating} />
+        <ThemeSection mode={mode} onSelect={handleSelectMode} />
+        <ButtonsSection />
+        <CardsSection />
+        <OcrSection items={items} sampleOcr={sampleOcr} onRunSample={runSampleOcr} />
+      </ScrollView>
+      <CaptureSheet />
+    </View>
+  );
+}
+
+/**
+ * 캡처 흐름 통합 훅.
+ * - 스크린샷 워처의 새 이벤트마다 startCapture를 자동 호출(처리 id 집합으로 무한 루프 방지).
+ * - 샘플 시뮬레이션: 번들 sample-ko.png를 localUri로 확보 후 startCapture.
+ */
+function useCaptureFlow(): { onSimulate: () => void; isSimulating: boolean } {
+  const { events } = useScreenshotWatcher();
+  const startCapture = useCaptureStore((state) => state.startCapture);
+  const [isSimulating, setIsSimulating] = useState(false);
+  // 이미 캡처 흐름을 시작한 스크린샷 id. 재렌더 시 중복 트리거를 막는다.
+  const triggeredIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const pending = events.filter(
+      (event) => event.id.length > 0 && !triggeredIds.current.has(event.id),
+    );
+    if (pending.length === 0) return;
+
+    for (const event of pending) {
+      triggeredIds.current.add(event.id);
+      void startCapture(toStartCaptureInput(event));
+    }
+  }, [events, startCapture]);
+
+  const onSimulate = useCallback(() => {
+    setIsSimulating(true);
+    void (async () => {
+      try {
+        const asset = Asset.fromModule(SAMPLE_KO);
+        await asset.downloadAsync();
+        const uri = asset.localUri ?? asset.uri;
+        if (!uri) {
+          throw new Error('샘플 이미지 경로를 확인할 수 없습니다.');
+        }
+        // 시뮬레이터에서 현재 OS를 sourcePlatform으로 사용. OCR/업로드 모두 uri 경로.
+        const sourcePlatform = Platform.OS === 'ios' ? 'ios' : 'android';
+        await startCapture({ imageUri: uri, sourcePlatform, uri });
+      } catch (error) {
+        console.error('[capture] 샘플 시뮬레이션 실패:', error);
+      } finally {
+        setIsSimulating(false);
+      }
+    })();
+  }, [startCapture]);
+
+  return { onSimulate, isSimulating };
+}
+
+/** 스크린샷 이벤트 → startCapture 입력. iOS는 assetId, Android는 uri를 OCR source로. */
+function toStartCaptureInput(event: ScreenshotEvent): {
+  imageUri: string;
+  sourcePlatform: 'ios' | 'android';
+  assetId?: string;
+  uri?: string;
+} {
+  const raw = (event.raw ?? {}) as ScreenshotRaw;
+  if (event.platform === 'ios') {
+    // iOS는 미리보기 uri 확보가 어려우면 assetId만 사용(미리보기는 placeholder 허용).
+    return {
+      imageUri: raw.uri ?? '',
+      sourcePlatform: 'ios',
+      assetId: raw.assetId,
+      uri: raw.uri,
+    };
+  }
+  return {
+    imageUri: raw.uri ?? '',
+    sourcePlatform: 'android',
+    uri: raw.uri,
+  };
+}
+
+type CaptureSectionProps = {
+  onSimulate: () => void;
+  isSimulating: boolean;
+};
+
+function CaptureSection({ onSimulate, isSimulating }: CaptureSectionProps) {
+  const { colors } = useTheme();
+  return (
+    <Section titleKey="demo.section.capture">
+      <Button
+        variant="primary"
+        size="lg"
+        loading={isSimulating}
+        onPress={onSimulate}
+        accessibilityLabel={t('demo.capture.simulate')}
+        leftIcon={<Icon name="camera" size={20} color="onPrimary" />}
+      >
+        {t('demo.capture.simulate')}
+      </Button>
+      <Text style={[styles.caption, { color: colors.textSecondary }]}>
+        {t('demo.capture.hint')}
+      </Text>
+    </Section>
   );
 }
 
@@ -346,6 +460,9 @@ function Section({ titleKey, children }: SectionProps) {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   header: {
     gap: spacing.xs,
   },
