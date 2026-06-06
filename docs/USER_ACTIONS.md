@@ -5,28 +5,24 @@
 
 ---
 
-## 🔴 지금 필요한 일 — Edge Function(OpenAI) 배포를 위해 (Week 2 Phase 2b)
+## 🔴 지금 필요한 일 — OpenAI 결제(빌링) 활성화 1가지만 남음
 
-온디바이스 OCR(Phase 2a)은 양쪽 검증 완료. 다음은 OCR 텍스트를 gpt-4o-mini로 후처리하는
-`process-capture` Edge Function 배포다. 클라우드 배포라 **2가지**가 필요하다.
+Edge Function(`process-capture`)은 **배포·검증 완료**. 검증 중 함수가 OpenAI에 실제 도달했고,
+OpenAI가 `billing_not_active`("Your account is not active, check your billing details")를 반환했다.
+즉 **코드는 완벽히 동작하고, OpenAI 계정 결제만 활성화하면 끝**이다.
 
-### 1. Supabase 로그인 (함수 배포 권한)
-터미널 프롬프트에서 아래를 입력하면 이 세션에서 실행된다(브라우저 인증 1회):
-```
-! supabase login
-```
-> 또는 토큰 방식: supabase.com → 우상단 계정 → **Account → Access Tokens** → Generate →
-> 토큰 값을 알려주면 내가 `SUPABASE_ACCESS_TOKEN`으로 사용한다.
+### 할 일: OpenAI 결제 활성화
+1. platform.openai.com → **Settings → Billing** → 결제 수단 등록 + 크레딧 충전($5~10)
+2. (권장) **Usage limits**에서 월 한도 설정 → 비용 사고 방지
+3. 활성화 후 알려주면, 내가 즉시 재검증(테스트 유저 JWT로 OCR→GPT 호출 → 정제 텍스트·이벤트추출 JSON 확인)
 
-### 2. OpenAI 키를 Edge Function 시크릿으로 등록
-키는 앱이 아니라 **서버 시크릿**으로만 들어간다. 둘 중 택1:
-- **(권장) 직접 등록**: Supabase 대시보드 → 프로젝트 → **Edge Functions → Secrets**(또는
-  Project Settings → Edge Functions) → `OPENAI_API_KEY` = (당신의 키) 추가. → 키를 나에게 안 줘도 됨.
-- **위임**: 키를 알려주면 내가 `supabase secrets set OPENAI_API_KEY=...`로 등록.
+> 결제 활성화는 보통 몇 분 내 반영. gpt-4o-mini 캡처당 ~0.3원이라 $5로 수천 장 처리 가능.
 
-위 2개가 되면 알려주세요. 내가 `supabase functions deploy process-capture` 배포 + 동작 검증(미인증 401 확인 + 테스트 유저 JWT로 OCR→GPT 호출)을 진행합니다.
-
-> 비용: gpt-4o-mini 캡처당 ~0.3원. OpenAI에서 월 사용한도를 걸어두면 안전합니다.
+### ✅ 이미 완료된 것 (참고)
+- Supabase 로그인·프로젝트 link (당신이 직접) ✓
+- OpenAI 키를 Edge Function 시크릿(`OPENAI_API_KEY`)으로 등록 (당신이 대시보드에서) ✓
+- `process-capture` 함수 배포(ACTIVE, v2) ✓
+- 검증: 미인증 401 + JWT 인증 통과 + OpenAI 실제 도달 ✓ (남은 건 OpenAI 빌링뿐)
 
 ---
 
