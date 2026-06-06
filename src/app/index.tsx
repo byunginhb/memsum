@@ -1,129 +1,208 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import type { ListRenderItemInfo } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Asset } from 'expo-asset';
+import { useRouter } from 'expo-router';
 
 import { Button } from '@/design/components/Button/Button';
-import type { ButtonSize, ButtonVariant } from '@/design/components/Button/Button';
-import { Card } from '@/design/components/Card/Card';
 import { Icon } from '@/design/icons/Icon';
-import { haptic } from '@/design/theme/platform';
-import { useThemeStore } from '@/design/theme/theme-store';
-import type { ThemeMode } from '@/design/theme/theme-store';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
-import type { SemanticColorName } from '@/design/tokens';
+import { radius, spacing, typography, zIndex } from '@/design/tokens';
 import { CaptureSheet } from '@/features/capture/CaptureSheet';
-import { useImageOcr } from '@/hooks/use-image-ocr';
-import type { ImageOcrState } from '@/hooks/use-image-ocr';
-import { useScreenshotOcr } from '@/hooks/use-screenshot-ocr';
-import type { OcrItem, OcrStatus } from '@/hooks/use-screenshot-ocr';
-import { useScreenshotWatcher } from '@/hooks/use-screenshot-watcher';
-import type { ScreenshotEvent } from '@/hooks/use-screenshot-watcher';
+import { CaptureCard } from '@/features/captures/CaptureCard';
+import type { CaptureListItem } from '@/features/captures/types';
+import { useCaptures } from '@/hooks/use-captures';
 import { t } from '@/i18n';
 import { useCaptureStore } from '@/stores/capture-store';
 
-// 샘플 스크린샷(시뮬레이션용). use-image-ocr와 동일 에셋을 캡처 흐름에도 재사용.
+// 샘플 스크린샷(시뮬레이션용). dev 데모와 동일 에셋을 캡처 흐름 트리거에 재사용.
 const SAMPLE_KO = require('@/assets/ocr-test/sample-ko.png');
 
-// 캡처 OCR source 추출용 raw 페이로드(iOS assetId / Android uri).
-type ScreenshotRaw = {
-  assetId?: string;
-  uri?: string;
-};
-
-const BUTTON_VARIANTS: ButtonVariant[] = [
-  'primary',
-  'secondary',
-  'ghost',
-  'destructive',
-  'accent',
-];
-
-const BUTTON_SIZES: ButtonSize[] = ['sm', 'md', 'lg'];
-
-const THEME_MODES: ThemeMode[] = ['system', 'light', 'dark'];
-
-const THEME_LABEL_KEY: Record<ThemeMode, string> = {
-  system: 'demo.theme.system',
-  light: 'demo.theme.light',
-  dark: 'demo.theme.dark',
-};
+// 2열 그리드.
+const GRID_COLUMNS = 2;
 
 /**
- * 디자인 시스템 데모 화면 — 디자인시스템.md §3, §10
- * Button/Card 쇼케이스 + 테마 토글 + 스크린샷 로그 패널.
+ * 홈(캡처 리스트) 화면 — 기능명세 Screen 01.
+ *
+ * 저장된 captures를 2열 그리드로 보여주고, 우하단 FAB로 샘플 캡처 흐름을 트리거한다.
+ * pull-to-refresh / 하단 도달 시 페이지네이션. 빈 상태는 EmptyState로 안내.
+ * 캡처 확인 Sheet(<CaptureSheet />)를 화면에 상주시켜 저장 흐름을 노출한다.
  */
-export default function DemoScreen() {
+export default function HomeScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { items } = useScreenshotOcr();
-  const { state: sampleOcr, run: runSampleOcr } = useImageOcr();
-  const mode = useThemeStore((state) => state.mode);
-  const setMode = useThemeStore((state) => state.setMode);
-  const { onSimulate, isSimulating } = useCaptureFlow();
+  const router = useRouter();
+  const { items, isLoading, refresh, loadMore } = useCaptures();
+  const { onSimulate, isSimulating } = useSampleCapture();
+
+  const handleOpenCapture = useCallback(
+    (id: string): void => {
+      router.push({ pathname: '/captures/[id]', params: { id } });
+    },
+    [router],
+  );
+
+  const handleOpenSearch = useCallback((): void => {
+    router.push('/search');
+  }, [router]);
+
+  const handleOpenDev = useCallback((): void => {
+    router.push('/dev');
+  }, [router]);
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<CaptureListItem>) => (
+      <View style={styles.cell}>
+        <CaptureCard item={item} onPress={handleOpenCapture} />
+      </View>
+    ),
+    [handleOpenCapture],
+  );
+
+  const keyExtractor = useCallback((item: CaptureListItem): string => item.id, []);
 
   const contentStyle = useMemo(
     () => ({
-      paddingTop: insets.top + spacing.lg,
-      paddingBottom: insets.bottom + spacing['4xl'],
-      paddingHorizontal: spacing.xl,
-      gap: spacing['3xl'],
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      // FAB가 마지막 행을 가리지 않도록 하단 여백 확보.
+      paddingBottom: insets.bottom + spacing['6xl'],
+      gap: spacing.md,
     }),
-    [insets.top, insets.bottom],
+    [insets.bottom],
   );
-
-  const handleSelectMode = async (next: ThemeMode): Promise<void> => {
-    await haptic('light');
-    setMode(next);
-  };
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
-      <ScrollView contentContainerStyle={contentStyle}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>{t('demo.title')}</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {t('demo.subtitle')}
-          </Text>
-        </View>
+      <Header onSearch={handleOpenSearch} onDev={handleOpenDev} topInset={insets.top} />
 
-        <CaptureSection onSimulate={onSimulate} isSimulating={isSimulating} />
-        <ThemeSection mode={mode} onSelect={handleSelectMode} />
-        <ButtonsSection />
-        <CardsSection />
-        <OcrSection items={items} sampleOcr={sampleOcr} onRunSample={runSampleOcr} />
-      </ScrollView>
+      <FlatList
+        data={items}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        numColumns={GRID_COLUMNS}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={contentStyle}
+        showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.4}
+        onEndReached={loadMore}
+        ListEmptyComponent={isLoading ? null : <EmptyState />}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={refresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+      />
+
+      <View style={[styles.fab, { bottom: insets.bottom + spacing.xl }]} pointerEvents="box-none">
+        <Button
+          variant="accent"
+          size="lg"
+          loading={isSimulating}
+          onPress={onSimulate}
+          accessibilityLabel={t('home.capture.sample')}
+          leftIcon={<Icon name="camera" size={20} color="textOnAccent" />}
+        >
+          {t('home.capture.sample')}
+        </Button>
+      </View>
+
       <CaptureSheet />
     </View>
   );
 }
 
+type HeaderProps = {
+  onSearch: () => void;
+  onDev: () => void;
+  topInset: number;
+};
+
+function Header({ onSearch, onDev, topInset }: HeaderProps) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
+      <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('home.title')}</Text>
+      <View style={styles.headerActions}>
+        <IconButton name="search" label={t('home.action.search')} onPress={onSearch} />
+        <IconButton name="sliders-horizontal" label={t('home.action.dev')} onPress={onDev} />
+      </View>
+    </View>
+  );
+}
+
+type IconButtonProps = {
+  name: 'search' | 'sliders-horizontal';
+  label: string;
+  onPress: () => void;
+};
+
+function IconButton({ name, label, onPress }: IconButtonProps) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={spacing.sm}
+      style={({ pressed }) => [
+        styles.iconButton,
+        { backgroundColor: colors.bgSurface },
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Icon name={name} size={20} color="textPrimary" />
+    </Pressable>
+  );
+}
+
+function EmptyState() {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.empty}>
+      <View style={[styles.emptyIcon, { backgroundColor: colors.bgMuted }]}>
+        <Icon name="images" size={32} color="textSecondary" />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+        {t('home.empty.title')}
+      </Text>
+      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+        {t('home.empty.body')}
+      </Text>
+    </View>
+  );
+}
+
 /**
- * 캡처 흐름 통합 훅.
- * - 스크린샷 워처의 새 이벤트마다 startCapture를 자동 호출(처리 id 집합으로 무한 루프 방지).
- * - 샘플 시뮬레이션: 번들 sample-ko.png를 localUri로 확보 후 startCapture.
+ * 샘플 캡처 트리거 훅.
+ * 번들 sample-ko.png를 localUri로 확보한 뒤 startCapture로 캡처 흐름을 시작한다.
+ * 저장 완료 시 capture-store.savedCount가 증가하고, useCaptures가 이를 구독해 자동 새로고침한다.
  */
-function useCaptureFlow(): { onSimulate: () => void; isSimulating: boolean } {
-  const { events } = useScreenshotWatcher();
+function useSampleCapture(): { onSimulate: () => void; isSimulating: boolean } {
   const startCapture = useCaptureStore((state) => state.startCapture);
   const [isSimulating, setIsSimulating] = useState(false);
-  // 이미 캡처 흐름을 시작한 스크린샷 id. 재렌더 시 중복 트리거를 막는다.
-  const triggeredIds = useRef<Set<string>>(new Set());
-
+  // 언마운트 후 setState 경고 방지.
+  const mounted = useRef(true);
   useEffect(() => {
-    const pending = events.filter(
-      (event) => event.id.length > 0 && !triggeredIds.current.has(event.id),
-    );
-    if (pending.length === 0) return;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
-    for (const event of pending) {
-      triggeredIds.current.add(event.id);
-      void startCapture(toStartCaptureInput(event));
-    }
-  }, [events, startCapture]);
-
-  const onSimulate = useCallback(() => {
+  const onSimulate = useCallback((): void => {
     setIsSimulating(true);
     void (async () => {
       try {
@@ -133,13 +212,13 @@ function useCaptureFlow(): { onSimulate: () => void; isSimulating: boolean } {
         if (!uri) {
           throw new Error('샘플 이미지 경로를 확인할 수 없습니다.');
         }
-        // 시뮬레이터에서 현재 OS를 sourcePlatform으로 사용. OCR/업로드 모두 uri 경로.
+        // 시뮬레이터에서 현재 OS를 sourcePlatform으로. OCR/업로드 모두 uri 경로.
         const sourcePlatform = Platform.OS === 'ios' ? 'ios' : 'android';
         await startCapture({ imageUri: uri, sourcePlatform, uri });
       } catch (error) {
         console.error('[capture] 샘플 시뮬레이션 실패:', error);
       } finally {
-        setIsSimulating(false);
+        if (mounted.current) setIsSimulating(false);
       }
     })();
   }, [startCapture]);
@@ -147,414 +226,72 @@ function useCaptureFlow(): { onSimulate: () => void; isSimulating: boolean } {
   return { onSimulate, isSimulating };
 }
 
-/** 스크린샷 이벤트 → startCapture 입력. iOS는 assetId, Android는 uri를 OCR source로. */
-function toStartCaptureInput(event: ScreenshotEvent): {
-  imageUri: string;
-  sourcePlatform: 'ios' | 'android';
-  assetId?: string;
-  uri?: string;
-} {
-  const raw = (event.raw ?? {}) as ScreenshotRaw;
-  if (event.platform === 'ios') {
-    // iOS는 미리보기 uri 확보가 어려우면 assetId만 사용(미리보기는 placeholder 허용).
-    return {
-      imageUri: raw.uri ?? '',
-      sourcePlatform: 'ios',
-      assetId: raw.assetId,
-      uri: raw.uri,
-    };
-  }
-  return {
-    imageUri: raw.uri ?? '',
-    sourcePlatform: 'android',
-    uri: raw.uri,
-  };
-}
-
-type CaptureSectionProps = {
-  onSimulate: () => void;
-  isSimulating: boolean;
-};
-
-function CaptureSection({ onSimulate, isSimulating }: CaptureSectionProps) {
-  const { colors } = useTheme();
-  return (
-    <Section titleKey="demo.section.capture">
-      <Button
-        variant="primary"
-        size="lg"
-        loading={isSimulating}
-        onPress={onSimulate}
-        accessibilityLabel={t('demo.capture.simulate')}
-        leftIcon={<Icon name="camera" size={20} color="onPrimary" />}
-      >
-        {t('demo.capture.simulate')}
-      </Button>
-      <Text style={[styles.caption, { color: colors.textSecondary }]}>
-        {t('demo.capture.hint')}
-      </Text>
-    </Section>
-  );
-}
-
-type ThemeSectionProps = {
-  mode: ThemeMode;
-  onSelect: (mode: ThemeMode) => void;
-};
-
-function ThemeSection({ mode, onSelect }: ThemeSectionProps) {
-  const { colors } = useTheme();
-  return (
-    <Section titleKey="demo.section.theme">
-      <View style={styles.row}>
-        {THEME_MODES.map((m) => (
-          <View key={m} style={styles.flexItem}>
-            <Button
-              variant={mode === m ? 'primary' : 'secondary'}
-              size="md"
-              onPress={() => onSelect(m)}
-              accessibilityLabel={t(THEME_LABEL_KEY[m])}
-            >
-              {t(THEME_LABEL_KEY[m])}
-            </Button>
-          </View>
-        ))}
-      </View>
-      <Text style={[styles.caption, { color: colors.textSecondary }]}>{mode}</Text>
-    </Section>
-  );
-}
-
-function ButtonsSection() {
-  return (
-    <Section titleKey="demo.section.buttons">
-      {BUTTON_VARIANTS.map((variant) => (
-        <View key={variant} style={styles.buttonRow}>
-          {BUTTON_SIZES.map((size) => (
-            <View key={size} style={styles.flexItem}>
-              <Button
-                variant={variant}
-                size={size}
-                onPress={() => undefined}
-                accessibilityLabel={`${variant} ${size}`}
-                leftIcon={<Icon name="camera" size={16} color="onPrimary" />}
-              >
-                {variant}
-              </Button>
-            </View>
-          ))}
-        </View>
-      ))}
-      <View style={styles.buttonRow}>
-        <View style={styles.flexItem}>
-          <Button variant="primary" size="md" loading onPress={() => undefined}>
-            {t('button.capture')}
-          </Button>
-        </View>
-        <View style={styles.flexItem}>
-          <Button variant="primary" size="md" disabled onPress={() => undefined}>
-            {t('button.capture')}
-          </Button>
-        </View>
-      </View>
-    </Section>
-  );
-}
-
-function CardsSection() {
-  const { colors } = useTheme();
-  return (
-    <Section titleKey="demo.section.cards">
-      <Card variant="flat">
-        <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>flat</Text>
-      </Card>
-      <Card variant="elevated">
-        <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>elevated</Text>
-      </Card>
-      <Card variant="outlined">
-        <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>outlined</Text>
-      </Card>
-      <Card variant="highlight">
-        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
-          {t('demo.card.sample.title')}
-        </Text>
-        <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
-          {t('demo.card.sample.body')}
-        </Text>
-      </Card>
-    </Section>
-  );
-}
-
-// OCR 인식 텍스트 표시 최대 줄 수(긴 결과 잘림 처리).
-const OCR_TEXT_MAX_LINES = 8;
-
-const OCR_STATUS_LABEL_KEY: Record<OcrStatus, string> = {
-  pending: 'demo.ocr.pending',
-  done: 'demo.ocr.done',
-  error: 'demo.ocr.error',
-};
-
-// status별 의미 색 토큰 매핑(하드코딩 금지).
-const OCR_STATUS_COLOR: Record<OcrStatus, SemanticColorName> = {
-  pending: 'textSecondary',
-  done: 'primary',
-  error: 'danger',
-};
-
-type OcrSectionProps = {
-  items: OcrItem[];
-  sampleOcr: ImageOcrState;
-  onRunSample: () => void;
-};
-
-function OcrSection({ items, sampleOcr, onRunSample }: OcrSectionProps) {
-  const { colors } = useTheme();
-  const isSampleLoading = sampleOcr.status === 'pending';
-  const isEmpty = items.length === 0 && sampleOcr.status === 'idle';
-
-  return (
-    <Section titleKey="demo.section.ocr">
-      <Button
-        variant="accent"
-        size="md"
-        loading={isSampleLoading}
-        onPress={onRunSample}
-        accessibilityLabel={t('demo.ocr.test')}
-        leftIcon={<Icon name="images" size={16} color="textOnAccent" />}
-      >
-        {t('demo.ocr.test')}
-      </Button>
-
-      {sampleOcr.status !== 'idle' ? (
-        <SampleOcrCard state={sampleOcr} />
-      ) : null}
-
-      {isEmpty ? (
-        <Card variant="outlined">
-          <View style={styles.emptyState}>
-            <Icon name="images" size={32} color="textSecondary" />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {t('demo.ocr.empty')}
-            </Text>
-          </View>
-        </Card>
-      ) : (
-        items.map((item) => <OcrItemCard key={item.id} item={item} />)
-      )}
-    </Section>
-  );
-}
-
-type StatusBadgeProps = {
-  status: OcrStatus;
-};
-
-function StatusBadge({ status }: StatusBadgeProps) {
-  const { colors } = useTheme();
-  const color = colors[OCR_STATUS_COLOR[status]];
-  return (
-    <View
-      style={[styles.badge, { borderColor: color }]}
-      accessibilityRole="text"
-      accessibilityLabel={t(OCR_STATUS_LABEL_KEY[status])}
-    >
-      <Text style={[styles.badgeText, { color }]}>{t(OCR_STATUS_LABEL_KEY[status])}</Text>
-    </View>
-  );
-}
-
-type OcrItemCardProps = {
-  item: OcrItem;
-};
-
-function OcrItemCard({ item }: OcrItemCardProps) {
-  const { colors } = useTheme();
-  const hasText = item.status === 'done' && !!item.text && item.text.trim().length > 0;
-  const bodyText =
-    item.status === 'error'
-      ? item.error
-      : hasText
-        ? item.text
-        : item.status === 'done'
-          ? t('demo.ocr.noText')
-          : undefined;
-
-  return (
-    <Card variant="flat" compact>
-      <View style={styles.logRow}>
-        <Icon name="camera" size={20} color="primary" />
-        <View style={styles.logText}>
-          <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>{item.platform}</Text>
-          <Text style={[styles.caption, { color: colors.textSecondary }]}>
-            {new Date(item.createdAt * 1000).toLocaleString()}
-          </Text>
-        </View>
-        <StatusBadge status={item.status} />
-      </View>
-      {bodyText ? (
-        <Text
-          style={[styles.ocrText, { color: colors.textSecondary }]}
-          numberOfLines={OCR_TEXT_MAX_LINES}
-        >
-          {bodyText}
-        </Text>
-      ) : null}
-    </Card>
-  );
-}
-
-type SampleOcrCardProps = {
-  state: ImageOcrState;
-};
-
-function SampleOcrCard({ state }: SampleOcrCardProps) {
-  const { colors } = useTheme();
-  const status: OcrStatus = state.status === 'idle' ? 'pending' : state.status;
-  const hasText = state.status === 'done' && !!state.text && state.text.trim().length > 0;
-  const bodyText =
-    state.status === 'error'
-      ? state.error
-      : hasText
-        ? state.text
-        : state.status === 'done'
-          ? t('demo.ocr.noText')
-          : undefined;
-
-  return (
-    <Card variant="highlight" compact>
-      <View style={styles.logRow}>
-        <Icon name="file-text" size={20} color="accent" />
-        <View style={styles.logText}>
-          <Text style={[styles.cardLabel, { color: colors.textPrimary }]}>
-            {t('demo.ocr.testTitle')}
-          </Text>
-        </View>
-        <StatusBadge status={status} />
-      </View>
-      {bodyText ? (
-        <Text
-          style={[styles.ocrText, { color: colors.textSecondary }]}
-          numberOfLines={OCR_TEXT_MAX_LINES}
-        >
-          {bodyText}
-        </Text>
-      ) : null}
-    </Card>
-  );
-}
-
-type SectionProps = {
-  titleKey: string;
-  children: React.ReactNode;
-};
-
-function Section({ titleKey, children }: SectionProps) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t(titleKey)}</Text>
-      <View style={styles.sectionBody}>{children}</View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
   header: {
-    gap: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
   },
-  title: {
-    fontSize: typography.display.size,
-    lineHeight: typography.display.line,
-    fontWeight: typography.display.weight,
+  headerTitle: {
+    fontSize: typography.heading.size,
+    lineHeight: typography.heading.line,
+    fontWeight: typography.heading.weight,
   },
-  subtitle: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  section: {
-    gap: spacing.md,
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: typography.title.size,
-    lineHeight: typography.title.line,
-    fontWeight: typography.title.weight,
-  },
-  sectionBody: {
-    gap: spacing.md,
+  pressed: {
+    opacity: 0.7,
   },
   row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  flexItem: {
+  cell: {
     flex: 1,
   },
-  caption: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
+  fab: {
+    position: 'absolute',
+    right: spacing.xl,
+    zIndex: zIndex.sticky,
   },
-  cardLabel: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  cardTitle: {
-    fontSize: typography.title.size,
-    lineHeight: typography.title.line,
-    fontWeight: typography.title.weight,
-  },
-  cardBody: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-    marginTop: spacing.xs,
-  },
-  emptyState: {
+  empty: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
-    paddingVertical: spacing['2xl'],
+    paddingTop: spacing['6xl'],
+    paddingHorizontal: spacing.xl,
   },
-  emptyText: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: typography.title.size,
+    lineHeight: typography.title.line,
+    fontWeight: typography.title.weight,
     textAlign: 'center',
   },
-  logRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  logText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  badge: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  badgeText: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  ocrText: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-    marginTop: spacing.md,
+  emptyBody: {
+    fontSize: typography.body.size,
+    lineHeight: typography.body.line,
+    fontWeight: typography.body.weight,
+    textAlign: 'center',
   },
 });

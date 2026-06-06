@@ -32,6 +32,8 @@ export type StartCaptureInput = {
 type CaptureStore = {
   current: CaptureDraft | null;
   isSheetOpen: boolean;
+  /** 캡처가 'done'(서버 저장 완료)에 도달할 때마다 증가. 리스트 화면이 이 값을 구독해 새로고침한다. */
+  savedCount: number;
   startCapture: (input: StartCaptureInput) => Promise<void>;
   closeSheet: () => void;
   reset: () => void;
@@ -68,6 +70,7 @@ function uploadUri(input: StartCaptureInput): string {
 export const useCaptureStore = create<CaptureStore>((set, get) => ({
   current: null,
   isSheetOpen: false,
+  savedCount: 0,
 
   startCapture: async (input: StartCaptureInput): Promise<void> => {
     const id = localCaptureId();
@@ -146,13 +149,18 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       });
 
       // ⑤ 완료(stage: done). 서버 capture_id는 result.capture_id에 별도 보관.
-      advance({
-        ...initial,
-        stage: 'done',
-        storagePath: upload.path,
-        ocrText: ocr.text,
-        result,
-      });
+      if (
+        advance({
+          ...initial,
+          stage: 'done',
+          storagePath: upload.path,
+          ocrText: ocr.text,
+          result,
+        })
+      ) {
+        // 저장 완료 신호: 리스트 화면이 savedCount 변화를 구독해 새로고침한다.
+        set({ savedCount: get().savedCount + 1 });
+      }
     } catch (error) {
       // 단계는 현재 draft에서 추정(가장 최근 전이 stage).
       const stage = get().current?.stage ?? 'uploading';
