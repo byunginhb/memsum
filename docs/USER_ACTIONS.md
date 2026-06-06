@@ -5,6 +5,31 @@
 
 ---
 
+## 🔴 지금 필요한 일 — Edge Function(OpenAI) 배포를 위해 (Week 2 Phase 2b)
+
+온디바이스 OCR(Phase 2a)은 양쪽 검증 완료. 다음은 OCR 텍스트를 gpt-4o-mini로 후처리하는
+`process-capture` Edge Function 배포다. 클라우드 배포라 **2가지**가 필요하다.
+
+### 1. Supabase 로그인 (함수 배포 권한)
+터미널 프롬프트에서 아래를 입력하면 이 세션에서 실행된다(브라우저 인증 1회):
+```
+! supabase login
+```
+> 또는 토큰 방식: supabase.com → 우상단 계정 → **Account → Access Tokens** → Generate →
+> 토큰 값을 알려주면 내가 `SUPABASE_ACCESS_TOKEN`으로 사용한다.
+
+### 2. OpenAI 키를 Edge Function 시크릿으로 등록
+키는 앱이 아니라 **서버 시크릿**으로만 들어간다. 둘 중 택1:
+- **(권장) 직접 등록**: Supabase 대시보드 → 프로젝트 → **Edge Functions → Secrets**(또는
+  Project Settings → Edge Functions) → `OPENAI_API_KEY` = (당신의 키) 추가. → 키를 나에게 안 줘도 됨.
+- **위임**: 키를 알려주면 내가 `supabase secrets set OPENAI_API_KEY=...`로 등록.
+
+위 2개가 되면 알려주세요. 내가 `supabase functions deploy process-capture` 배포 + 동작 검증(미인증 401 확인 + 테스트 유저 JWT로 OCR→GPT 호출)을 진행합니다.
+
+> 비용: gpt-4o-mini 캡처당 ~0.3원. OpenAI에서 월 사용한도를 걸어두면 안전합니다.
+
+---
+
 ## ✅ 현재 상태 (Week 1 검증 완료 — 2026-06-06)
 
 iOS 시뮬레이터 · Android 에뮬레이터 양쪽에서 **빌드·실행·렌더 확인 완료**.
