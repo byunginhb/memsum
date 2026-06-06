@@ -192,8 +192,12 @@ async function callOpenAiOnce(
 
     if (response.status === 429 || response.status >= 500) {
       const detail = await response.text().catch(() => "");
-      const err = new Error(`OpenAI 일시 오류 (${response.status}): ${detail}`);
-      (err as Error & { retryable?: boolean }).retryable = true;
+      // billing_not_active·insufficient_quota·invalid_api_key 는 429여도 영구 오류라
+      // 재시도해봐야 소용없다. 즉시 실패시켜 백오프 대기(최대 15s)를 낭비하지 않는다.
+      const permanent = /billing_not_active|insufficient_quota|invalid_api_key|account_deactivated/i
+        .test(detail);
+      const err = new Error(`OpenAI ${permanent ? "설정" : "일시"} 오류 (${response.status}): ${detail}`);
+      (err as Error & { retryable?: boolean }).retryable = !permanent;
       throw err;
     }
     if (!response.ok) {
