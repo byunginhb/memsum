@@ -5,18 +5,24 @@
 
 ---
 
-## 🔴 지금 필요한 일 — 익명 로그인 토글 1회 (Week 3 검증용)
+## ✅ Week 3 완전 완료 (2026-06-06) — 지금 필요한 일 없음
 
-캡처 저장 흐름은 RLS 때문에 로그인 세션이 필요해서, 정식 온보딩 전까지 **익명 로그인**으로
-세션을 보장한다. 현재 프로젝트에 **익명 로그인이 꺼져 있다**(`anonymous_provider_disabled` 확인).
+캡처 저장 흐름이 **end-to-end로 실제 동작·DB 저장까지 검증**됨.
 
-### 할 일 (대시보드 토글 1회)
-1. Supabase 대시보드 → 프로젝트 `memsum` → **Authentication → Sign In / Providers**
-2. **"Anonymous sign-ins"** (익명 로그인) 토글 → **켜기(Enable)** → 저장
-3. 켰다고 알려주면, 내가 캡처 저장 흐름 end-to-end 재검증(샘플 캡처 → 업로드 → OCR → GPT → captures 기록)
+### 검증 결과 (앱 → DB 실측)
+샘플 캡처 → 익명세션 → 이미지 업로드 → OCR → GPT 후처리 → captures 기록:
+- captures row 생성: `status=ocr_done`, `source_platform=android`
+- `image_url`: `{익명uid}/cap_....jpg` (본인 폴더, Storage RLS 준수)
+- `ocr_text`: "Memsum 디자인 위크 2026 / 6월 15일 토요일 오후 2시 / ..."
+- `parsed_event`: title="Memsum 디자인 위크 2026", starts_at=`2026-06-15T14:00:00+09:00`, location="코엑스 그랜드볼룸"
+- CaptureSheet에 제목·요약·이벤트카드·[저장만]/[캘린더 추가] 정상 표시
 
-> 익명 로그인 = 앱 첫 실행 시 자동으로 임시 세션 생성. 나중에 Apple/Google 정식 로그인으로 업그레이드.
-> 토글 없이도 앱 빌드·렌더·UI는 동작하지만, 실제 "저장"은 세션이 있어야 한다.
+### 완료된 셋업 (참고)
+- 익명 로그인(Anonymous sign-ins) 활성화 ✓ · captures-raw 버킷 + RLS ✓
+
+### 기술 메모
+- 캡처 Sheet는 @gorhom/bottom-sheet v5가 reanimated4 스택에서 silent fail 하여 **RN 내장 Modal**로 구현.
+- 향후 reanimated 기반 모션(로고 점 애니메이션 등) 추가 시 reanimated4 호환을 별도 점검 필요.
 
 ---
 
