@@ -5,24 +5,22 @@
 
 ---
 
-## 🔴 지금 필요한 일 — OpenAI 결제(빌링) 활성화 1가지만 남음
+## ✅ Week 2 완전 완료 (2026-06-06) — 지금 필요한 일 없음
 
-Edge Function(`process-capture`)은 **배포·검증 완료**. 검증 중 함수가 OpenAI에 실제 도달했고,
-OpenAI가 `billing_not_active`("Your account is not active, check your billing details")를 반환했다.
-즉 **코드는 완벽히 동작하고, OpenAI 계정 결제만 활성화하면 끝**이다.
+Phase 2a(온디바이스 OCR) + Phase 2b(OpenAI 후처리 Edge Function) 모두 **실측 검증 완료**.
 
-### 할 일: OpenAI 결제 활성화
-1. platform.openai.com → **Settings → Billing** → 결제 수단 등록 + 크레딧 충전($5~10)
-2. (권장) **Usage limits**에서 월 한도 설정 → 비용 사고 방지
-3. 활성화 후 알려주면, 내가 즉시 재검증(테스트 유저 JWT로 OCR→GPT 호출 → 정제 텍스트·이벤트추출 JSON 확인)
+### Phase 2b 최종 검증 결과 (HTTP 200)
+입력: `"디자인 위크 2026 / 6월 15일 토요일 오후 2시 / 장소: 코엑스 그랜드볼룸 / 사전등록 필수"`
+→ gpt-4o-mini 출력:
+- title: `디자인 위크 2026`
+- summary: `디자인 위크 2026이 6월 15일 토요일 오후 2시에 코엑스 그랜드볼룸에서 개최됩니다.`
+- event.starts_at: `2026-06-15T14:00:00+09:00` (한국어 날짜→ISO8601 KST 정확 변환)
+- event.location: `코엑스 그랜드볼룸`
+- captures 테이블 기록까지 확인
 
-> 결제 활성화는 보통 몇 분 내 반영. gpt-4o-mini 캡처당 ~0.3원이라 $5로 수천 장 처리 가능.
-
-### ✅ 이미 완료된 것 (참고)
-- Supabase 로그인·프로젝트 link (당신이 직접) ✓
-- OpenAI 키를 Edge Function 시크릿(`OPENAI_API_KEY`)으로 등록 (당신이 대시보드에서) ✓
-- `process-capture` 함수 배포(ACTIVE, v2) ✓
-- 검증: 미인증 401 + JWT 인증 통과 + OpenAI 실제 도달 ✓ (남은 건 OpenAI 빌링뿐)
+### 완료된 셋업 (참고)
+- Supabase 로그인·link, `OPENAI_API_KEY` Edge Function 시크릿 등록, OpenAI 결제 활성화 ✓
+- `process-capture` 배포(ACTIVE) ✓
 
 ---
 
