@@ -35,9 +35,24 @@ pnpm android          # = expo run:android
 
 ---
 
-## 🔴 지금 필요한 일 (Week 1 완료를 위해)
+## ✅ Supabase 연결·스키마 적용 완료 (2026-06-06)
 
-### 1. Supabase 프로젝트 생성 + 키 입력  ← 가장 중요
+- 프로젝트 `pyelhfiqafzexksrqkog` (Seoul, ap-northeast-2) 연결됨
+- `.env`: `EXPO_PUBLIC_SUPABASE_URL`·`ANON_KEY` + `SUPABASE_DB_URL`(Session pooler, 자동 탐색 고정) 설정됨
+- **마이그레이션 `0001_init.sql` 적용 완료** — `user_profiles`·`captures` 테이블 + RLS ON + 정책 2개
+- 검증: anon REST 조회 `[]`(테이블 인식 + RLS 작동), 재실행 시 idempotent skip
+- 이후 마이그레이션 추가 시: `supabase/migrations/`에 SQL 추가 후 `pnpm db:migrate`
+
+> 메모: direct 연결(`db.<ref>.supabase.co`)은 이 환경(IPv4)에서 DNS 미해석 → **Session pooler URL**(`aws-1-ap-northeast-2.pooler.supabase.com:5432`, 유저명 `postgres.<ref>`)을 사용. `.env`에 이미 반영됨.
+
+---
+
+## 🔴 지금 필요한 일
+
+### 1. (선택) 더미 INSERT로 RLS 직접 체감
+RLS가 막고 있어 인증 없으면 INSERT가 거부됩니다(정상). 실제 데이터는 앱에서 로그인 후 생성됩니다. 대시보드에서 바로 테스트하려면 Authentication → Add user로 유저 1명 만들고 그 uid로 SQL Editor에서 INSERT.
+
+### (참고) 초기 Supabase 셋업 — 이미 완료됨
 1. https://supabase.com → 로그인 → **New Project**
    - Name: `memsum`
    - Region: **Northeast Asia (Seoul) `ap-northeast-2`** (없으면 Tokyo `ap-northeast-1`)
