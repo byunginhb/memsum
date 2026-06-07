@@ -83,8 +83,14 @@ export function useCaptures(): UseCapturesResult {
   }, []);
 
   // 마운트 + savedCount 변화 시 처음부터 새로고침.
+  // refresh()의 setIsLoading(true)가 FlatList/RefreshControl이 완전히 마운트되기 전에
+  // 동기로 호출되면 "hasn't mounted yet" 경고가 난다. 다음 틱으로 미뤄 마운트 후에
+  // setState가 일어나게 한다.
   useEffect(() => {
-    void refresh();
+    const id = setTimeout(() => {
+      void refresh();
+    }, 0);
+    return () => clearTimeout(id);
   }, [refresh, savedCount]);
 
   useEffect(() => {
