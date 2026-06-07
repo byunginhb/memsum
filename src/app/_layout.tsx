@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ToastProvider } from '@/design/components/Toast';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
 import { AuthProvider } from '@/providers/AuthProvider';
@@ -34,10 +35,12 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
-            <ThemedStatusBar />
-            <OnboardingGate>
-              <Stack screenOptions={{ headerShown: false }} />
-            </OnboardingGate>
+            <ToastProvider>
+              <ThemedStatusBar />
+              <OnboardingGate>
+                <Stack screenOptions={{ headerShown: false }} />
+              </OnboardingGate>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>

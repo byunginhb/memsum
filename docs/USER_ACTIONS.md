@@ -5,6 +5,35 @@
 
 ---
 
+## ✅ Week 6 완전 완료 (2026-06-07) — 지금 필요한 일 없음
+
+**3개 워크스트림 병행**(주간 5줄 리포트 / 설정 화면 / 디자인 잔여 정합)을 멀티 에이전트로 **계획→공통 컴포넌트→화면·백엔드→교차검증→라이브 검증**까지 완료.
+
+### 신규 기능
+- **주간 5줄 리포트(Hero Moment)** — 제품 핵심 가치. 한 주 캡처 중 gpt-4o-mini가 5개 선별·랭킹·요약. 1위 카드 coral 강조(display 28pt) + 2~5위 elevated, ritual(1200ms) stagger 등장 + 1위 reveal 햅틱, up/down 피드백. 온디맨드 생성 + 주당 캐시(재호출 시 OpenAI 0회), 캡처<5 빈 상태, OpenAI 실패 시 created_at 폴백.
+- **설정 화면** — 계정(닉네임·Avatar)/권한(자동감지·캘린더·리포트 Switch)/스타일(다크모드 3택·말투 2택)/데이터(백업·내보내기·삭제 "준비 중" 토스트). 로컬 영속 닉네임으로 리포트 개인화("{name} 님이 던지신…").
+- **공통 컴포넌트 7종** — Input·ListItem·Switch·Avatar·Toast(전역)·NotificationCard(Liquid Glass)·Card padding 3단계. 홈 헤더에 검색·리포트·설정 진입점 추가.
+
+### 백엔드 (적용·배포됨)
+- 마이그레이션 **0004_weekly_reports.sql** 적용 — `weekly_reports`·`report_feedback` 테이블 + RLS(본인만).
+- Edge Function **weekly-report** 배포(ACTIVE) — `OPENAI_API_KEY` 시크릿 공유(process-capture와 동일). **참고: 캐시 미스 시에만 OpenAI 호출**(같은 주 재조회는 비용 0).
+
+### 교차검증 후 반영 (CRITICAL 0)
+- ReportCard reduce-motion 후발 활성화 시 카드 가시성 보장(최종값 강제) + 1위 햅틱을 reveal 완료 콜백에 결합.
+- 피드백 captureId별 in-flight 가드(연타 race 방지), Edge Function captures 쿼리 `user_id` 명시(defense-in-depth), 에러 카피 i18n화, 리포트 헤딩 hero(34)→heading(22) 위계 정정.
+
+### 라이브 검증 (Android, 시드 캡처 6건)
+- 홈 6장 카드 + 헤더 4진입점 ✓ / 설정 4섹션·Switch·세그먼트·Avatar ✓ / 닉네임 Input 시트 ✓
+- **리포트: GPT가 6건 중 5건 선별·요약·랭킹 → Hero UI 렌더, 캐시(week_start KST 월요일·total 6) ✓**
+- 좋아요 → `report_feedback` DB 기록 + 낙관적 UI ✓ / `pnpm typecheck`·`pnpm lint` 그린(에러 0)
+- 검증 후 테스트 데이터(캡처·리포트·피드백) 전량 정리.
+
+### 메모
+- 디자인 SSOT 내부 모순 2건(§11/§20 gentle stiffness, §11/§27 햅틱 카드)은 구현이 합리적 선택을 했고, 문서 갱신은 후속 과제.
+- 후속 후보: 홈 화면을 design.md §26(개인화 large 헤더·주간 통계 카드)으로 정렬, dev 데모에 신규 컴포넌트 등록, Input maxLength/keyboardType 패스스루.
+
+---
+
 ## ✅ Week 5 완전 완료 (2026-06-07) — 지금 필요한 일 없음
 
 **디자인·사용성 집중 주차.** `projectmd/designmd/design.md`("Calm Glass" 컨셉)에 맞춰 온보딩·디자인 컴포넌트·브랜드 모션·Liquid Glass를 구현하고, **2개 리뷰 에이전트(코드+디자인 정합성) 교차검증 → 발견사항 반영 → Android 라이브 검증**까지 완료.

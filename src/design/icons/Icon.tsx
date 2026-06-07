@@ -17,6 +17,8 @@ import {
   Share2,
   SlidersHorizontal,
   Star,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   User,
   X,
@@ -52,6 +54,8 @@ const ICONS = {
   'more-horizontal': MoreHorizontal,
   'sliders-horizontal': SlidersHorizontal,
   'refresh-cw': RefreshCw,
+  'thumbs-up': ThumbsUp,
+  'thumbs-down': ThumbsDown,
   loader: Loader,
 } as const;
 

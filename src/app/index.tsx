@@ -17,6 +17,7 @@ import { Button } from '@/design/components/Button/Button';
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { Icon } from '@/design/icons/Icon';
+import type { IconName } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, radius, spacing, typography, zIndex } from '@/design/tokens';
 import { CaptureSheet } from '@/features/capture/CaptureSheet';
@@ -57,6 +58,14 @@ export default function HomeScreen() {
     router.push('/search');
   }, [router]);
 
+  const handleOpenReport = useCallback((): void => {
+    router.push('/report/weekly');
+  }, [router]);
+
+  const handleOpenSettings = useCallback((): void => {
+    router.push('/settings');
+  }, [router]);
+
   const handleOpenDev = useCallback((): void => {
     router.push('/dev');
   }, [router]);
@@ -85,7 +94,13 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
-      <Header onSearch={handleOpenSearch} onDev={handleOpenDev} topInset={insets.top} />
+      <Header
+        onSearch={handleOpenSearch}
+        onReport={handleOpenReport}
+        onSettings={handleOpenSettings}
+        onDev={handleOpenDev}
+        topInset={insets.top}
+      />
 
       <FlatList
         data={items}
@@ -130,17 +145,21 @@ export default function HomeScreen() {
 
 type HeaderProps = {
   onSearch: () => void;
+  onReport: () => void;
+  onSettings: () => void;
   onDev: () => void;
   topInset: number;
 };
 
-function Header({ onSearch, onDev, topInset }: HeaderProps) {
+function Header({ onSearch, onReport, onSettings, onDev, topInset }: HeaderProps) {
   const { colors } = useTheme();
   return (
     <View style={[styles.header, { paddingTop: topInset + spacing.sm }]}>
       <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('home.title')}</Text>
       <View style={styles.headerActions}>
         <IconButton name="search" label={t('home.action.search')} onPress={onSearch} />
+        <IconButton name="file-text" label={t('home.action.report')} onPress={onReport} />
+        <IconButton name="settings" label={t('home.action.settings')} onPress={onSettings} />
         <IconButton name="sliders-horizontal" label={t('home.action.dev')} onPress={onDev} />
       </View>
     </View>
@@ -148,7 +167,7 @@ function Header({ onSearch, onDev, topInset }: HeaderProps) {
 }
 
 type IconButtonProps = {
-  name: 'search' | 'sliders-horizontal';
+  name: IconName;
   label: string;
   onPress: () => void;
 };
