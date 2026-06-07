@@ -13,7 +13,11 @@ export const motion = {
     base: 200,
     slow: 300,
     lazy: 500,
+    // ⭐ 일요일 5줄 리포트(Hero Moment) stagger 전용 — design.md §11.
+    ritual: 1200,
   },
+  // 리스트/그리드 순차 등장 간격(ms) — DotsGrid 9점, 카드 stagger 등. design.md §11-4.
+  stagger: 50,
   easing: {
     standard: Easing.bezier(0.2, 0, 0, 1),
     emphasized: Easing.bezier(0.3, 0, 0, 1),

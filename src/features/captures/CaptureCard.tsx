@@ -65,7 +65,6 @@ export function CaptureCard({ item, onPress }: CaptureCardProps): ReactNode {
           {item.hasEvent ? (
             <View
               style={[styles.badge, { backgroundColor: colors.accent }]}
-              accessibilityRole="text"
               accessibilityLabel={t('captures.card.eventBadge')}
             >
               <Icon name="calendar" size={16} color="textOnAccent" />

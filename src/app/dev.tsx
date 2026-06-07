@@ -356,7 +356,6 @@ function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <View
       style={[styles.badge, { borderColor: color }]}
-      accessibilityRole="text"
       accessibilityLabel={t(OCR_STATUS_LABEL_KEY[status])}
     >
       <Text style={[styles.badgeText, { color }]}>{t(OCR_STATUS_LABEL_KEY[status])}</Text>

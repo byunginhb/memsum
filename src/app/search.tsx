@@ -3,19 +3,18 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 
+import { SearchBar } from '@/design/components/SearchBar/SearchBar';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography, zIndex } from '@/design/tokens';
+import { spacing, typography, zIndex } from '@/design/tokens';
 import { CaptureCard } from '@/features/captures/CaptureCard';
 import { useSearchCaptures } from '@/hooks/use-search-captures';
 import { t } from '@/i18n';
@@ -55,11 +54,29 @@ export default function SearchScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          topInset={insets.top}
-        />
+        <View
+          style={[
+            styles.searchBarWrap,
+            {
+              paddingTop: insets.top + spacing.sm,
+              backgroundColor: colors.bgBase,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          {/* P1-1: 디자인시스템 SearchBar로 통합(로컬 중복 구현 제거). */}
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search.placeholder')}
+            autoFocus
+            inputProps={{
+              autoCorrect: false,
+              autoCapitalize: 'none',
+              accessibilityLabel: t('search.placeholder'),
+            }}
+          />
+        </View>
         <ScrollView
           style={styles.flex}
           contentContainerStyle={listContentStyle}
@@ -77,62 +94,6 @@ export default function SearchScreen() {
           ))}
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
-  );
-}
-
-type SearchBarProps = {
-  value: string;
-  onChangeText: (next: string) => void;
-  topInset: number;
-};
-
-/** 상단 sticky 검색 입력. search prefix + clear(x) 버튼. */
-function SearchBar({ value, onChangeText, topInset }: SearchBarProps) {
-  const { colors } = useTheme();
-  const hasValue = value.length > 0;
-
-  return (
-    <View
-      style={[
-        styles.searchBarWrap,
-        {
-          paddingTop: topInset + spacing.sm,
-          backgroundColor: colors.bgBase,
-          borderBottomColor: colors.border,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.searchField,
-          { backgroundColor: colors.bgSurface, borderColor: colors.border },
-        ]}
-      >
-        <Icon name="search" size={20} color="textSecondary" />
-        <TextInput
-          style={[styles.searchInput, { color: colors.textPrimary }]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={t('search.placeholder')}
-          placeholderTextColor={colors.textSecondary}
-          autoFocus
-          autoCorrect={false}
-          autoCapitalize="none"
-          returnKeyType="search"
-          accessibilityLabel={t('search.placeholder')}
-        />
-        {hasValue ? (
-          <Pressable
-            onPress={() => onChangeText('')}
-            hitSlop={spacing.sm}
-            accessibilityRole="button"
-            accessibilityLabel={t('search.clear')}
-          >
-            <Icon name="x" size={20} color="textSecondary" />
-          </Pressable>
-        ) : null}
-      </View>
     </View>
   );
 }
@@ -172,7 +133,7 @@ function SearchBody({ hasQuery, isSearching, error, resultCount }: SearchBodyPro
 
   return (
     <Text style={[styles.resultHeader, { color: colors.textSecondary }]}>
-      {t('search.results.count').replace('{count}', String(resultCount))}
+      {t('search.results.count', { count: resultCount })}
     </Text>
   );
 }
@@ -206,22 +167,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     zIndex: zIndex.sticky,
-  },
-  searchField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    height: 44,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-    padding: 0,
   },
   statusBlock: {
     alignItems: 'center',

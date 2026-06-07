@@ -14,9 +14,11 @@ import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
 
 import { Button } from '@/design/components/Button/Button';
+import { EmptyState } from '@/design/components/EmptyState/EmptyState';
+import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography, zIndex } from '@/design/tokens';
+import { letterSpacingFor, radius, spacing, typography, zIndex } from '@/design/tokens';
 import { CaptureSheet } from '@/features/capture/CaptureSheet';
 import { CaptureCard } from '@/features/captures/CaptureCard';
 import type { CaptureListItem } from '@/features/captures/types';
@@ -95,7 +97,9 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.4}
         onEndReached={loadMore}
-        ListEmptyComponent={isLoading ? null : <EmptyState />}
+        ListEmptyComponent={
+          isLoading ? null : <HomeEmptyState onSimulate={onSimulate} />
+        }
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
@@ -168,19 +172,24 @@ function IconButton({ name, label, onPress }: IconButtonProps) {
   );
 }
 
-function EmptyState() {
-  const { colors } = useTheme();
+type HomeEmptyStateProps = {
+  onSimulate: () => void;
+};
+
+/**
+ * 홈 빈 상태 — 브랜드 모먼트.
+ * 디자인 EmptyState에 애니메이션 DotsGrid(9점 로고)를 일러스트로 주입하고,
+ * 샘플 캡처 CTA로 첫 경험을 유도한다(디자인시스템 §3.10·§7-4).
+ */
+function HomeEmptyState({ onSimulate }: HomeEmptyStateProps) {
   return (
     <View style={styles.empty}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.bgMuted }]}>
-        <Icon name="images" size={32} color="textSecondary" />
-      </View>
-      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-        {t('home.empty.title')}
-      </Text>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {t('home.empty.body')}
-      </Text>
+      <EmptyState
+        illustration={<DotsGrid size={112} animated />}
+        title={t('home.empty.title')}
+        body={t('home.empty.body')}
+        action={{ label: t('home.capture.sample'), onPress: onSimulate }}
+      />
     </View>
   );
 }
@@ -241,6 +250,7 @@ const styles = StyleSheet.create({
     fontSize: typography.heading.size,
     lineHeight: typography.heading.line,
     fontWeight: typography.heading.weight,
+    letterSpacing: letterSpacingFor('heading'),
   },
   headerActions: {
     flexDirection: 'row',
@@ -274,24 +284,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingTop: spacing['6xl'],
     paddingHorizontal: spacing.xl,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    fontSize: typography.title.size,
-    lineHeight: typography.title.line,
-    fontWeight: typography.title.weight,
-    textAlign: 'center',
-  },
-  emptyBody: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-    textAlign: 'center',
   },
 });

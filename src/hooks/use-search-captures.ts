@@ -34,11 +34,14 @@ export function useSearchCaptures(): UseSearchCapturesResult {
     const trimmed = query.trim();
 
     // 빈 검색어: 디바운스 없이 즉시 비우고 호출하지 않는다.
+    // 입력 변화에 따른 의도적 동기 리셋이라 set-state-in-effect를 국소 허용한다.
     if (trimmed.length === 0) {
       latestQueryRef.current = '';
+      /* eslint-disable react-hooks/set-state-in-effect */
       setResults([]);
       setError(null);
       setIsSearching(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
 

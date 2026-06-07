@@ -1,5 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Modal,
   Pressable,
@@ -9,17 +10,21 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography, zIndex } from '@/design/tokens';
-import { t } from '@/i18n';
+import { glass, radius, spacing, typography, zIndex } from '@/design/tokens';
+import { getLocale, t } from '@/i18n';
 import { useCaptureStore } from '@/stores/capture-store';
 
 import type { CaptureDraft, CaptureEvent, CaptureStage } from './types';
+
+// Sheet 상단 Glass 핸들 밴드 높이. design.md §20 "Sheet 상단 64px Glass".
+const GLASS_HANDLE_HEIGHT = 64;
 
 // 진행 중(스피너) 단계 → 라벨 i18n 키.
 const PROGRESS_LABEL_KEY: Record<'uploading' | 'ocr' | 'processing', string> = {
@@ -33,6 +38,38 @@ function isProgress(stage: CaptureStage): stage is 'uploading' | 'ocr' | 'proces
 }
 
 /**
+ * "투명도 줄이기"(reduce transparency) 접근성 설정 구독 훅 — design.md P1-4.
+ * 켜져 있으면 Liquid Glass 대신 불투명 폴백을 써야 가독성이 유지된다.
+ * 초기값을 비동기로 읽고, 변경 이벤트를 구독한다. cleanup에서 리스너 해제.
+ */
+function useReduceTransparency(): boolean {
+  const [reduceTransparency, setReduceTransparency] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function readInitial() {
+      const enabled = await AccessibilityInfo.isReduceTransparencyEnabled();
+      // 비동기 응답 도착 전에 언마운트되면 상태 갱신 금지.
+      if (isMounted) setReduceTransparency(enabled);
+    }
+    void readInitial();
+
+    const subscription = AccessibilityInfo.addEventListener(
+      'reduceTransparencyChanged',
+      setReduceTransparency,
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduceTransparency;
+}
+
+/**
  * 캡처 확인 Sheet — 기능명세 Screen 09 / 디자인시스템 §3.7.
  *
  * capture-store의 current/isSheetOpen만 구독한다(스토어가 단일 진실).
@@ -43,7 +80,7 @@ function isProgress(stage: CaptureStage): stage is 'uploading' | 'ocr' | 'proces
  * 이미지 미리보기 + 단계 표시(스피너) → 완료 시 제목·요약·OCR·이벤트 카드 + 액션.
  */
 export function CaptureSheet() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const current = useCaptureStore((state) => state.current);
   const isSheetOpen = useCaptureStore((state) => state.isSheetOpen);
@@ -69,7 +106,7 @@ export function CaptureSheet() {
       <View style={styles.overlay}>
         {/* 상단 빈 영역 탭 → 닫기(backdrop). */}
         <Pressable
-          style={styles.backdrop}
+          style={[styles.backdrop, { backgroundColor: colors.scrim }]}
           onPress={closeSheet}
           accessibilityRole="button"
           accessibilityLabel={t('capture.action.close')}
@@ -81,7 +118,8 @@ export function CaptureSheet() {
           ]}
           accessibilityLabel={t('capture.sheet.title')}
         >
-          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          {/* Calm Glass: 상단 핸들 영역만 Liquid Glass(잠깐 떠 있다 사라진다는 신호) — design.md §20 */}
+          <SheetGlassHandle isDark={isDark} />
           <ScrollView contentContainerStyle={styles.content}>
             {current ? (
               <SheetBody draft={current} onClose={closeSheet} onRetry={handleRetry} />
@@ -91,6 +129,37 @@ export function CaptureSheet() {
       </View>
     </Modal>
   );
+}
+
+/**
+ * 캡처 Sheet 상단 핸들 영역 — Calm Glass의 유일한 Liquid Glass 적용부.
+ * iOS 26+에서는 GlassView(실제 Liquid Glass), 그 외에는 반투명 tint 폴백.
+ * design.md §6.4 glass 토큰 + §20 Sheet 명세.
+ */
+function SheetGlassHandle({ isDark }: { isDark: boolean }) {
+  const { colors } = useTheme();
+  const reduceTransparency = useReduceTransparency();
+  const g = isDark ? glass.dark : glass.light;
+  const handleBar = (
+    <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
+  );
+
+  // reduce-transparency가 켜져 있으면 GlassView 대신 불투명 폴백으로 가독성 확보(P1-4).
+  if (isLiquidGlassAvailable() && !reduceTransparency) {
+    return (
+      <GlassView
+        glassEffectStyle="regular"
+        tintColor={g.tint}
+        colorScheme={isDark ? 'dark' : 'light'}
+        style={styles.glassHandle}
+      >
+        {handleBar}
+      </GlassView>
+    );
+  }
+
+  // 폴백: Liquid Glass 미지원(Android·iOS26 미만)은 반투명 tint로 근사.
+  return <View style={[styles.glassHandle, { backgroundColor: g.fallback }]}>{handleBar}</View>;
 }
 
 type SheetBodyProps = {
@@ -294,7 +363,8 @@ function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
 function formatEventWhen(startsAt: string): string {
   const date = new Date(startsAt);
   if (Number.isNaN(date.getTime())) return startsAt;
-  return date.toLocaleString();
+  // 기기 로케일이 아닌 앱 i18n 로케일을 명시(LOW): ko → ko-KR, 그 외 → en-US.
+  return date.toLocaleString(getLocale() === 'ko' ? 'ko-KR' : 'en-US');
 }
 
 const PREVIEW_HEIGHT = 200;
@@ -312,22 +382,29 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    // 딤 색은 렌더에서 colors.scrim 토큰을 인라인 적용(라이트/다크 대응).
     zIndex: zIndex.overlay,
   },
   sheet: {
     maxHeight: SHEET_MAX_HEIGHT,
     borderTopLeftRadius: radius['2xl'],
     borderTopRightRadius: radius['2xl'],
-    paddingTop: spacing.sm,
+    // 상단 Liquid Glass 밴드가 둥근 모서리 밖으로 새지 않도록 클립.
+    overflow: 'hidden',
     zIndex: zIndex.modal,
   },
+  // Calm Glass: Sheet 상단 글래스 밴드(드래그 핸들 포함). design.md §20 (64px Glass)
+  glassHandle: {
+    minHeight: GLASS_HANDLE_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
   handle: {
-    alignSelf: 'center',
     width: 36,
     height: 4,
     borderRadius: radius.full,
-    marginBottom: spacing.sm,
   },
   content: {
     paddingHorizontal: spacing.xl,

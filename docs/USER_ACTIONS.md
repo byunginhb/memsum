@@ -5,6 +5,33 @@
 
 ---
 
+## ✅ Week 5 완전 완료 (2026-06-07) — 지금 필요한 일 없음
+
+**디자인·사용성 집중 주차.** `projectmd/designmd/design.md`("Calm Glass" 컨셉)에 맞춰 온보딩·디자인 컴포넌트·브랜드 모션·Liquid Glass를 구현하고, **2개 리뷰 에이전트(코드+디자인 정합성) 교차검증 → 발견사항 반영 → Android 라이브 검증**까지 완료.
+
+### 구현 (W5-A~C)
+- **온보딩 플로우**: 환영(애니메이션 DotsGrid 로고) → 가치 3종(자동감지·캘린더·일요일 5줄) → 시작. `pagingEnabled` 스와이프 + [다음]/[건너뛰기], AsyncStorage 영속 게이트(`completed`).
+- **디자인 컴포넌트**: Badge·EmptyState·Header·SearchBar + 브랜드 9닷 로고 애니메이션(`DotsGrid`, reanimated4 spring).
+- **Calm Glass**: 캡처 Sheet 상단에 Liquid Glass 밴드(64px, iOS26+ `GlassView` / 그 외 tint 폴백), 따뜻한 한국어 카피.
+
+### 교차검증 후 반영 (W5-E)
+- **CRITICAL**: DotsGrid 애니메이션 `cancelAnimation` cleanup 추가(언마운트 누수 방지) + 비애니메이션 시 accent 점 흰색으로 남던 버그 수정.
+- **디자인 토큰 P0**: `motion.duration.ritual=1200`·`motion.stagger=50` 추가, `typography.hero` weight `800→700`(명세 "800 금지"), 전 스케일 `tracking`(자간) + `letterSpacingFor()` 헬퍼.
+- **접근성**: reduce-motion(DotsGrid)·reduce-transparency(Glass) 대응, `accessibilityRole="text"`(RN 비표준) 전부 제거.
+- **통합**: 검색 화면이 디자인시스템 `SearchBar` 사용(이중 구현 제거), i18n `t(key, params)` 보간 도입(`{count}개` 등 수동 replace 제거).
+- **토큰화**: 백드롭 딤 `colors.scrim` 토큰, Badge `#FFFFFF`→`colors.onPrimary`.
+
+### 라이브 검증 결과 (Android 에뮬레이터)
+- 온보딩 4페이지 스와이프·[다음]·[시작하기]→홈 진입·`completed` 영속 확인.
+- 홈 EmptyState(DotsGrid 로고+따뜻한 카피), 캡처 카드(일정 Badge·썸네일), 캡처 Sheet 64px Glass 밴드+scrim, 검색("2026"→"1개" 보간·"지우기" a11y 라벨) 전부 동작.
+- `pnpm typecheck`·`pnpm lint` 모두 그린(에러 0).
+
+### 메모
+- iOS는 Liquid Glass 네이티브가 iOS26+에서만 실제 렌더 → iOS 시뮬레이터 검증은 네이티브 재빌드 후 진행 예정(Android는 tint 폴백으로 검증 완료).
+- 다음 후보: 주간 5줄 리포트(Hero Moment), 설정 화면(Input·ListItem 컴포넌트는 이때 구현), Header 개인화("수현 님") — design.md 잔여 격차.
+
+---
+
 ## ✅ Week 4 완전 완료 (2026-06-07) — 지금 필요한 일 없음
 
 캡처 리스트·검색·상세가 **라이브 UI + 데이터 레이어 모두 검증**됨.

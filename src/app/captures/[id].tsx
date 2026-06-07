@@ -14,11 +14,11 @@ import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { spacing, typography } from '@/design/tokens';
+import { letterSpacingFor, spacing, typography } from '@/design/tokens';
 import type { CaptureEvent } from '@/features/capture/types';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCapture } from '@/hooks/use-capture';
-import { t } from '@/i18n';
+import { getLocale, t } from '@/i18n';
 
 /**
  * 캡처 상세 화면 — 기능명세 상세 플로우 (W4-C).
@@ -255,7 +255,9 @@ function formatEventDate(iso: string): string {
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString();
+  // 디바이스 로케일에 의존하지 않도록 앱 로케일을 명시한다(KO/EN 일관성).
+  const locale = getLocale() === 'ko' ? 'ko-KR' : 'en-US';
+  return date.toLocaleString(locale);
 }
 
 const IMAGE_ASPECT_RATIO = 4 / 3;
@@ -293,6 +295,7 @@ const styles = StyleSheet.create({
     fontSize: typography.heading.size,
     lineHeight: typography.heading.line,
     fontWeight: typography.heading.weight,
+    letterSpacing: letterSpacingFor('heading'),
   },
   summary: {
     fontSize: typography.body.size,

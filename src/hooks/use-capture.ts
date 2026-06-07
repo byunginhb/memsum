@@ -26,10 +26,13 @@ export function useCapture(id: string | null | undefined): UseCaptureResult {
 
   useEffect(() => {
     // id가 없으면 빈 상태로 즉시 정리.
+    // 입력(id) 변화에 따른 의도적 동기 리셋이라 set-state-in-effect를 국소 허용한다.
     if (!id) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setItem(null);
       setError(null);
       setIsLoading(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
       latestIdRef.current = null;
       return;
     }

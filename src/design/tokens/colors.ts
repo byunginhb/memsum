@@ -55,6 +55,9 @@ export type SemanticColors = {
   border: string;
   borderStrong: string;
 
+  /** 모달/Sheet 뒤 딤 오버레이(스크림). design.md §20. */
+  scrim: string;
+
   accent: string;
   success: string;
   danger: string;
@@ -81,6 +84,8 @@ export const lightColors: SemanticColors = {
   border: palette.gray100,
   borderStrong: palette.gray300,
 
+  scrim: 'rgba(0, 0, 0, 0.4)',
+
   accent: palette.coral400,
   success: palette.success,
   danger: palette.danger,
@@ -106,6 +111,8 @@ export const darkColors: SemanticColors = {
 
   border: '#2E2E3E',
   borderStrong: '#3F3F50',
+
+  scrim: 'rgba(0, 0, 0, 0.6)',
 
   accent: palette.coral400,
   success: '#34D399',
