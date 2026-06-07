@@ -5,6 +5,23 @@
 
 ---
 
+## ✅ Week 4 완전 완료 (2026-06-07) — 지금 필요한 일 없음
+
+캡처 리스트·검색·상세가 **라이브 UI + 데이터 레이어 모두 검증**됨.
+
+### 검증 결과
+- 샘플 캡처 FAB → 업로드·OCR·GPT → captures 저장 → **홈 리스트에 카드**(썸네일·제목·"일정 감지됨" 배지·날짜) → 탭 → **상세**(요약·이벤트 6/15 14:00·코엑스·OCR 전문·캘린더 추가 버튼) 전부 동작.
+- 검색: `searchCaptures` jsonb `.or()` ILIKE 매칭 REST+DB 검증.
+- 데이터 레이어(list/search/get) RLS 세션 스코프 + 썸네일 batch 서명URL.
+
+### 고친 버그
+- `useCaptures` 마운트 시 `setIsLoading`이 RefreshControl 마운트 전 동기 호출 → "hasn't mounted yet" 경고(개발 LogBox 레드박스) → 초기 fetch를 setTimeout(0)으로 defer해 제거(리로드 후 0건 확인).
+
+### 화면 구조 메모
+- 홈(`/`) = 캡처 리스트. 검색(`/search`), 상세(`/captures/[id]`). 디자인시스템 데모는 `/dev`로 보존(헤더 우측 슬라이더 아이콘).
+
+---
+
 ## ✅ Week 3 완전 완료 (2026-06-06) — 지금 필요한 일 없음
 
 캡처 저장 흐름이 **end-to-end로 실제 동작·DB 저장까지 검증**됨.
