@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Stack, usePathname, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { ToastProvider } from '@/design/components/Toast';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
@@ -13,6 +15,13 @@ import { AuthProvider } from '@/providers/AuthProvider';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 
 import '@/global.css';
+
+// 네이티브 스플래시(라벤더+점)를 JS가 준비될 때까지 유지한다(자동 숨김 방지).
+// 첫 프레임에서 AnimatedSplash가 같은 화면을 그린 뒤 hideAsync로 매끄럽게 이어받는다.
+// 모듈 로드 시 1회. 실패해도 앱 기동을 막지 않는다(best-effort).
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* 이미 숨겨졌거나 미지원 환경 — 무시 */
+});
 
 /**
  * 루트 레이아웃 — 디자인시스템.md §4, §5
@@ -30,6 +39,18 @@ export default function RootLayout() {
     'Pretendard-Variable': require('@/assets/fonts/PretendardVariable.ttf'),
   });
 
+  // 애니메이션 스플래시가 끝나면 true. 그 전까지 오버레이로 앱을 가린다.
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashFinish = useCallback(() => setSplashDone(true), []);
+
+  // 첫 프레임 렌더 직후 네이티브 스플래시를 숨긴다.
+  // 이 시점엔 AnimatedSplash가 같은 라벤더 화면을 그리고 있어 깜빡임 없이 이어받는다.
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {
+      /* 이미 숨겨짐 — 무시 */
+    });
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
@@ -40,6 +61,8 @@ export default function RootLayout() {
               <OnboardingGate>
                 <Stack screenOptions={{ headerShown: false }} />
               </OnboardingGate>
+              {/* 최상단 오버레이: 점 애니메이션 스플래시(약 1초) → 페이드아웃 후 언마운트. */}
+              {!splashDone ? <AnimatedSplash onFinish={handleSplashFinish} /> : null}
             </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
