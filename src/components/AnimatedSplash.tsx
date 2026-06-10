@@ -14,9 +14,16 @@ import { useTheme } from '@/design/theme/useTheme';
 
 /**
  * 스플래시 노출 시간(ms). 네이티브 스플래시(라벤더+점)에서 이어받아 점 애니메이션을
- * 보여주는 시간. "1초 정도 나오고 바로 전환"(사용자 요청)에 맞춘다.
+ * 끝까지 보여주는 시간.
+ *
+ * why 1500: DotsGrid 9점 애니메이션은 (stagger 50ms × 8 = 400ms) 이후
+ * - 마지막 점 등장(opacity fast 150ms) ≈ 550ms
+ * - 우하단 코랄 전환(slow 300 + base 200) ≈ 900ms
+ * - bouncy 스프링(damping12/stiffness220, ζ≈0.40) 정착 ≈ 1070ms
+ * 에 끝난다. 1000ms면 점이 아직 튕기는 중에 전환돼 "다 뜨기 전에 넘어가는" 느낌이라,
+ * 1500ms로 두어 점이 모두 정착·코랄 전환까지 끝난 완성 로고를 잠깐 보여준 뒤 넘어간다.
  */
-const SPLASH_HOLD_MS = 1000;
+const SPLASH_HOLD_MS = 1500;
 
 /** 페이드아웃 시간(ms). 짧게 둬 빠르게 앱으로 넘어가게 한다. */
 const SPLASH_FADE_MS = 240;
