@@ -49,6 +49,55 @@ pnpm android   # = expo run:android
 
 ---
 
+## ✅ C3 스토어 배포 준비 완료 (2026-06-10) — 배포 전 당신 액션 정리
+
+스토어 제출에 필요한 **코드·에셋·문서**를 모두 준비했습니다. 아래 "당신만 할 수 있는 것"만 처리하면 제출 가능합니다.
+
+### 제가 완료한 것 (커밋됨)
+- **eas.json** — development/preview/production 빌드 프로파일 + submit 설정(플레이스홀더)
+- **app.json** — version 1.0.0 / iOS buildNumber 1 / Android versionCode 1 / iOS 수출규정(ITSAppUsesNonExemptEncryption=false)
+- **브랜드 아이콘·스플래시** — Expo 템플릿 → Memsum 9닷 마크(라벤더 #7C6FE8 + 흰 점 + 우하단 코랄). `scripts/gen-icons.mjs`로 재생성 가능
+- **애니메이션 스플래시** — 첫 실행 시 9닷이 움직이는 모션 약 1초 후 앱 전환(`src/components/AnimatedSplash.tsx`)
+- **인앱 데이터 삭제** — 설정 → 데이터 → "내 데이터 삭제"(개인정보·스토어 데이터 삭제 요건 충족, 라이브 검증됨)
+- **스토어 문서** (`docs/store/`) — 개인정보처리방침(ko/en)·리스팅 카피(ko/en)·데이터안전 양식·제출 체크리스트(코드 기준 정확, 교차검증 완료)
+
+### 🔴 당신만 할 수 있는 것 (배포 전)
+
+**1. 채워야 할 플레이스홀더** (스토어 문서 `[[...]]` 표시 항목)
+- 지원/문의 이메일, 개인정보처리방침 **호스팅 URL**(아무 정적 호스팅 가능 — GitHub Pages·Vercel·Notion 공개 페이지 등), 사업자/개발사 표기명, 정책 시행일
+- 데이터 보관 기간 정책 문구(현재 자동 만료 없음), 이용약관 URL(권장)
+- → `docs/store/*.md` 각 파일 끝 "채워야 할 항목"에 모아뒀습니다.
+
+**2. 계정·결제** (이미 안내한 후보 B)
+- Apple Developer Program($99/년), Google Play Console($25 1회) 가입 → Team ID·판매자 등록
+
+**3. EAS 설정** (제가 대신 못 함 — 로그인 필요)
+```bash
+npm i -g eas-cli            # 이미 설치돼 있으면 생략
+eas login                   # Expo 계정 로그인
+eas init                    # projectId 발급 → app.json에 자동 기록
+eas build --profile production --platform all   # 스토어 빌드
+```
+
+**4. 누락 그래픽 1종**
+- Google Play **피처 그래픽 1024×500**(현재 없음). 원하시면 제가 브랜드 색으로 생성해 드릴 수 있습니다(말씀만 주세요).
+
+**5. 스토어 스크린샷**
+- 콘솔 업로드용 마케팅 스크린샷은 실제 데이터가 담긴 화면이 보기 좋습니다. 원하시면 시드 데이터로 홈/리포트/캘린더 화면을 캡처해 드릴 수 있습니다.
+
+### ❗ 네이티브 재빌드 1회 필요 (아이콘·스플래시·secure-store 반영)
+브랜드 아이콘·라벤더 스플래시·캘린더 secure-store는 **네이티브 설정**이라 재빌드해야 실제 적용됩니다(JS 화면은 Metro로 즉시 반영).
+```bash
+pnpm ios       # = expo run:ios  (자동 prebuild 포함)
+pnpm android   # = expo run:android
+```
+> 현재 Android 에뮬레이터에 설치된 빌드는 옛 아이콘/스플래시입니다. 위 명령으로 재빌드하면 새 브랜드 에셋 + 애니메이션 스플래시가 보입니다.
+
+### ⚠️ 구글 OAuth 출시 주의 (이미 안내)
+`calendar.events`는 Google 민감 스코프 → 출시 시 OAuth 동의 화면 **게시(production) + 브랜드/스코프 검증**이 필요할 수 있습니다(검증에 수일~수주 버퍼 권장). 테스트 단계는 테스트 사용자만으로 충분합니다.
+
+---
+
 ## ✅ C2 캘린더 Google OAuth 연동 완료 (2026-06-10)
 
 감지된 일정을 구글 캘린더에 등록하는 기능을 **구현·교차검증·Android 라이브 검증**까지 완료. (커밋 `c4926ac`)
