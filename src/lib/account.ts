@@ -47,7 +47,14 @@ async function listAllStoragePaths(userId: string): Promise<string[]> {
   for (;;) {
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .list(userId, { limit: STORAGE_LIST_PAGE, offset });
+      // why sortBy: offset 페이지네이션은 정렬이 안정적일 때만 누락 없이 전부 순회한다.
+      // 기본 정렬은 보장이 약해 1,800장(18페이지)을 도는 중 객체를 건너뛸 수 있으므로
+      // name 오름차순으로 고정해 "완전 삭제"를 보장한다.
+      .list(userId, {
+        limit: STORAGE_LIST_PAGE,
+        offset,
+        sortBy: { column: 'name', order: 'asc' },
+      });
 
     if (error) {
       throw new Error(`이미지 목록 조회 실패: ${error.message}`);

@@ -1,6 +1,14 @@
 import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -48,7 +56,7 @@ const TONE_OPTIONS: readonly { value: ToneStyle; labelKey: string }[] = [
  *
  * 계정 / 권한 / 스타일 / 데이터 섹션을 ScrollView로 구성한다.
  * 자동화 토글·닉네임·말투는 settings-store, 다크모드는 theme-store(단일 진실)에서 읽고 쓴다.
- * 데이터 섹션은 미구현이라 onPress 시 토스트로 "준비 중" 안내만 한다.
+ * 데이터 섹션의 "내 데이터 삭제"는 실제 구현(확인 후 영구 삭제)이며, 백업·내보내기는 준비 중(토스트 안내)이다.
  */
 export function SettingsScreen(): ReactNode {
   const { colors } = useTheme();
@@ -100,7 +108,11 @@ export function SettingsScreen(): ReactNode {
       toast.show({ tone: 'success', title: t('settings.data.deleteSuccess') });
     } catch (error) {
       console.error('[settings] 데이터 삭제 실패:', error);
-      toast.show({ tone: 'danger', title: t('settings.data.deleteError') });
+      // 부분 실패 가능성: 삭제는 단계별로 진행돼 중간 실패 시 일부만 지워졌을 수 있다.
+      // 삭제는 멱등하므로 재시도로 완료된다. 목록도 새로고침해 부분 삭제분을 즉시 반영하고,
+      // "일부만 삭제됐을 수 있다"는 정확한 문구로 재시도를 유도한다("그대로다"로 오안내 방지).
+      notifyDataChanged();
+      toast.show({ tone: 'danger', title: t('settings.data.deletePartialError') });
     } finally {
       setIsDeleting(false);
     }
@@ -227,7 +239,7 @@ export function SettingsScreen(): ReactNode {
           />
         </Section>
 
-        {/* 데이터 섹션 — 미구현(토스트 안내) */}
+        {/* 데이터 섹션 — 백업·내보내기는 준비 중(토스트), "내 데이터 삭제"는 실제 동작 */}
         <Section header={t('settings.section.data')}>
           <ListItem
             title={t('settings.data.backup')}
@@ -241,7 +253,15 @@ export function SettingsScreen(): ReactNode {
           />
           <ListItem
             title={t('settings.data.delete')}
-            trailing={<Icon name="chevron-right" size={20} color="textSecondary" />}
+            // 삭제는 수십 초 걸릴 수 있어(다량 캡처) 진행 중 스피너로 피드백한다.
+            // onPress는 isDeleting 가드로 재진입을 막으므로 중복 삭제는 발생하지 않는다.
+            trailing={
+              isDeleting ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Icon name="chevron-right" size={20} color="textSecondary" />
+              )
+            }
             onPress={handleDeleteData}
           />
         </Section>

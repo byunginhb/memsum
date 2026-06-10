@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, {
@@ -45,19 +45,28 @@ export function AnimatedSplash({ onFinish }: AnimatedSplashProps): ReactNode {
   const opacity = useSharedValue(1);
   const reducedMotion = useReducedMotion();
 
+  // onFinish를 ref에 담아 타이머 effect 의존성에서 제외한다.
+  // why: 의존성에 두면 상위가 콜백을 안정화하지 않을 때 타이머가 재설정돼
+  // "마운트당 1회만 재생" 계약이 깨질 수 있다(안전망).
+  // ref 갱신은 렌더 중이 아니라 effect에서 한다(react-hooks/refs 규칙 준수).
+  const onFinishRef = useRef(onFinish);
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
+
   useEffect(() => {
     // HOLD 동안 점 애니메이션을 보여준 뒤 페이드아웃 → 완료 콜백으로 언마운트 신호.
     const fadeDuration = reducedMotion ? 0 : SPLASH_FADE_MS;
     const timer = setTimeout(() => {
       opacity.value = withTiming(0, { duration: fadeDuration }, (finished) => {
         if (finished) {
-          runOnJS(onFinish)();
+          runOnJS(onFinishRef.current)();
         }
       });
     }, SPLASH_HOLD_MS);
 
     return () => clearTimeout(timer);
-  }, [opacity, onFinish, reducedMotion]);
+  }, [opacity, reducedMotion]);
 
   const fadeStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 

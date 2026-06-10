@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getWeeklyReport, submitFeedback } from '@/lib/weekly-report';
+import { useCaptureStore } from '@/stores/capture-store';
 
 import type { ReportFeedback, WeeklyReport } from '@/features/report/types';
 
@@ -30,6 +31,10 @@ export function useWeeklyReport(weekStart?: string): UseWeeklyReportResult {
   const feedbackInFlightRef = useRef<Set<string>>(new Set());
   // 언마운트 후 setState 방지.
   const mountedRef = useRef<boolean>(true);
+
+  // 데이터 변경 신호(새 캡처 저장·"내 데이터 삭제"). 변하면 리포트를 다시 불러와
+  // 삭제 후에도 stale한 5줄 리포트가 남지 않게 한다(다른 목록 훅과 동일 패턴).
+  const savedCount = useCaptureStore((state) => state.savedCount);
 
   const refresh = useCallback(async (): Promise<void> => {
     if (inFlightRef.current) return;
@@ -125,7 +130,7 @@ export function useWeeklyReport(weekStart?: string): UseWeeklyReportResult {
       void refresh();
     }, 0);
     return () => clearTimeout(id);
-  }, [refresh]);
+  }, [refresh, savedCount]);
 
   return { report, isLoading, error, refresh, setFeedback };
 }

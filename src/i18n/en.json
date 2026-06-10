@@ -122,6 +122,7 @@
   "settings.data.deleteConfirm.confirm": "Delete",
   "settings.data.deleteSuccess": "All your data has been deleted",
   "settings.data.deleteError": "Failed to delete. Please try again.",
+  "settings.data.deletePartialError": "Some data may not have been deleted. Please try again.",
   "settings.comingSoon": "Coming soon",
   "toast.dismiss": "Dismiss",
   "notif.eventDetected": "Event detected",

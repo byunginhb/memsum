@@ -122,6 +122,7 @@
   "settings.data.deleteConfirm.confirm": "삭제",
   "settings.data.deleteSuccess": "데이터를 모두 삭제했어요",
   "settings.data.deleteError": "삭제에 실패했어요. 잠시 후 다시 시도해주세요",
+  "settings.data.deletePartialError": "일부만 삭제됐을 수 있어요. 다시 시도해주세요",
   "settings.comingSoon": "준비 중이에요",
   "toast.dismiss": "닫기",
   "notif.eventDetected": "이벤트 감지",
