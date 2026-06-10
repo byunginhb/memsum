@@ -23,6 +23,9 @@ const CAPTURE_BUTTON_SIZE = 56;
 const CAPTURE_BUTTON_LIFT = 8;
 // 탭바 본문 높이(safe-area inset 제외).
 const BAR_HEIGHT = 56;
+// 5칸(탭4 + 캡처1) 균등 분할 폭. flex:1 분배가 콘텐츠 차로 어긋나는 것을 막기 위해
+// 명시 퍼센트로 고정한다. as const로 DimensionValue('${number}%') 타입을 만족시킨다.
+const SLOT_WIDTH = '20%' as const;
 
 // 캡처+ 버튼 좌측에 들어갈 두 탭, 우측에 들어갈 두 탭.
 const LEADING_TABS: readonly BottomBarTab[] = [
@@ -214,8 +217,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tab: {
-    flex: 1,
-    minWidth: MIN_TOUCH,
+    // 5칸(탭4 + 캡처1)을 정확히 균등 분할한다. flex:1은 캡처 슬롯과 탭의
+    // 콘텐츠 차이로 셀 폭이 어긋나(탭 239 / 캡처 124) 간격이 불규칙해졌으므로,
+    // 명시적 20% 고정 폭으로 5칸을 동일하게 맞춘다(중심 간격 균등 보장).
+    width: SLOT_WIDTH,
     minHeight: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
@@ -231,7 +236,8 @@ const styles = StyleSheet.create({
     letterSpacing: letterSpacingFor('caption'),
   },
   captureSlot: {
-    flex: 1,
+    // 탭과 동일한 20% 고정 폭. 캡처 버튼(원형)을 이 슬롯 중앙에 둔다.
+    width: SLOT_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
   },
