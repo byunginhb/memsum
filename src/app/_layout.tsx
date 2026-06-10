@@ -11,6 +11,7 @@ import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { ToastProvider } from '@/design/components/Toast';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
+import { useAutoCapture } from '@/hooks/use-auto-capture';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 
@@ -58,6 +59,8 @@ export default function RootLayout() {
           <AuthProvider>
             <ToastProvider>
               <ThemedStatusBar />
+              {/* 스크린샷 자동 감지 → 백그라운드 캡처(앱 핵심 기능). UI 없음. */}
+              <AutoCaptureGate />
               <OnboardingGate>
                 <Stack screenOptions={{ headerShown: false }} />
               </OnboardingGate>
@@ -123,4 +126,14 @@ function OnboardingGate({ children }: { children: React.ReactNode }) {
 function ThemedStatusBar() {
   const { isDark } = useTheme();
   return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
+/**
+ * 스크린샷 자동 감지 게이트 — UI 없는 마운트 지점.
+ * useAutoCapture가 권한 요청 + 스크린샷 구독 + 백그라운드 캡처를 담당한다.
+ * ToastProvider 안에 두어 결과 토스트를 띄울 수 있게 한다.
+ */
+function AutoCaptureGate() {
+  useAutoCapture();
+  return null;
 }

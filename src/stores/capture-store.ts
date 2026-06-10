@@ -34,7 +34,14 @@ type CaptureStore = {
   isSheetOpen: boolean;
   /** 캡처가 'done'(서버 저장 완료)에 도달할 때마다 증가. 리스트 화면이 이 값을 구독해 새로고침한다. */
   savedCount: number;
-  startCapture: (input: StartCaptureInput) => Promise<void>;
+  /**
+   * 캡처 파이프라인 시작. options.silent=true면 확인 Sheet를 열지 않고 백그라운드로
+   * 처리한다(스크린샷 자동 감지용 — 저장되면 savedCount 증가로 목록이 갱신된다).
+   */
+  startCapture: (
+    input: StartCaptureInput,
+    options?: { silent?: boolean },
+  ) => Promise<void>;
   closeSheet: () => void;
   reset: () => void;
   /**
@@ -77,17 +84,21 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
   isSheetOpen: false,
   savedCount: 0,
 
-  startCapture: async (input: StartCaptureInput): Promise<void> => {
+  startCapture: async (
+    input: StartCaptureInput,
+    options?: { silent?: boolean },
+  ): Promise<void> => {
     const id = localCaptureId();
 
-    // 초기 draft: uploading 단계로 시작하며 즉시 Sheet를 연다.
+    // 초기 draft: uploading 단계로 시작. silent가 아니면 즉시 Sheet를 연다.
+    // silent(스크린샷 자동 감지)면 Sheet 없이 백그라운드 처리하고, 완료 시 savedCount로 알린다.
     const initial: CaptureDraft = {
       id,
       sourcePlatform: input.sourcePlatform,
       imageUri: input.imageUri,
       stage: 'uploading',
     };
-    set({ current: initial, isSheetOpen: true });
+    set({ current: initial, isSheetOpen: options?.silent !== true });
 
     // 단계 전이마다 새 draft를 만들고, 그 사이 다른 캡처로 교체됐으면 무시한다.
     const advance = (next: CaptureDraft): boolean => {

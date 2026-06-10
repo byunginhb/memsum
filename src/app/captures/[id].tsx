@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Linking,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
@@ -21,7 +23,9 @@ import type { CaptureEvent } from '@/features/capture/types';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCapture } from '@/hooks/use-capture';
 import { getLocale, t } from '@/i18n';
+import { deleteCapture } from '@/lib/captures';
 import { useCalendarStore } from '@/stores/calendar-store';
+import { useCaptureStore } from '@/stores/capture-store';
 
 /**
  * 캡처 상세 화면 — 기능명세 상세 플로우 (W4-C) + 캘린더 연동(C2).
@@ -32,6 +36,10 @@ export default function CaptureDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const { item, isLoading, error } = useCapture(id);
+  const router = useRouter();
+  const toast = useToast();
+  const notifyDataChanged = useCaptureStore((s) => s.notifyDataChanged);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // why here: 캘린더 연결 상태는 SecureStore 복원 후에 확정된다. 이 화면이 캘린더
   // 액션을 노출하므로 마운트 시 1회 복원을 보장한다(restore는 멱등이라 중복 호출 무해).
@@ -41,9 +49,63 @@ export default function CaptureDetailScreen() {
     if (!hydrated) void restore();
   }, [hydrated, restore]);
 
+  // 이 캡처 1건을 영구 삭제. 파괴적이라 확인 다이얼로그 후 진행하고, 성공 시 목록 갱신 + 뒤로.
+  const handleDelete = useCallback((): void => {
+    if (isDeleting || !item) return;
+    Alert.alert(
+      t('captures.detail.delete.confirmTitle'),
+      t('captures.detail.delete.confirmBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('captures.detail.delete.confirm'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setIsDeleting(true);
+              try {
+                await deleteCapture(item.id, item.imagePath);
+                notifyDataChanged();
+                toast.show({ tone: 'success', title: t('captures.detail.delete.success') });
+                router.back();
+              } catch (deleteError) {
+                console.error('[captures/detail] 삭제 실패:', deleteError);
+                toast.show({ tone: 'danger', title: t('captures.detail.delete.error') });
+                setIsDeleting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [isDeleting, item, notifyDataChanged, toast, router]);
+
   return (
     <View style={styles.flex}>
-      <Stack.Screen options={{ headerShown: true, title: t('captures.detail.title') }} />
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: t('captures.detail.title'),
+          // 항목 로드 후에만 삭제 버튼 노출. 삭제 중엔 스피너로 진행 표시.
+          headerRight: () =>
+            item ? (
+              <Pressable
+                onPress={handleDelete}
+                disabled={isDeleting}
+                accessibilityRole="button"
+                accessibilityLabel={t('captures.detail.delete.action')}
+                hitSlop={spacing.sm}
+                style={styles.headerButton}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" />
+                ) : (
+                  <Icon name="trash-2" size={24} color="danger" />
+                )}
+              </Pressable>
+            ) : null,
+        }}
+      />
       <DetailBody item={item} isLoading={isLoading} error={error} />
     </View>
   );
@@ -368,6 +430,12 @@ const IMAGE_ASPECT_RATIO = 4 / 3;
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  headerButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   center: {
     alignItems: 'center',

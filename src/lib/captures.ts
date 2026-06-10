@@ -373,6 +373,45 @@ export async function listEventCaptures(
   }
 }
 
+/**
+ * 단건 캡처를 영구 삭제한다(이미지 Storage 객체 + DB row).
+ *
+ * 이미지(있으면)를 먼저 best-effort로 지우고(실패해도 경고만 — 고아 이미지 < 고아 행),
+ * captures row를 삭제한다. RLS로 본인 행만 지워지며 report_feedback은 FK cascade로 함께 정리된다.
+ * 캘린더에 이미 등록된 일정(구글 캘린더 이벤트)은 사용자 캘린더에 그대로 둔다(이 앱 데이터만 삭제).
+ */
+export async function deleteCapture(
+  captureId: string,
+  imagePath: string | null,
+): Promise<void> {
+  const supabase = getSupabase();
+
+  try {
+    // 1) 이미지 Storage 객체 삭제(있으면). 실패는 치명적이지 않으므로 경고 후 진행.
+    if (imagePath) {
+      const { error: storageError } = await supabase.storage
+        .from(BUCKET)
+        .remove([imagePath]);
+      if (storageError) {
+        console.warn('[captures] 이미지 삭제 실패(계속 진행):', storageError.message);
+      }
+    }
+
+    // 2) captures row 삭제(RLS로 본인 행만). 명시적으로 id 한정.
+    const { error } = await supabase.from('captures').delete().eq('id', captureId);
+    if (error) {
+      throw new Error(`캡처 삭제 실패: ${error.message}`);
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : '캡처를 삭제하는 중 알 수 없는 오류가 발생했습니다.';
+    console.error('[captures] deleteCapture 실패:', message);
+    throw new Error(message);
+  }
+}
+
 /** 캘린더 등록 결과 기록 입력. */
 export type MarkCalendarRegisteredArgs = {
   captureId: string;
