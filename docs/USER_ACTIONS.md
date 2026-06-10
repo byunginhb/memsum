@@ -49,6 +49,32 @@ pnpm android   # = expo run:android
 
 ---
 
+## ✅ C2 캘린더 Google OAuth 연동 완료 (2026-06-10)
+
+감지된 일정을 구글 캘린더에 등록하는 기능을 **구현·교차검증·Android 라이브 검증**까지 완료. (커밋 `c4926ac`)
+
+### 핵심 결정
+- **네이티브 Authorization Code + PKCE** 플로우 → iOS/Android 클라이언트(public client)만으로 토큰 발급. **client secret·Web 클라이언트 ID 불필요**(기다리던 Web ID, 안 써도 됨).
+- 토큰은 **SecureStore(Keychain/Keystore)에만** 저장(AsyncStorage 금지). 스코프는 `calendar.events` 최소 권한.
+- **멱등 등록**: captureId 기반 결정적 event id → 같은 일정 재등록 시 409로 거부되어 캘린더 중복 생성 방지.
+
+### 라이브 검증 (Android 에뮬레이터, 재빌드 후)
+- secure-store 네이티브 모듈 + OAuth scheme 배열 prebuild 반영 → **BUILD SUCCESSFUL**.
+- 캘린더 탭(미연결 연결 안내) / 설정 "연동" 섹션 행 / 캡처 상세 "캘린더에 추가" 렌더 ✓.
+- "연결" 탭 → 앱이 **Chrome Custom Tab으로 구글 동의 진입** ✓ (실제 로그인은 본인 계정 자격증명 필요 — 거기까지만 자동 검증).
+- 취소(브라우저 back) → 앱 복귀, 크래시 없음 ✓. `pnpm typecheck`·`pnpm lint` 그린.
+- 리뷰: code-reviewer·security-reviewer 교차검증 **critical/high 0건**, medium·low 전부 반영(멱등 등록·htmlLink https 가드·동시성 가드·응답 런타임 검증 등).
+
+### 당신이 직접 테스트하려면
+1. **iOS도 쓰려면** `pnpm ios`로 1회 재빌드(네이티브 모듈·스킴 반영). Android는 이미 재빌드됨.
+2. 설정 → 연동 → "구글 캘린더" 또는 캘린더 탭 → "구글 캘린더 연결" 탭 → 브라우저에서 **본인 구글 계정(테스트 사용자로 등록된)으로 로그인·동의**.
+3. 캡처 상세에서 "캘린더에 추가" → 구글 캘린더 앱/웹에서 일정 확인.
+
+### 알려진 후속 점검(비차단)
+- 홈 화면 시작 시 **개발 전용 LogBox 경고**("hasn't mounted yet")가 잠깐 떴다 사라짐. 홈(C1) 영역 + `reactCompiler` 실험 플래그 정황. 프로덕션 무영향. 다음에 데이터 훅 마운트 타이밍 점검 예정.
+
+---
+
 ## ✅ Week 6 완전 완료 (2026-06-07) — 지금 필요한 일 없음
 
 **3개 워크스트림 병행**(주간 5줄 리포트 / 설정 화면 / 디자인 잔여 정합)을 멀티 에이전트로 **계획→공통 컴포넌트→화면·백엔드→교차검증→라이브 검증**까지 완료.
