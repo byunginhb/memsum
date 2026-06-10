@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -15,6 +15,9 @@ import type { ThemeMode } from '@/design/theme/theme-store';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
 import { t } from '@/i18n';
+import { deleteAllUserData } from '@/lib/account';
+import { useAuthStore } from '@/stores/auth-store';
+import { useCaptureStore } from '@/stores/capture-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { ToneStyle } from '@/stores/settings-store';
 
@@ -68,15 +71,59 @@ export function SettingsScreen(): ReactNode {
   const setThemeMode = useThemeStore((state) => state.setMode);
 
   const [isNicknameSheetOpen, setNicknameSheetOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // 데이터 삭제에 필요한 본인 식별자 + 삭제 후 목록 새로고침 신호.
+  const userId = useAuthStore((state) => state.userId);
+  const notifyDataChanged = useCaptureStore((state) => state.notifyDataChanged);
 
   const handleBack = useCallback(() => {
     router.back();
   }, [router]);
 
-  // 미구현 데이터 동작 — 토스트로 준비 중 안내(공통 핸들러로 중복 제거).
+  // 미구현 데이터 동작(백업·내보내기) — 토스트로 준비 중 안내(공통 핸들러로 중복 제거).
   const showComingSoon = useCallback(() => {
     toast.show({ tone: 'info', title: t('settings.comingSoon') });
   }, [toast]);
+
+  // 실제 삭제 수행(확인 후). 본인 캡처·이미지·리포트를 영구 삭제하고 목록을 비운다.
+  const runDeleteAllData = useCallback(async (): Promise<void> => {
+    if (!userId) {
+      toast.show({ tone: 'danger', title: t('settings.data.deleteError') });
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await deleteAllUserData(userId);
+      // 홈·검색·캘린더 목록이 비워지도록 새로고침 신호를 보낸다.
+      notifyDataChanged();
+      toast.show({ tone: 'success', title: t('settings.data.deleteSuccess') });
+    } catch (error) {
+      console.error('[settings] 데이터 삭제 실패:', error);
+      toast.show({ tone: 'danger', title: t('settings.data.deleteError') });
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [userId, notifyDataChanged, toast]);
+
+  // 파괴적 작업이라 네이티브 확인 다이얼로그로 한 번 더 확인받는다.
+  const handleDeleteData = useCallback((): void => {
+    if (isDeleting) return;
+    Alert.alert(
+      t('settings.data.deleteConfirm.title'),
+      t('settings.data.deleteConfirm.body'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.data.deleteConfirm.confirm'),
+          style: 'destructive',
+          onPress: () => {
+            void runDeleteAllData();
+          },
+        },
+      ],
+    );
+  }, [isDeleting, runDeleteAllData]);
 
   const accountTitle = nickname.length > 0 ? nickname : t('settings.nickname.empty');
 
@@ -195,7 +242,7 @@ export function SettingsScreen(): ReactNode {
           <ListItem
             title={t('settings.data.delete')}
             trailing={<Icon name="chevron-right" size={20} color="textSecondary" />}
-            onPress={showComingSoon}
+            onPress={handleDeleteData}
           />
         </Section>
       </ScrollView>

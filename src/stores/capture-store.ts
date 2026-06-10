@@ -37,6 +37,11 @@ type CaptureStore = {
   startCapture: (input: StartCaptureInput) => Promise<void>;
   closeSheet: () => void;
   reset: () => void;
+  /**
+   * 외부에서 데이터가 바뀌었음을 알려 리스트 화면을 새로고침시킨다(savedCount 증가 재사용).
+   * 예: 설정에서 "내 데이터 삭제" 후 홈/검색/캘린더 목록을 비우기 위해 호출.
+   */
+  notifyDataChanged: () => void;
 };
 
 /**
@@ -174,5 +179,9 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
 
   reset: (): void => {
     set({ current: null, isSheetOpen: false });
+  },
+
+  notifyDataChanged: (): void => {
+    set({ savedCount: get().savedCount + 1 });
   },
 }));
