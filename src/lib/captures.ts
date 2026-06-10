@@ -40,7 +40,7 @@ const DEFAULT_SEARCH_LIMIT = 30;
  * (불필요한 전송량·우발적 컬럼 노출 방지).
  */
 const SELECT_COLUMNS =
-  'id, image_url, ocr_text, parsed_event, source_platform, status, category, created_at';
+  'id, image_url, ocr_text, parsed_event, source_platform, status, category, calendar_event_id, calendar_html_link, created_at';
 
 // ── 내부 타입 ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +64,8 @@ type CaptureRow = {
   source_platform: string | null;
   status: string | null;
   category: string | null;
+  calendar_event_id: string | null;
+  calendar_html_link: string | null;
   created_at: string;
 };
 
@@ -103,6 +105,8 @@ function rowToItem(row: CaptureRow): CaptureListItem {
     event,
     status: row.status ?? 'pending',
     category: normalizeCategory(row.category, event !== null),
+    calendarEventId: row.calendar_event_id,
+    calendarHtmlLink: row.calendar_html_link,
   };
 }
 
@@ -329,6 +333,88 @@ export async function getCapture(id: string): Promise<CaptureListItem | null> {
         ? error.message
         : '캡처를 불러오는 중 알 수 없는 오류가 발생했습니다.';
     console.error('[captures] getCapture 실패:', message);
+    throw new Error(message);
+  }
+}
+
+/**
+ * 이벤트(parsed_event.event)가 감지된 캡처만 최신순으로 조회한다(캘린더 탭용).
+ *
+ * PostgREST `.not('parsed_event->event','is',null)` 로 jsonb 하위키가 null이 아닌 행만 거른다.
+ * (category='event'로 거르면 날짜 있는 마케팅 전단 등 일부 이벤트를 놓치므로 event 존재로 판별.)
+ * 등록 여부(calendar_event_id)는 결과의 각 항목으로 UI가 판단한다.
+ */
+export async function listEventCaptures(
+  limit = DEFAULT_LIST_LIMIT,
+): Promise<CaptureListItem[]> {
+  const supabase = getSupabase();
+
+  try {
+    const { data, error } = await supabase
+      .from('captures')
+      .select(SELECT_COLUMNS)
+      .not('parsed_event->event', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`이벤트 캡처 조회 실패: ${error.message}`);
+    }
+
+    const rows = (data ?? []) as CaptureRow[];
+    return attachThumbnails(rows.map(rowToItem));
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : '이벤트 캡처를 불러오는 중 알 수 없는 오류가 발생했습니다.';
+    console.error('[captures] listEventCaptures 실패:', message);
+    throw new Error(message);
+  }
+}
+
+/** 캘린더 등록 결과 기록 입력. */
+export type MarkCalendarRegisteredArgs = {
+  captureId: string;
+  eventId: string;
+  htmlLink: string | null;
+  /** 동기화 시각 ISO8601. 호출 측이 등록 시점을 넘긴다. */
+  syncedAt: string;
+};
+
+/**
+ * 캡처에 구글 캘린더 등록 결과(event id·htmlLink·시각)와 status='calendar_added'를 기록한다.
+ *
+ * RLS로 본인 행만 갱신되며, 대상 행이 없으면(타인·삭제됨) 오류를 던진다.
+ * 등록 자체(events.insert)는 이미 성공한 뒤이므로, 여기 실패는 "캘린더엔 등록됐으나
+ * 앱 DB 반영 실패" 상태다. 호출 측(calendar-store)이 이를 사용자에게 구분해 안내한다.
+ */
+export async function markCaptureCalendarRegistered(
+  args: MarkCalendarRegisteredArgs,
+): Promise<void> {
+  const { captureId, eventId, htmlLink, syncedAt } = args;
+  const supabase = getSupabase();
+
+  try {
+    const { error } = await supabase
+      .from('captures')
+      .update({
+        calendar_event_id: eventId,
+        calendar_html_link: htmlLink,
+        calendar_synced_at: syncedAt,
+        status: 'calendar_added',
+      })
+      .eq('id', captureId);
+
+    if (error) {
+      throw new Error(`캘린더 등록 결과 저장 실패: ${error.message}`);
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : '캘린더 등록 결과를 저장하는 중 알 수 없는 오류가 발생했습니다.';
+    console.error('[captures] markCaptureCalendarRegistered 실패:', message);
     throw new Error(message);
   }
 }

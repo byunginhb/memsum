@@ -18,6 +18,7 @@ import { t } from '@/i18n';
 import { useSettingsStore } from '@/stores/settings-store';
 import type { ToneStyle } from '@/stores/settings-store';
 
+import { GoogleCalendarRow } from './GoogleCalendarRow';
 import { NicknameEditSheet } from './NicknameEditSheet';
 
 /** 인라인 세그먼트 토글 최소 탭 높이 — 디자인시스템.md §10: 44pt. */
@@ -112,6 +113,11 @@ export function SettingsScreen(): ReactNode {
             trailing={<Icon name="chevron-right" size={20} color="textSecondary" />}
             onPress={() => setNicknameSheetOpen(true)}
           />
+        </Section>
+
+        {/* 연동 섹션 — 구글 캘린더 연결/해제 */}
+        <Section header={t('settings.section.connections')}>
+          <GoogleCalendarRow />
         </Section>
 
         {/* 권한·자동화 섹션 */}

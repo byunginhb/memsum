@@ -32,6 +32,10 @@ export type CaptureListItem = {
   status: string;
   /** 캡처 카테고리(주제별 묶음·검색 필터용). 미분류는 'etc'. */
   category: CategoryKey;
+  /** 구글 캘린더에 등록된 이벤트 id. 미등록이면 null. */
+  calendarEventId: string | null;
+  /** "구글 캘린더에서 열기" 딥링크(htmlLink). 미등록·없으면 null. */
+  calendarHtmlLink: string | null;
 };
 
 /** 목록 페이지네이션 결과. */

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import { useLocalSearchParams, Stack } from 'expo-router';
 
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
+import { useToast } from '@/design/components/Toast/useToast';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, spacing, typography } from '@/design/tokens';
@@ -19,16 +21,25 @@ import type { CaptureEvent } from '@/features/capture/types';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCapture } from '@/hooks/use-capture';
 import { getLocale, t } from '@/i18n';
+import { useCalendarStore } from '@/stores/calendar-store';
 
 /**
- * 캡처 상세 화면 — 기능명세 상세 플로우 (W4-C).
+ * 캡처 상세 화면 — 기능명세 상세 플로우 (W4-C) + 캘린더 연동(C2).
  * 큰 이미지 + 제목/요약 + 이벤트 카드(있으면) + OCR 전체 텍스트 + 메타 + 하단 액션.
- * 캘린더/공유 액션은 Week9 예정으로 현재 비활성(disabled) 상태다.
+ * 캘린더 액션은 calendar-store와 연결돼 동작한다. 공유는 아직 준비 중(비활성).
  */
 export default function CaptureDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const { item, isLoading, error } = useCapture(id);
+
+  // why here: 캘린더 연결 상태는 SecureStore 복원 후에 확정된다. 이 화면이 캘린더
+  // 액션을 노출하므로 마운트 시 1회 복원을 보장한다(restore는 멱등이라 중복 호출 무해).
+  const hydrated = useCalendarStore((s) => s.hydrated);
+  const restore = useCalendarStore((s) => s.restore);
+  useEffect(() => {
+    if (!hydrated) void restore();
+  }, [hydrated, restore]);
 
   return (
     <View style={styles.flex}>
@@ -103,7 +114,7 @@ function DetailBody({ item, isLoading, error }: DetailBodyProps) {
       </View>
 
       <View style={styles.bodySection}>
-        <DetailActions hasEvent={item.hasEvent} />
+        <DetailActions item={item} />
       </View>
     </ScrollView>
   );
@@ -147,7 +158,7 @@ function EventCard({ event }: { event: CaptureEvent }) {
         <View style={styles.eventTexts}>
           <Text style={[styles.eventTitle, { color: colors.textPrimary }]}>{event.title}</Text>
           <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>
-            {formatEventDate(event.starts_at)}
+            {formatDateTime(event.starts_at)}
           </Text>
           {event.location ? (
             <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>
@@ -214,24 +225,121 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** 하단 액션. 캘린더 추가(이벤트 있을 때)·공유 — 둘 다 Week9 예정으로 현재 비활성. */
-function DetailActions({ hasEvent }: { hasEvent: boolean }) {
+/**
+ * 하단 액션. 이벤트가 있으면 "캘린더에 추가"(연결 필요 시 자동 연결 시도)를 노출하고,
+ * 이미 등록된 캡처면 "캘린더에서 열기"로 전환한다. 공유는 아직 준비 중(비활성).
+ *
+ * why 로컬 낙관적 갱신: useCapture 훅에는 refetch가 없으므로, 등록 성공 시 item을 다시
+ * 불러오는 대신 이 컴포넌트의 로컬 state(justRegistered + htmlLink)로 즉시 "열기"로 바꾼다.
+ */
+function DetailActions({ item }: { item: CaptureListItem }) {
+  const toast = useToast();
+
+  // 스토어에서 진행 상태·액션을 구독한다(필요한 슬라이스만 선택해 리렌더 최소화).
+  // 연결 상태(status)는 핸들러에서 getState()로 최신값을 직접 읽으므로 구독하지 않는다.
+  const isBusy = useCalendarStore((s) => s.isBusy);
+  const connect = useCalendarStore((s) => s.connect);
+  const registerCapture = useCalendarStore((s) => s.registerCapture);
+
+  // 등록 성공 후 낙관적 표시용. 서버 item 갱신 없이 버튼을 "열기"로 전환한다.
+  const [justRegistered, setJustRegistered] = useState(false);
+  const [registeredHtmlLink, setRegisteredHtmlLink] = useState<string | null>(null);
+  // 이 버튼이 트리거한 작업 진행 여부. 중복 탭 방지 + 버튼 로딩 표시용.
+  const [localBusy, setLocalBusy] = useState(false);
+
+  // 서버 기준 등록 여부(calendarEventId) 또는 이번 세션 등록(justRegistered)이면 "열기".
+  const isRegistered = item.calendarEventId !== null || justRegistered;
+  // 딥링크는 서버 값 우선, 없으면 방금 등록 응답의 htmlLink를 쓴다.
+  const htmlLink = item.calendarHtmlLink ?? registeredHtmlLink;
+
+  // 스토어 작업 중이거나 이 화면이 띄운 작업 중이면 버튼 비활성(중복 탭 차단).
+  const busy = isBusy || localBusy;
+
+  /** 등록된 일정을 구글 캘린더 앱/웹에서 연다. 링크가 없으면 안내 토스트. */
+  const handleOpen = useCallback(async () => {
+    if (busy) return;
+    if (!htmlLink) {
+      // 등록은 됐지만 딥링크가 없을 수 있다(events.insert 응답에 htmlLink 누락 가능).
+      // 별도 키가 없어 "등록됨" 의미의 success 문구를 info 톤으로 안내한다.
+      toast.show({ tone: 'info', title: t('calendar.toast.registerSuccess') });
+      return;
+    }
+    try {
+      await Linking.openURL(htmlLink);
+    } catch (openError) {
+      console.error('[captures/detail] 캘린더 링크 열기 실패:', openError);
+      toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
+    }
+  }, [busy, htmlLink, toast]);
+
+  /** 캡처 이벤트를 구글 캘린더에 등록. 미연결이면 먼저 연결을 시도한다. */
+  const handleAdd = useCallback(async () => {
+    // 중복 탭 또는 이벤트 누락 시 무동작(타입상 event는 호출부에서 보장).
+    if (busy || !item.event) return;
+
+    setLocalBusy(true);
+    try {
+      // 미연결이면 먼저 OAuth 연결을 시도한다(취소/실패는 connect 내부에서 상태 반영).
+      if (useCalendarStore.getState().status !== 'connected') {
+        try {
+          await connect();
+        } catch (connectError) {
+          // connect 실패는 아래 status 재확인에서 needConnect로 안내하므로 여기선 로깅만.
+          console.error('[captures/detail] 캘린더 연결 실패:', connectError);
+          toast.show({ tone: 'danger', title: t('calendar.toast.connectError') });
+          return;
+        }
+      }
+
+      // 연결 시도 후에도 connected가 아니면(취소 등) 등록을 진행하지 않는다.
+      if (useCalendarStore.getState().status !== 'connected') {
+        toast.show({ tone: 'info', title: t('calendar.toast.needConnect') });
+        return;
+      }
+
+      const registration = await registerCapture({
+        captureId: item.id,
+        event: item.event,
+      });
+
+      // 낙관적 갱신: 서버 item 재조회 없이 즉시 "열기"로 전환한다.
+      setRegisteredHtmlLink(registration.htmlLink);
+      setJustRegistered(true);
+      toast.show({ tone: 'success', title: t('calendar.toast.registerSuccess') });
+    } catch (registerError) {
+      console.error('[captures/detail] 캘린더 등록 실패:', registerError);
+      toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
+    } finally {
+      setLocalBusy(false);
+    }
+  }, [busy, item.event, item.id, connect, registerCapture, toast]);
+
   return (
     <View style={styles.actions}>
-      {hasEvent ? (
-        // Week9 예정: 캘린더 연동 전까지 비활성.
+      {isRegistered ? (
         <Button
           variant="primary"
           size="lg"
-          disabled
-          onPress={() => undefined}
+          loading={busy}
+          onPress={handleOpen}
+          accessibilityLabel={t('captures.detail.action.openInCalendar')}
+          leftIcon={<Icon name="calendar" size={20} color="onPrimary" />}
+        >
+          {t('captures.detail.action.openInCalendar')}
+        </Button>
+      ) : item.hasEvent && item.event ? (
+        <Button
+          variant="primary"
+          size="lg"
+          loading={busy}
+          onPress={handleAdd}
           accessibilityLabel={t('captures.detail.action.addToCalendar')}
           leftIcon={<Icon name="calendar" size={20} color="onPrimary" />}
         >
           {t('captures.detail.action.addToCalendar')}
         </Button>
       ) : null}
-      {/* Week9 예정: 공유 기능 준비 중. */}
+      {/* 공유 기능 준비 중: 의도적으로 비활성 유지(기존 동작 보존). */}
       <Button
         variant="secondary"
         size="lg"
@@ -244,11 +352,6 @@ function DetailActions({ hasEvent }: { hasEvent: boolean }) {
       </Button>
     </View>
   );
-}
-
-/** 이벤트 시작 일시 포맷(KST ISO8601 → 로컬 표시). */
-function formatEventDate(iso: string): string {
-  return formatDateTime(iso);
 }
 
 /** ISO8601 → 사람이 읽는 일시. 파싱 실패 시 원문 반환(앱이 깨지지 않음). */

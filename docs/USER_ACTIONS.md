@@ -13,20 +13,32 @@
 1. https://console.cloud.google.com → 새 프로젝트 `memsum` 생성
 2. **API 및 서비스 → 라이브러리** → "Google Calendar API" **사용 설정**
 3. **OAuth 동의 화면**: External, 앱 이름 `Memsum`, 지원 이메일, 스코프 `.../auth/calendar.events` 추가, 테스트 사용자에 본인 이메일 추가
-4. **사용자 인증 정보 → OAuth 2.0 클라이언트 ID** 발급 (앱 단계에서 정확한 타입 안내 예정):
-   - iOS 클라이언트 (Bundle ID `app.memsum`)
-   - Android 클라이언트 (패키지 `app.memsum` + SHA-1 지문 — 제가 추출 명령 안내)
-   - Web 클라이언트 (expo-auth-session 프록시/리다이렉트용)
-5. 발급된 **클라이언트 ID**(들)를 알려주시면 `.env`·설정에 반영합니다. (시크릿이 필요한 서버 교환분은 Supabase Edge Function 시크릿으로 처리)
+4. **사용자 인증 정보 → OAuth 2.0 클라이언트 ID** 발급:
+   - iOS 클라이언트 (Bundle ID `app.memsum`) ✅ 발급됨
+   - Android 클라이언트 (패키지 `app.memsum` + SHA-1 지문) ✅ 발급됨
+   - ~~Web 클라이언트~~ → **불필요**(아래 설명)
+5. 발급된 **클라이언트 ID**(들)를 알려주시면 `.env`·설정에 반영합니다.
 
 **받은 자격증명 (2026-06-08):**
-- iOS 클라이언트 ID: `649138266676-kkj5lepd53o1fu8ha04tppj6qd9604nk.apps.googleusercontent.com`
-- Android 디버그 SHA-1 (`android/app/debug.keystore`, 개발/테스트용): `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` → 이 값으로 Android OAuth 클라이언트 생성
-- Android 클라이언트 ID: `649138266676-j8bl0afld4bfps2cldigvltfd677elvi.apps.googleusercontent.com`
-- ⏳ 대기: **Web 클라이언트 ID**(expo-auth-session 리다이렉트/서버 토큰 교환용 — "웹 애플리케이션" 유형으로 1개 더 발급해 알려주기)
+- iOS 클라이언트 ID: `649138266676-kkj5lepd53o1fu8ha04tppj6qd9604nk.apps.googleusercontent.com` ✅ `.env` 반영됨
+- Android 디버그 SHA-1 (`android/app/debug.keystore`, 개발/테스트용): `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`
+- Android 클라이언트 ID: `649138266676-j8bl0afld4bfps2cldigvltfd677elvi.apps.googleusercontent.com` ✅ `.env` 반영됨
+- ✅ **Web 클라이언트 ID는 발급 안 해도 됩니다.** 우리는 **네이티브 Authorization Code + PKCE** 플로우를 쓰는데, 이 방식은 iOS/Android 클라이언트(public client)만으로 access·refresh 토큰을 받습니다. client secret도, Web 클라이언트도 필요 없습니다. (기다리시던 그 항목, 이제 신경 안 쓰셔도 됩니다.)
 - ⚠️ 출시 단계에서 EAS 업로드 키 SHA-1 + Play 앱 서명 SHA-1을 같은 Android 클라이언트에 **추가** 필요
 
+#### ❗ C2 동작을 위해 지금 확인할 2가지 (Google Cloud Console)
+1. **OAuth 동의 화면 스코프에 `.../auth/calendar.events` 가 추가돼 있는지** 확인(없으면 추가). 위 3번에서 이미 하셨으면 OK.
+2. **테스트 사용자에 본인 구글 계정(연결 테스트할 계정)이 추가돼 있는지** 확인. 앱이 "테스트" 상태이므로 등록된 테스트 사용자만 로그인됩니다.
+
 > 참고: 출시 전 OAuth 앱 "게시" 상태 전환·Google 검증이 필요할 수 있습니다(민감 스코프). 테스트 단계는 테스트 사용자만으로 충분합니다.
+
+#### ❗ C2 코드 반영 후 — 네이티브 재빌드 1회 필요
+캘린더 연동은 네이티브 모듈(`expo-secure-store`)과 OAuth 리다이렉트 URL 스킴을 추가하므로, **Fast Refresh로는 안 되고 네이티브 재빌드가 1회 필요**합니다(이후엔 다시 Metro만으로 충분).
+```bash
+# 둘 중 실행할 플랫폼만
+pnpm ios       # = expo run:ios  (자동 prebuild 포함)
+pnpm android   # = expo run:android
+```
 
 ### B. 스토어 출시용 — 개발자 계정 (후보 3)
 1. **Apple Developer Program** — https://developer.apple.com/programs/ 가입 ($99/년 결제). 가입 후 Team ID 확보.
