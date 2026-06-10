@@ -74,7 +74,7 @@ export function WeeklyReportScreen({
         onRetry={refresh}
         onPressOriginal={handlePressOriginal}
         onFeedback={handleFeedback}
-        onViewArchive={() => router.push('/')}
+        onViewArchive={() => router.push('/search')}
       />
     </View>
   );

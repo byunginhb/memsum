@@ -29,6 +29,8 @@ export type { AvatarSize } from './Avatar/Avatar';
 export { Toast, ToastProvider, useToast } from './Toast';
 export type { ToastTone, ToastAction, ToastApi, ToastOptions, ToastDuration } from './Toast';
 
+export { ProgressBar } from './ProgressBar/ProgressBar';
+
 export { NotificationCard } from './NotificationCard';
 export type {
   NotificationCardProps,

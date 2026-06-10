@@ -18,6 +18,7 @@ import type {
   ListCapturesArgs,
   SearchCapturesArgs,
 } from '@/features/captures/types';
+import { normalizeCategory } from '@/lib/categories';
 import { getSupabase } from '@/lib/supabase';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
@@ -39,7 +40,7 @@ const DEFAULT_SEARCH_LIMIT = 30;
  * (불필요한 전송량·우발적 컬럼 노출 방지).
  */
 const SELECT_COLUMNS =
-  'id, image_url, ocr_text, parsed_event, source_platform, status, created_at';
+  'id, image_url, ocr_text, parsed_event, source_platform, status, category, created_at';
 
 // ── 내부 타입 ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ type CaptureRow = {
   parsed_event: ParsedEvent | null;
   source_platform: string | null;
   status: string | null;
+  category: string | null;
   created_at: string;
 };
 
@@ -100,6 +102,7 @@ function rowToItem(row: CaptureRow): CaptureListItem {
     hasEvent: event !== null,
     event,
     status: row.status ?? 'pending',
+    category: normalizeCategory(row.category, event !== null),
   };
 }
 
@@ -242,31 +245,43 @@ export async function listCaptures(
 }
 
 /**
- * ocr_text 또는 parsed_event.title 부분일치(ILIKE) 검색.
+ * ocr_text 또는 parsed_event.title 부분일치(ILIKE) 검색 + 카테고리 필터.
  *
- * 빈/공백 query면 즉시 [](네트워크 호출 없음). 와일드카드는 이스케이프해
- * 사용자가 입력한 %, _ 를 리터럴로 취급한다(인젝션·오매칭 방지).
+ * - query·category 둘 다 비면 즉시 [](네트워크 호출 없음).
+ * - category만 있고 query가 비면 카테고리 단독 조회(ILIKE 없이 해당 묶음 전체).
+ * - query가 있으면 ILIKE 부분일치, category가 함께 있으면 AND로 좁힌다.
  *
+ * 와일드카드는 이스케이프해 사용자가 입력한 %, _ 를 리터럴로 취급한다(인젝션·오매칭 방지).
  * .or() 문법: PostgREST는 "col.ilike.패턴" 을 콤마로 OR 연결한다.
  * 패턴 양끝에 %를 붙여 부분일치로 만든다.
  */
 export async function searchCaptures(
   args: SearchCapturesArgs,
 ): Promise<CaptureListItem[]> {
-  const { query, limit = DEFAULT_SEARCH_LIMIT } = args;
+  const { query, limit = DEFAULT_SEARCH_LIMIT, category } = args;
   const trimmed = query.trim();
-  if (trimmed.length === 0) return [];
+
+  // query·category 둘 다 없으면 검색 의미가 없다 → 즉시 빈 결과(호출 비용 0).
+  if (trimmed.length === 0 && !category) return [];
 
   const supabase = getSupabase();
 
   try {
-    const pattern = `%${escapeLikePattern(trimmed)}%`;
-    const orFilter = `ocr_text.ilike.${pattern},parsed_event->>title.ilike.${pattern}`;
+    let queryBuilder = supabase.from('captures').select(SELECT_COLUMNS);
 
-    const { data, error } = await supabase
-      .from('captures')
-      .select(SELECT_COLUMNS)
-      .or(orFilter)
+    // query가 있을 때만 ILIKE OR 필터를 적용(카테고리 단독 조회는 텍스트 필터 없음).
+    if (trimmed.length > 0) {
+      const pattern = `%${escapeLikePattern(trimmed)}%`;
+      const orFilter = `ocr_text.ilike.${pattern},parsed_event->>title.ilike.${pattern}`;
+      queryBuilder = queryBuilder.or(orFilter);
+    }
+
+    // 카테고리 필터는 텍스트 필터와 AND로 결합된다.
+    if (category) {
+      queryBuilder = queryBuilder.eq('category', category);
+    }
+
+    const { data, error } = await queryBuilder
       .order('created_at', { ascending: false })
       .limit(limit);
 

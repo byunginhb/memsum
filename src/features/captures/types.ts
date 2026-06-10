@@ -2,6 +2,7 @@
 // 데이터 레이어(W4-A)·홈 리스트(W4-B)·검색/상세(W4-C)가 단일 진실로 사용한다.
 
 import type { CaptureEvent } from '@/features/capture/types';
+import type { CategoryKey } from '@/lib/categories';
 
 /**
  * 화면 표시용 캡처 항목.
@@ -29,6 +30,8 @@ export type CaptureListItem = {
   event: CaptureEvent | null;
   /** 'pending' | 'ocr_done' | 'calendar_added' | 'failed'. */
   status: string;
+  /** 캡처 카테고리(주제별 묶음·검색 필터용). 미분류는 'etc'. */
+  category: CategoryKey;
 };
 
 /** 목록 페이지네이션 결과. */
@@ -47,6 +50,8 @@ export type ListCapturesArgs = {
 export type SearchCapturesArgs = {
   query: string;
   limit?: number;
+  /** 카테고리 필터. 지정 시 해당 카테고리로 좁힌다(빈 query여도 카테고리 단독 조회 가능). */
+  category?: CategoryKey;
 };
 
 // ── CaptureCard 계약 (W4-B 소유, W4-C 재사용) ─────────────────────────────────

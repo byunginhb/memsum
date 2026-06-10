@@ -5,6 +5,38 @@
 
 ---
 
+## 🔴 지금 시작하면 좋은 준비 (후보 2·3 — 시간 걸리는 계정/결제/OAuth)
+
+> 아래는 **사람만 할 수 있는 설정**입니다. 제가 코드·에셋·메타데이터·정책 문서는 전부 준비하니, 시간이 걸리는 계정 가입·결제·OAuth 발급을 지금부터 병행해 주시면 매끄럽게 출시까지 갑니다.
+
+### A. 캘린더 연동용 — Google Cloud OAuth (후보 2)
+1. https://console.cloud.google.com → 새 프로젝트 `memsum` 생성
+2. **API 및 서비스 → 라이브러리** → "Google Calendar API" **사용 설정**
+3. **OAuth 동의 화면**: External, 앱 이름 `Memsum`, 지원 이메일, 스코프 `.../auth/calendar.events` 추가, 테스트 사용자에 본인 이메일 추가
+4. **사용자 인증 정보 → OAuth 2.0 클라이언트 ID** 발급 (앱 단계에서 정확한 타입 안내 예정):
+   - iOS 클라이언트 (Bundle ID `app.memsum`)
+   - Android 클라이언트 (패키지 `app.memsum` + SHA-1 지문 — 제가 추출 명령 안내)
+   - Web 클라이언트 (expo-auth-session 프록시/리다이렉트용)
+5. 발급된 **클라이언트 ID**(들)를 알려주시면 `.env`·설정에 반영합니다. (시크릿이 필요한 서버 교환분은 Supabase Edge Function 시크릿으로 처리)
+
+**받은 자격증명 (2026-06-08):**
+- iOS 클라이언트 ID: `649138266676-kkj5lepd53o1fu8ha04tppj6qd9604nk.apps.googleusercontent.com`
+- Android 디버그 SHA-1 (`android/app/debug.keystore`, 개발/테스트용): `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` → 이 값으로 Android OAuth 클라이언트 생성
+- Android 클라이언트 ID: `649138266676-j8bl0afld4bfps2cldigvltfd677elvi.apps.googleusercontent.com`
+- ⏳ 대기: **Web 클라이언트 ID**(expo-auth-session 리다이렉트/서버 토큰 교환용 — "웹 애플리케이션" 유형으로 1개 더 발급해 알려주기)
+- ⚠️ 출시 단계에서 EAS 업로드 키 SHA-1 + Play 앱 서명 SHA-1을 같은 Android 클라이언트에 **추가** 필요
+
+> 참고: 출시 전 OAuth 앱 "게시" 상태 전환·Google 검증이 필요할 수 있습니다(민감 스코프). 테스트 단계는 테스트 사용자만으로 충분합니다.
+
+### B. 스토어 출시용 — 개발자 계정 (후보 3)
+1. **Apple Developer Program** — https://developer.apple.com/programs/ 가입 ($99/년 결제). 가입 후 Team ID 확보.
+2. **Google Play Console** — https://play.google.com/console/signup 가입 ($25 1회 결제).
+3. (제가 준비) 앱 아이콘·스플래시·스토어 스크린샷·설명·개인정보처리방침 → 가입 완료되면 콘솔에 업로드(GUI는 사용자) 안내.
+
+> 인증서·프로비저닝·스토어 리스팅 입력은 GUI라 사용자만 가능. EAS가 인증서 자동 관리를 도와줍니다(EAS 로그인 필요 — 추후 안내).
+
+---
+
 ## ✅ Week 6 완전 완료 (2026-06-07) — 지금 필요한 일 없음
 
 **3개 워크스트림 병행**(주간 5줄 리포트 / 설정 화면 / 디자인 잔여 정합)을 멀티 에이전트로 **계획→공통 컴포넌트→화면·백엔드→교차검증→라이브 검증**까지 완료.

@@ -27,6 +27,16 @@ modules/*/ios/build/
 .env
 .env*.local
 
+# OAuth 자격증명 파일 (시크릿 — 절대 커밋 금지)
+# Google Cloud Console에서 내려받은 client_secret / plist 원본.
+# 코드는 EXPO_PUBLIC_* 환경변수의 client ID만 사용한다.
+docs/android_json/
+docs/ios_plist/
+**/client_secret_*.json
+**/client_*.apps.googleusercontent.com.plist
+GoogleService-Info.plist
+google-services.json
+
 # 로그
 *.log
 npm-debug.*

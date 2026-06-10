@@ -1,0 +1,251 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Asset } from 'expo-asset';
+
+import { Icon } from '@/design/icons/Icon';
+import type { IconName } from '@/design/icons/Icon';
+import { useTheme } from '@/design/theme/useTheme';
+import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
+import { t } from '@/i18n';
+import { useCaptureStore } from '@/stores/capture-store';
+
+import type { BottomBarProps, BottomBarTab } from './BottomBar.types';
+
+// 샘플 스크린샷(시뮬레이션용). 홈 FAB와 동일 에셋을 캡처 흐름 트리거에 재사용한다.
+const SAMPLE_KO = require('@/assets/ocr-test/sample-ko.png');
+
+// 최소 탭 터치 영역 — 디자인시스템.md §10 (44pt).
+const MIN_TOUCH = 44;
+// 중앙 캡처+ 버튼 지름. 탭바 위로 살짝 솟도록 탭바 높이보다 크게.
+const CAPTURE_BUTTON_SIZE = 56;
+// 캡처+ 버튼이 위로 솟는 정도.
+const CAPTURE_BUTTON_LIFT = 8;
+// 탭바 본문 높이(safe-area inset 제외).
+const BAR_HEIGHT = 56;
+
+// 캡처+ 버튼 좌측에 들어갈 두 탭, 우측에 들어갈 두 탭.
+const LEADING_TABS: readonly BottomBarTab[] = [
+  { routeName: 'index', icon: 'home', labelKey: 'home.tab.home' },
+  { routeName: 'search', icon: 'search', labelKey: 'home.tab.search' },
+];
+const TRAILING_TABS: readonly BottomBarTab[] = [
+  { routeName: 'calendar', icon: 'calendar', labelKey: 'home.tab.calendar' },
+  { routeName: 'settings', icon: 'settings', labelKey: 'home.tab.settings' },
+];
+
+/**
+ * 하단 탭바 — 홈/검색/[캡처+]/캘린더/설정 5칸.
+ *
+ * expo-router Tabs의 커스텀 tabBar로 주입된다(레이아웃: (tabs)/_layout.tsx).
+ * 4개 탭은 state.routes에서 name으로 찾아 매핑하고, 활성 판별은 state.index를 쓴다.
+ * 중앙 캡처+는 라우트가 아니라 샘플 캡처 흐름을 트리거하는 액션 버튼이다
+ * (capture-store.startCapture 직접 호출 — 홈 FAB의 useSampleCapture 패턴 재사용).
+ * 색·간격·반경은 토큰만 사용하고, safe-area 하단 inset을 반영한다.
+ */
+export function BottomBar({ state, navigation }: BottomBarProps): React.ReactNode {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { onCapture, isCapturing } = useSampleCapture();
+
+  // 현재 활성 라우트 이름(state.index 기준)으로 탭 활성 여부를 판별한다.
+  const activeRouteName = state.routes[state.index]?.name;
+
+  const handleNavigate = useCallback(
+    (routeName: string): void => {
+      navigation.navigate(routeName);
+    },
+    [navigation],
+  );
+
+  const renderTab = useCallback(
+    (tab: BottomBarTab) => {
+      // 라우트가 (tabs)에 등록돼 있을 때만 렌더(방어적 — 미등록 시 빈 칸 방지).
+      const route = state.routes.find((r) => r.name === tab.routeName);
+      if (!route) return null;
+      const isActive = activeRouteName === tab.routeName;
+      return (
+        <TabItem
+          key={tab.routeName}
+          icon={tab.icon}
+          label={t(tab.labelKey)}
+          isActive={isActive}
+          onPress={() => handleNavigate(tab.routeName)}
+        />
+      );
+    },
+    [state.routes, activeRouteName, handleNavigate],
+  );
+
+  return (
+    <View
+      style={[
+        styles.bar,
+        {
+          paddingBottom: insets.bottom,
+          backgroundColor: colors.bgSurface,
+          borderTopColor: colors.border,
+        },
+      ]}
+    >
+      <View style={[styles.row, { height: BAR_HEIGHT }]}>
+        {LEADING_TABS.map(renderTab)}
+
+        <CaptureButton onPress={onCapture} disabled={isCapturing} />
+
+        {TRAILING_TABS.map(renderTab)}
+      </View>
+    </View>
+  );
+}
+
+type TabItemProps = {
+  icon: IconName;
+  label: string;
+  isActive: boolean;
+  onPress: () => void;
+};
+
+/** 단일 탭 셀 — 아이콘 + 라벨. 활성 시 primary, 비활성 시 textSecondary. */
+function TabItem({ icon, label, isActive, onPress }: TabItemProps) {
+  const { colors } = useTheme();
+  const tint = isActive ? 'primary' : 'textSecondary';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isActive }}
+      accessibilityLabel={label}
+      android_ripple={{ borderless: true }}
+      // 정적 style 배열 사용: NativeWind 래핑 Pressable의 함수형 style은
+      // flex 등 레이아웃 속성을 누락시켜 탭이 가장자리로 몰린다(W1 동일 버그).
+      style={styles.tab}
+    >
+      <Icon name={icon} size={24} color={tint} />
+      <Text
+        style={[
+          styles.label,
+          { color: isActive ? colors.primary : colors.textSecondary },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+type CaptureButtonProps = {
+  onPress: () => void;
+  disabled: boolean;
+};
+
+/** 중앙 캡처+ 액션 버튼 — primary 원형, 위로 살짝 솟은 형태. 라우트 아님. */
+function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.captureSlot}>
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        accessibilityLabel={t('home.tab.capture')}
+        android_ripple={{ borderless: true }}
+        style={styles.captureButton}
+      >
+        {/* 색 원은 내부 View에 둔다: NativeWind 래핑 Pressable은 inline
+            backgroundColor를 누락시켜(투명 원) 흰 아이콘만 보이게 되므로,
+            배경색이 정상 적용되는 일반 View로 원을 그린다. */}
+        <View style={[styles.captureCircle, { backgroundColor: colors.primary }]}>
+          <Icon name="camera" size={24} color="onPrimary" />
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * 샘플 캡처 트리거 훅 — 홈 FAB의 useSampleCapture와 동일 로직.
+ * 번들 sample-ko.png를 localUri로 확보한 뒤 startCapture로 캡처 흐름을 시작한다.
+ * Sheet는 (tabs)/_layout.tsx에 상주하므로 여기서는 트리거만 담당한다.
+ */
+function useSampleCapture(): { onCapture: () => void; isCapturing: boolean } {
+  const startCapture = useCaptureStore((s) => s.startCapture);
+  const [isCapturing, setIsCapturing] = useState(false);
+  // 언마운트 후 setState 경고 방지.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const onCapture = useCallback((): void => {
+    setIsCapturing(true);
+    void (async () => {
+      try {
+        const asset = Asset.fromModule(SAMPLE_KO);
+        await asset.downloadAsync();
+        const uri = asset.localUri ?? asset.uri;
+        if (!uri) {
+          throw new Error('샘플 이미지 경로를 확인할 수 없습니다.');
+        }
+        const sourcePlatform = Platform.OS === 'ios' ? 'ios' : 'android';
+        await startCapture({ imageUri: uri, sourcePlatform, uri });
+      } catch (error) {
+        console.error('[capture] 샘플 시뮬레이션 실패:', error);
+      } finally {
+        if (mounted.current) setIsCapturing(false);
+      }
+    })();
+  }, [startCapture]);
+
+  return { onCapture, isCapturing };
+}
+
+const styles = StyleSheet.create({
+  bar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tab: {
+    flex: 1,
+    minWidth: MIN_TOUCH,
+    minHeight: MIN_TOUCH,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  label: {
+    fontSize: typography.caption.size,
+    lineHeight: typography.caption.line,
+    fontWeight: typography.caption.weight,
+    letterSpacing: letterSpacingFor('caption'),
+  },
+  captureSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureCircle: {
+    width: CAPTURE_BUTTON_SIZE,
+    height: CAPTURE_BUTTON_SIZE,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // 탭바 위로 살짝 솟은 형태.
+    marginTop: -CAPTURE_BUTTON_LIFT,
+  },
+});

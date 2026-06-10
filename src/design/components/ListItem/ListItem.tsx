@@ -12,6 +12,11 @@ type ListItemProps = {
   trailing?: ReactNode;
   onPress?: () => void;
   showDivider?: boolean;
+  /**
+   * 스크린리더 라벨. 미지정 시 title을 쓴다. trailing의 시각 정보(개수 등)를
+   * 음성에도 합쳐 전달할 때 사용(예: "마케팅 자료 2장"). design.md §35.
+   */
+  accessibilityLabel?: string;
 };
 
 /** 1줄(subtitle 없음) 행 높이 — design.md §17 (≥44 탭타깃 충족). */
@@ -43,6 +48,7 @@ export function ListItem({
   trailing,
   onPress,
   showDivider = false,
+  accessibilityLabel,
 }: ListItemProps): ReactNode {
   const { colors } = useTheme();
   const [pressed, setPressed] = useState(false);
@@ -104,7 +110,7 @@ export function ListItem({
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         accessibilityRole="button"
-        accessibilityLabel={title}
+        accessibilityLabel={accessibilityLabel ?? title}
         android_ripple={{ color: colors.primaryMuted }}
         style={[
           styles.container,

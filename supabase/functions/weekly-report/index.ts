@@ -451,7 +451,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const candidates = (rows ?? []) as CaptureCandidate[];
-    const totalCaptures = candidates.length;
+
+    // total_captures는 "그 주 전체 캡처 수"여야 한다(후보는 랭킹 입력용 상한 50).
+    // 홈 통계카드의 "이번 주 N장"과 분모가 일치하도록 head:true·count:exact로 실수를 센다.
+    const { count: weekCount, error: countError } = await supabase
+      .from("captures")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", fromUtc)
+      .lt("created_at", toUtc);
+    if (countError) {
+      throw new Error(`captures 카운트 실패: ${countError.message}`);
+    }
+    const totalCaptures = weekCount ?? candidates.length;
 
     // (3) 캡처 < 5건: OpenAI 미호출, 빈 items 캐시·반환.
     let items: ReportItemRow[];

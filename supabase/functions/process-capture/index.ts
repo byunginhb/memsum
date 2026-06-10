@@ -36,6 +36,25 @@ const OPENAI_TIMEOUT_MS = 30000;
 // KST. starts_at/ends_at 해석 기준 타임존을 프롬프트에 명시한다.
 const TIMEZONE = "Asia/Seoul";
 
+// 캡처 카테고리 6종. DB check 제약(0005_category.sql)·src/lib/categories.ts와 동일.
+// 단일 진실은 클라이언트 categories.ts지만, Deno↔RN 경계라 여기 의도적으로 복제한다.
+const CATEGORY_KEYS = [
+  "marketing",
+  "event",
+  "receipt",
+  "shopping",
+  "info",
+  "etc",
+] as const;
+
+type CategoryKey = (typeof CATEGORY_KEYS)[number];
+
+// 미분류 폴백 카테고리.
+const DEFAULT_CATEGORY: CategoryKey = "etc";
+
+// 화이트리스트 검증용 Set.
+const CATEGORY_SET: ReadonlySet<string> = new Set(CATEGORY_KEYS);
+
 // ── 타입 ─────────────────────────────────────────────────────────────────────
 
 type SourcePlatform = "ios" | "android";
@@ -59,6 +78,7 @@ interface OpenAiResult {
   readonly title: string;
   readonly summary: string;
   readonly event: ExtractedEvent | null;
+  readonly category: CategoryKey;
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────────────────────
@@ -117,6 +137,13 @@ function buildSystemPrompt(nowIso: string): string {
     "1. 오타·띄어쓰기·줄바꿈을 교정한 정제 텍스트(clean_text)를 만듭니다. 원문에 없는 내용을 추가하지 않습니다.",
     "2. 한 줄 제목(title)과 한 줄 요약(summary)을 한국어로 생성합니다.",
     "3. 일정/약속/행사 등 캘린더 이벤트가 감지되면 event 객체로 추출합니다. 없으면 event는 null 입니다.",
+    "4. 캡처 내용을 아래 6종 중 하나로 분류해 category에 넣습니다(반드시 이 중 하나):",
+    "   - marketing: 광고·프로모션·할인·쿠폰·브랜드 캠페인 자료",
+    "   - event: 약속·일정·행사·예약·초대 등 날짜/시간이 핵심인 내용",
+    "   - receipt: 영수증·결제 내역·주문 확인·청구서",
+    "   - shopping: 상품·장바구니·위시리스트·쇼핑몰 화면",
+    "   - info: 기사·정보·팁·노하우·읽을거리(아티클)",
+    "   - etc: 위 어디에도 명확히 속하지 않는 기타",
     "",
     "한국식 날짜·시간 표현을 해석합니다. 예: '다음 주 화 오후 2시', '6/15 토 14시', '내일 오전 10시 반'.",
     `starts_at·ends_at은 ISO8601 형식이며 KST 오프셋(+09:00)을 포함합니다. 예: '2026-06-15T14:00:00+09:00'.`,
@@ -127,7 +154,8 @@ function buildSystemPrompt(nowIso: string): string {
     '  "clean_text": string,',
     '  "title": string,',
     '  "summary": string,',
-    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null }',
+    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null },',
+    '  "category": "marketing" | "event" | "receipt" | "shopping" | "info" | "etc"',
     '}',
   ].join("\n");
 }
@@ -159,7 +187,17 @@ function normalizeOpenAiResult(parsed: unknown, fallbackText: string): OpenAiRes
     };
   }
 
-  return { clean_text: cleanText, title, summary, event };
+  // 카테고리 화이트리스트 검증. enum 6종이면 그대로, 아니면 폴백:
+  // 이벤트가 잡혔으면 'event', 아니면 'etc'(src/lib/categories.ts normalizeCategory 동일 규칙).
+  const rawCategory = obj.category;
+  const category: CategoryKey =
+    typeof rawCategory === "string" && CATEGORY_SET.has(rawCategory)
+      ? (rawCategory as CategoryKey)
+      : event !== null
+        ? "event"
+        : DEFAULT_CATEGORY;
+
+  return { clean_text: cleanText, title, summary, event, category };
 }
 
 // OpenAI Chat Completions 1회 호출. 재시도가 필요한 상태(429/5xx)면 retryable=true로 throw.
@@ -331,6 +369,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .update({
           ocr_text: result.clean_text,
           parsed_event: parsedEvent,
+          category: result.category,
           status: "ocr_done",
         })
         .eq("id", body.capture_id)
@@ -353,6 +392,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           image_url: body.image_url ?? "",
           ocr_text: result.clean_text,
           parsed_event: parsedEvent,
+          category: result.category,
           source_platform: body.source_platform,
           status: "ocr_done",
         })
@@ -372,6 +412,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         title: result.title,
         summary: result.summary,
         event: result.event,
+        category: result.category,
       },
       200,
     );
