@@ -1,17 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
-import * as Notifications from 'expo-notifications';
 
 import { useToast } from '@/design/components/Toast/useToast';
 import { t } from '@/i18n';
-import {
-  CAPTURE_ASK_ACTION_DISMISS,
-  CAPTURE_ASK_CATEGORY,
-  ensureNotificationPermission,
-  notifyCaptureAsk,
-  notifyLocal,
-} from '@/lib/notifications';
+import { ensureNotificationPermission, notifyLocal } from '@/lib/notifications';
 import { useCaptureStore } from '@/stores/capture-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
@@ -34,6 +27,23 @@ const PROCESSED_IDS_MAX = 300;
  * 행잉되면 직렬 큐 전체가 막히므로, 시간 초과 시 실패로 간주하고 다음으로 넘어간다.
  */
 const PIPELINE_TIMEOUT_MS = 90 * 1000;
+
+/**
+ * 처리한 스크린샷 id 공유 집합.
+ * why 모듈 스코프: 훅(옵저버/캐치업/딥링크)과 헤드리스 [저장] 태스크(앱이 떠 있으면
+ * 같은 JS 런타임에서 실행됨)가 서로의 처리 여부를 보고 중복 저장을 막아야 한다.
+ */
+const processedIds = new Set<string>();
+
+/** 외부(헤드리스 태스크)용: 이미 처리된 항목인지. */
+export function isProcessedScreenshot(id: string): boolean {
+  return processedIds.has(id);
+}
+
+/** 외부(헤드리스 태스크)용: 처리됨으로 마킹(FIFO 상한 적용). */
+export function markProcessedScreenshot(id: string): void {
+  rememberProcessed(processedIds, id);
+}
 
 /**
  * 스크린샷 자동 감지 훅.
@@ -59,9 +69,6 @@ export function useAutoCapture(): void {
   const hydrated = useSettingsStore((state) => state.hydrated);
   const toast = useToast();
 
-  // 이미 처리(질문 게시 포함)한 스크린샷 id. 삽입 순서를 유지하는 Set이므로
-  // 상한 초과 시 가장 오래된 항목부터 제거한다(FIFO).
-  const processedIds = useRef<Set<string>>(new Set());
   // 직렬 처리 체인. 새 작업은 이전 처리 완료 후 시작된다.
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   // 권한 거부 안내는 세션당 1회만(반복 토스트 방지).
@@ -84,30 +91,13 @@ export function useAutoCapture(): void {
     })();
   }, [hydrated, autoCapture, toast]);
 
-  // 스크린샷 이벤트 구독 + 질문 알림 응답 구독 → 직렬 큐로 처리.
+  // 스크린샷 이벤트 구독 + 딥링크 → 직렬 큐로 처리.
   useEffect(() => {
-    // 같은 알림 응답이 리스너+콜드스타트 경로로 중복 전달되는 것을 막는다.
-    const handledResponses = new Set<string>();
-
     const subscription = addScreenshotListener((payload) => {
       enqueue(() => handleScreenshot(payload));
     });
 
-    const responseSub = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleAskResponse(response);
-      },
-    );
-    // 앱이 종료 상태에서 알림 액션으로 시작된 경우의 응답을 회수한다.
-    void Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        if (response) handleAskResponse(response);
-      })
-      .catch(() => {
-        /* 미지원 환경 — 무시 */
-      });
-
-    // 네이티브 질문 알림(JobScheduler 게시)의 [저장]/본문 탭 딥링크 처리.
+    // 네이티브 질문 알림(JobScheduler 게시)의 본문("열어서 보기") 탭 딥링크 처리.
     // Android 동결 중 감지는 네이티브 잡이 알림을 띄우고, 저장 선택 시
     // memsum://?autoSaveUri=... 로 앱을 열어 여기서 파이프라인을 잇는다.
     const handledUrls = new Set<string>();
@@ -120,8 +110,8 @@ export function useAutoCapture(): void {
         const uri = typeof rawUri === 'string' && rawUri.length > 0 ? rawUri : undefined;
         if (!uri) return;
         // 같은 항목이 옵저버/캐치업 경로로 이미 처리됐다면 중복 저장하지 않는다.
-        if (processedIds.current.has(uri)) return;
-        rememberProcessed(processedIds.current, uri);
+        if (processedIds.has(uri)) return;
+        rememberProcessed(processedIds, uri);
         const input = toCaptureInput({ uri });
         if (!input) return;
         enqueue(async () => {
@@ -158,7 +148,6 @@ export function useAutoCapture(): void {
 
     return () => {
       subscription.remove();
-      responseSub.remove();
       linkSub.remove();
       appStateSub.remove();
     };
@@ -173,7 +162,7 @@ export function useAutoCapture(): void {
     /** 단일 스크린샷 처리: 설정·중복 가드 → 포그라운드면 즉시, 백그라운드면 질문 알림. */
     async function handleScreenshot(payload: CaptureAskPayload): Promise<void> {
       const screenshotId = payload.assetId ?? payload.uri ?? '';
-      if (!screenshotId || processedIds.current.has(screenshotId)) return;
+      if (!screenshotId || processedIds.has(screenshotId)) return;
 
       // 콜백은 stale 클로저이므로 최신 설정값을 store에서 직접 읽는다.
       if (!useSettingsStore.getState().autoCapture) return;
@@ -182,54 +171,16 @@ export function useAutoCapture(): void {
       if (!input) return; // 지원되지 않는 페이로드(예: uri 없는 iOS 이벤트)는 조용히 무시.
 
       if (AppState.currentState !== 'active') {
-        // 다른 앱 사용 중: 상단 헤드업으로 묻는다. 게시 성공 시에만 처리됨으로 마킹해,
-        // 권한 거부 등으로 묻지 못한 항목은 앱 복귀 시 캐치업으로 다시 들어오게 한다.
-        const posted = await notifyCaptureAsk({
-          assetId: payload.assetId,
-          uri: payload.uri,
-        });
-        if (posted) rememberProcessed(processedIds.current, screenshotId);
+        // 다른 앱 사용 중: 질문 알림은 네이티브 잡(ScreenshotAskJobService)이 단일 게시한다
+        // (동결/비동결 모두 커버 + [저장]=백그라운드 처리). JS는 여기서 관여하지 않고,
+        // 사용자가 응답하지 않은 채 앱으로 돌아오면 캐치업(checkNow)이 자동 처리한다.
         return;
       }
 
       // 앱 사용 중: 묻지 않고 즉시 정리(토스트로 진행·결과 안내).
-      rememberProcessed(processedIds.current, screenshotId);
+      rememberProcessed(processedIds, screenshotId);
       toast.show({ tone: 'info', title: t('autoCapture.detected') });
       await runPipeline(input);
-    }
-
-    /** 질문 알림 응답 처리: [저장]/본문 탭 → 파이프라인, [무시] → 폐기. */
-    function handleAskResponse(
-      response: Notifications.NotificationResponse,
-    ): void {
-      const request = response.notification.request;
-      if (request.content.categoryIdentifier !== CAPTURE_ASK_CATEGORY) return;
-      if (handledResponses.has(request.identifier)) return;
-      handledResponses.add(request.identifier);
-
-      // 트레이에 남은 알림 정리(액션 응답은 자동 제거되지 않는 플랫폼이 있다).
-      void Notifications.dismissNotificationAsync(request.identifier).catch(
-        () => {
-          /* 이미 제거됨 — 무시 */
-        },
-      );
-
-      // [무시]는 여기서 끝(폐기). 본문 탭(DEFAULT)·[저장]은 저장 의사로 본다.
-      if (response.actionIdentifier === CAPTURE_ASK_ACTION_DISMISS) return;
-
-      const data = request.content.data as CaptureAskPayload | undefined;
-      const input = toCaptureInput({
-        assetId: data?.assetId,
-        uri: data?.uri,
-      });
-      if (!input) return;
-
-      enqueue(async () => {
-        if (AppState.currentState === 'active') {
-          toast.show({ tone: 'info', title: t('autoCapture.detected') });
-        }
-        await runPipeline(input);
-      });
     }
 
     /** 파이프라인 실행 + 결과 안내(포그라운드 토스트 / 백그라운드 시스템 알림). */

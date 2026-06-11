@@ -96,6 +96,15 @@ class PhotoLibraryWatcherModule : Module() {
       null
     }
 
+    // 외부 경로(헤드리스 [저장] 등)가 항목을 처리했음을 알린다 — 옵저버/캐치업이
+    // 같은 항목을 다시 발화해 중복 저장하는 것을 막는다(마커 전진).
+    Function("markHandled") { mediaId: Double ->
+      val id = mediaId.toLong()
+      if (id > lastSeenId) lastSeenId = id
+      if (id > lastCheckNowId) lastCheckNowId = id
+      null
+    }
+
     OnDestroy {
       // 옵저버 해제 필수 (메모리 누수 방지).
       observer?.let {

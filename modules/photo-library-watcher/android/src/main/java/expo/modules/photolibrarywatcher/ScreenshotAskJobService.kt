@@ -19,6 +19,9 @@ import android.os.Bundle
 import android.os.Process
 import android.provider.MediaStore
 import android.util.Log
+import com.facebook.react.HeadlessJsTaskService
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.jstasks.HeadlessJsTaskConfig
 
 // 백그라운드 스크린샷 질문 알림 잡.
 //
@@ -128,16 +131,27 @@ class ScreenshotAskJobService : JobService() {
 
     val notifId = latest.id.toInt()
 
-    // [저장]/본문 탭: 앱을 열며 딥링크 data로 캡처 입력을 전달한다.
-    // (라우터는 루트로 보내고, JS Linking 핸들러가 쿼리 파라미터를 읽어 파이프라인 실행.)
-    val saveIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+    // 본문 탭 = "열어서 보기": 앱을 열며 딥링크로 저장까지 잇는다(보고 싶은 사용자용).
+    val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
       data = Uri.parse(
         "memsum://?autoSaveUri=${Uri.encode(latest.contentUri)}&autoSaveNotifId=$notifId"
       )
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     } ?: return
-    val savePending = PendingIntent.getActivity(
-      this, notifId, saveIntent,
+    val openPending = PendingIntent.getActivity(
+      this, notifId, openIntent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // [저장] = 백그라운드 저장: 앱을 열지 않는다(다른 작업 방해 금지 — 사용자 요구).
+    // 브로드캐스트 → Headless JS 서비스가 화면 없이 파이프라인을 실행한다.
+    val saveIntent = Intent(this, SaveCaptureReceiver::class.java).apply {
+      putExtra(EXTRA_NOTIF_ID, notifId)
+      putExtra(EXTRA_URI, latest.contentUri)
+      putExtra(EXTRA_MEDIA_ID, latest.id)
+    }
+    val savePending = PendingIntent.getBroadcast(
+      this, notifId * 10 + 1, saveIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
@@ -146,7 +160,7 @@ class ScreenshotAskJobService : JobService() {
       putExtra(EXTRA_NOTIF_ID, notifId)
     }
     val dismissPending = PendingIntent.getBroadcast(
-      this, notifId, dismissIntent,
+      this, notifId * 10 + 2, dismissIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
@@ -157,7 +171,7 @@ class ScreenshotAskJobService : JobService() {
       .setContentTitle("Memsum에 저장할까요?")
       .setContentText("방금 캡처한 화면을 정리해 둘게요")
       .setAutoCancel(true)
-      .setContentIntent(savePending)
+      .setContentIntent(openPending)
       .addAction(android.app.Notification.Action.Builder(null, "저장", savePending).build())
       .addAction(android.app.Notification.Action.Builder(null, "무시", dismissPending).build())
       .build()
@@ -172,6 +186,10 @@ class ScreenshotAskJobService : JobService() {
     const val KEY_LAST_ASKED = "last_asked_id"
     const val CHANNEL_ASK = "capture-ask"
     const val EXTRA_NOTIF_ID = "notif_id"
+    const val EXTRA_URI = "uri"
+    const val EXTRA_MEDIA_ID = "media_id"
+    /** JS AppRegistry.registerHeadlessTask와 일치해야 하는 태스크 이름. */
+    const val HEADLESS_TASK = "MemsumSaveCapture"
 
     // MediaStore 이미지 변경을 트리거로 하는 1회성 잡 등록(실행 후 매번 재스케줄).
     fun schedule(context: Context) {
@@ -215,5 +233,51 @@ class AskDismissReceiver : BroadcastReceiver() {
       val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       nm.cancel(id)
     }
+  }
+}
+
+/**
+ * [저장] 액션 — 앱을 열지 않고 백그라운드에서 저장 파이프라인을 시작한다.
+ * 알림 액션 탭은 사용자 상호작용이라 이 짧은 윈도우 안에서 서비스 시작이 허용된다.
+ */
+class SaveCaptureReceiver : BroadcastReceiver() {
+  override fun onReceive(context: Context, intent: Intent) {
+    val notifId = intent.getIntExtra(ScreenshotAskJobService.EXTRA_NOTIF_ID, -1)
+    if (notifId >= 0) {
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      nm.cancel(notifId)
+    }
+
+    try {
+      val service = Intent(context, SaveCaptureService::class.java).apply {
+        putExtras(intent)
+      }
+      // Headless JS 동안 도즈로 잠들지 않도록 웨이크락 확보(RN 권장 패턴).
+      HeadlessJsTaskService.acquireWakeLockNow(context)
+      context.startService(service)
+      Log.i("PhotoLibraryWatcher", "[저장] 백그라운드 처리 시작 (notifId=$notifId)")
+    } catch (e: Exception) {
+      Log.e("PhotoLibraryWatcher", "백그라운드 저장 시작 실패", e)
+    }
+  }
+}
+
+/**
+ * 백그라운드 저장 실행기 — 화면 없이 JS 파이프라인(업로드→OCR→GPT→저장)을 돌린다.
+ * JS 번들이 안 떠 있으면(RN Headless) 런타임을 헤드리스로 부팅해 실행한다.
+ * 태스크 구현: src/tasks/save-capture-task.ts (AppRegistry 'MemsumSaveCapture').
+ */
+class SaveCaptureService : HeadlessJsTaskService() {
+  override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig? {
+    val extras = intent?.extras ?: return null
+    Log.i("PhotoLibraryWatcher", "헤드리스 저장 태스크 구성 (uri=${extras.getString(ScreenshotAskJobService.EXTRA_URI)})")
+    return HeadlessJsTaskConfig(
+      ScreenshotAskJobService.HEADLESS_TASK,
+      Arguments.fromBundle(extras),
+      // 업로드+OCR+GPT 왕복 여유. 초과 시 태스크 강제 종료(무한 점유 방지).
+      90_000,
+      // 앱이 포그라운드여도 실행 허용(드물지만 전환 직후 탭하는 경우).
+      true
+    )
   }
 }

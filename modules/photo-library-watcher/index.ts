@@ -17,6 +17,7 @@ type PhotoLibraryWatcherModuleEvents = {
 declare class PhotoLibraryWatcherModule extends NativeModule<PhotoLibraryWatcherModuleEvents> {
   startWatching: () => void;
   checkNow: () => void;
+  markHandled: (mediaId: number) => void;
 }
 
 const Native = requireNativeModule<PhotoLibraryWatcherModule>('PhotoLibraryWatcher');
@@ -50,6 +51,18 @@ export function checkNow(): void {
     Native.checkNow();
   } catch (error) {
     console.warn('[photo-library-watcher] checkNow 미지원/실패:', error);
+  }
+}
+
+/**
+ * 외부 경로(헤드리스 [저장] 등)가 항목을 처리했음을 네이티브에 알린다.
+ * 옵저버/캐치업 마커를 전진시켜 같은 항목의 재발화(중복 저장)를 막는다(Android 전용 no-op 허용).
+ */
+export function markHandled(mediaId: number): void {
+  try {
+    Native.markHandled(mediaId);
+  } catch (error) {
+    console.warn('[photo-library-watcher] markHandled 미지원/실패:', error);
   }
 }
 

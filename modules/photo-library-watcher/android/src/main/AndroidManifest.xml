@@ -14,5 +14,15 @@
     <receiver
       android:name="expo.modules.photolibrarywatcher.AskDismissReceiver"
       android:exported="false" />
+
+    <!-- 질문 알림의 [저장] 액션 — 앱을 열지 않고 백그라운드 저장 시작. -->
+    <receiver
+      android:name="expo.modules.photolibrarywatcher.SaveCaptureReceiver"
+      android:exported="false" />
+
+    <!-- Headless JS 실행기 — 화면 없이 저장 파이프라인(JS)을 돌린다. -->
+    <service
+      android:name="expo.modules.photolibrarywatcher.SaveCaptureService"
+      android:exported="false" />
   </application>
 </manifest>
