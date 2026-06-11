@@ -135,6 +135,8 @@
   "autoCapture.detected": "스크린샷을 정리하고 있어요",
   "autoCapture.saved": "스크린샷을 정리했어요",
   "autoCapture.error": "스크린샷 정리에 실패했어요",
+  "autoCapture.notifTitle": "Memsum",
+  "autoCapture.permissionNeeded": "사진 권한이 없어 자동 정리를 쓸 수 없어요. 설정에서 허용해주세요",
   "notif.dismiss": "알림 닫기",
   "home.greeting": "안녕 {name} 님",
   "home.greetingFallback": "안녕하세요",

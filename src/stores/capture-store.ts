@@ -37,11 +37,14 @@ type CaptureStore = {
   /**
    * 캡처 파이프라인 시작. options.silent=true면 확인 Sheet를 열지 않고 백그라운드로
    * 처리한다(스크린샷 자동 감지용 — 저장되면 savedCount 증가로 목록이 갱신된다).
+   *
+   * @returns saved — 서버 저장(done)까지 완료됐는지. 호출 측(자동 캡처 토스트 등)이
+   * 전역 savedCount 폴링 대신 이 반환값으로 성공을 판별한다(동시 캡처 race 제거).
    */
   startCapture: (
     input: StartCaptureInput,
     options?: { silent?: boolean },
-  ) => Promise<void>;
+  ) => Promise<{ saved: boolean }>;
   closeSheet: () => void;
   reset: () => void;
   /**
@@ -87,21 +90,28 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
   startCapture: async (
     input: StartCaptureInput,
     options?: { silent?: boolean },
-  ): Promise<void> => {
+  ): Promise<{ saved: boolean }> => {
+    const silent = options?.silent === true;
     const id = localCaptureId();
 
     // 초기 draft: uploading 단계로 시작. silent가 아니면 즉시 Sheet를 연다.
-    // silent(스크린샷 자동 감지)면 Sheet 없이 백그라운드 처리하고, 완료 시 savedCount로 알린다.
+    // silent(스크린샷 자동 감지)는 current/Sheet를 일절 건드리지 않는다 —
+    // current는 확인 Sheet 1개 전용 슬롯이라, 백그라운드 파이프라인이 공유하면
+    // 동시 캡처 시 서로를 중단시키는 race가 생긴다(코드리뷰 HIGH).
     const initial: CaptureDraft = {
       id,
       sourcePlatform: input.sourcePlatform,
       imageUri: input.imageUri,
       stage: 'uploading',
     };
-    set({ current: initial, isSheetOpen: options?.silent !== true });
+    if (!silent) {
+      set({ current: initial, isSheetOpen: true });
+    }
 
-    // 단계 전이마다 새 draft를 만들고, 그 사이 다른 캡처로 교체됐으면 무시한다.
+    // 단계 전이(UI 추적용). silent는 UI가 없으므로 항상 계속 진행한다.
+    // 비-silent는 그 사이 다른 캡처로 교체됐으면 UI 갱신을 멈춘다(파이프라인 자체는 계속).
     const advance = (next: CaptureDraft): boolean => {
+      if (silent) return true;
       if (get().current?.id !== id) return false;
       set({ current: next });
       return true;
@@ -111,6 +121,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       const message =
         error instanceof Error ? error.message : '캡처 처리 중 오류가 발생했습니다.';
       console.error('[capture] 실패:', { id, stage, error });
+      if (silent) return; // 백그라운드 캡처는 UI 상태를 건드리지 않는다(호출 측이 반환값으로 처리).
       // 현재 draft가 이 캡처일 때만 error로 전이(불변 업데이트).
       const draft = get().current;
       if (!draft || draft.id !== id) return;
@@ -124,7 +135,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       if (!userId) {
         const authError = useAuthStore.getState().error;
         fail('uploading', new Error(authError ?? '로그인 세션을 확보하지 못했습니다.'));
-        return;
+        return { saved: false };
       }
 
       // ② 이미지 업로드(stage: uploading). 업로드 경로는 로컬 captureId 사용.
@@ -134,12 +145,12 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         captureId: id,
       });
       if (!advance({ ...initial, stage: 'uploading', storagePath: upload.path })) {
-        return;
+        return { saved: false };
       }
 
       // ③ 온디바이스 OCR(stage: ocr).
       if (!advance({ ...initial, stage: 'ocr', storagePath: upload.path })) {
-        return;
+        return { saved: false };
       }
       const ocr = await recognizeText(ocrSource(input));
 
@@ -152,7 +163,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
           ocrText: ocr.text,
         })
       ) {
-        return;
+        return { saved: false };
       }
       // captureId는 넘기지 않는다: 로컬 id(cap_...)는 DB에 없고 uuid도 아니라
       // 함수의 UPDATE-by-id 경로가 실패한다. capture_id 없이 호출해 새 row를
@@ -164,23 +175,22 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         imageUrl: upload.path,
       });
 
-      // ⑤ 완료(stage: done). 서버 capture_id는 result.capture_id에 별도 보관.
-      if (
-        advance({
-          ...initial,
-          stage: 'done',
-          storagePath: upload.path,
-          ocrText: ocr.text,
-          result,
-        })
-      ) {
-        // 저장 완료 신호: 리스트 화면이 savedCount 변화를 구독해 새로고침한다.
-        set({ savedCount: get().savedCount + 1 });
-      }
+      // ⑤ 완료. 서버 저장은 이미 성공했으므로, UI(advance) 성공 여부와 무관하게
+      // 목록 새로고침 신호(savedCount)를 보낸다(신호 유실 방지 — 코드리뷰 HIGH).
+      advance({
+        ...initial,
+        stage: 'done',
+        storagePath: upload.path,
+        ocrText: ocr.text,
+        result,
+      });
+      set({ savedCount: get().savedCount + 1 });
+      return { saved: true };
     } catch (error) {
-      // 단계는 현재 draft에서 추정(가장 최근 전이 stage).
-      const stage = get().current?.stage ?? 'uploading';
+      // 단계는 현재 draft에서 추정(가장 최근 전이 stage). silent는 추적 안 하므로 uploading.
+      const stage = silent ? 'uploading' : (get().current?.stage ?? 'uploading');
       fail(stage, error);
+      return { saved: false };
     }
   },
 

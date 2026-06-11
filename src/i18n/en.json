@@ -135,6 +135,8 @@
   "autoCapture.detected": "Organizing your screenshot…",
   "autoCapture.saved": "Screenshot organized",
   "autoCapture.error": "Couldn't organize the screenshot",
+  "autoCapture.notifTitle": "Memsum",
+  "autoCapture.permissionNeeded": "Photo permission is required for auto-organize. Please allow it in Settings.",
   "notif.dismiss": "Dismiss notification",
   "home.greeting": "Hi, {name}",
   "home.greetingFallback": "Welcome back",
