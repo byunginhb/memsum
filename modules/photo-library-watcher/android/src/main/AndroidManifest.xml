@@ -1,3 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <application>
+    <!-- MediaStore 변경 트리거 잡: 백그라운드(동결) 중 스크린샷 감지 → 질문 알림 게시.
+         BIND_JOB_SERVICE 권한은 시스템(JobScheduler)만 바인드할 수 있게 하는 표준 설정. -->
+    <service
+      android:name="expo.modules.photolibrarywatcher.ScreenshotAskJobService"
+      android:permission="android.permission.BIND_JOB_SERVICE"
+      android:exported="false" />
+
+    <!-- 질문 알림의 [무시] 액션 — 앱을 열지 않고 알림만 제거. -->
+    <receiver
+      android:name="expo.modules.photolibrarywatcher.AskDismissReceiver"
+      android:exported="false" />
+  </application>
 </manifest>

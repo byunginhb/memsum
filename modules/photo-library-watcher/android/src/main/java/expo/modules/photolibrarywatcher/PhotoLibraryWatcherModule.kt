@@ -68,6 +68,15 @@ class PhotoLibraryWatcherModule : Module() {
           MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true, obs
         )
       }
+
+      // 백그라운드(동결) 감지용 잡 등록 + 질문 기준점 동기화.
+      // 인프로세스 옵저버는 동결 중 콜백을 받지 못하므로(freezer), MediaStore 변경 시
+      // OS가 깨워주는 TriggerContentUri 잡이 질문 알림을 담당한다(중복은 잡의
+      // 포그라운드-skip과 lastAsked 기준점으로 방지).
+      appContext.reactContext?.let { ctx ->
+        ScreenshotAskJobService.resetBaseline(ctx, lastSeenId)
+        ScreenshotAskJobService.schedule(ctx)
+      }
       null
     }
 
