@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+
+/* 브랜드 토큰 — 앱 디자인시스템(Calm Glass)과 동일 팔레트 */
+@theme {
+  --color-primary: #7c6fe8;
+  --color-primary-soft: #efedfc;
+  --color-accent: #f2a65a;
+  --color-ink: #1f2430;
+  --color-ink-soft: #5a6172;
+  --color-cream: #fbf5ed;
+  --color-card: #ffffff;
+  --color-line: #ece5da;
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system,
+    BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* 정책 문서(prose) — md 변환 HTML에 적용 */
+.legal h1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  margin: 0 0 0.6em;
+}
+.legal h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 2.2em 0 0.6em;
+}
+.legal h3 {
+  font-size: 1.02rem;
+  font-weight: 600;
+  margin: 1.6em 0 0.5em;
+}
+.legal p,
+.legal li {
+  font-size: 0.98rem;
+  line-height: 1.75;
+  color: var(--color-ink);
+}
+.legal p {
+  margin: 0.5em 0;
+}
+.legal ul {
+  list-style: disc;
+  padding-left: 1.3em;
+  margin: 0.6em 0;
+}
+.legal ul ul {
+  list-style: circle;
+  margin: 0.25em 0;
+}
+.legal hr {
+  border: none;
+  border-top: 1px solid var(--color-line);
+  margin: 2em 0;
+}
+.legal a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal code {
+  background: var(--color-primary-soft);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+.legal strong {
+  font-weight: 700;
+}
+.legal .table-wrap {
+  overflow-x: auto;
+  margin: 1em 0;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-card);
+}
+.legal table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+  font-size: 0.88rem;
+}
+.legal th,
+.legal td {
+  border-bottom: 1px solid var(--color-line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.6;
+}
+.legal th {
+  background: #f6f1fb;
+  font-weight: 600;
+}
+.legal tr:last-child td {
+  border-bottom: none;
+}
