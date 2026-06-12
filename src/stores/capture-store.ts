@@ -3,10 +3,18 @@ import { create } from 'zustand';
 import { processCapture } from '@/lib/api';
 import { uploadCaptureImage } from '@/lib/storage';
 import { useAuthStore } from '@/stores/auth-store';
+// 자동 캘린더 등록(설정 ON + 구글 연결 시). calendar-store는 capture-store를
+// import하지 않으므로 순환 의존이 없다.
+import { useCalendarStore } from '@/stores/calendar-store';
+import { useSettingsStore } from '@/stores/settings-store';
 
 import { recognizeText } from '../../modules/vision-ocr';
 
-import type { CaptureDraft, CaptureStage } from '@/features/capture/types';
+import type {
+  CaptureDraft,
+  CaptureStage,
+  ProcessCaptureResult,
+} from '@/features/capture/types';
 
 /**
  * 캡처 파이프라인 오케스트레이션 스토어 (W3-C).
@@ -80,6 +88,66 @@ function ocrSource(input: StartCaptureInput): { assetId?: string; uri?: string }
  */
 function uploadUri(input: StartCaptureInput): string {
   return input.uri ?? input.imageUri;
+}
+
+/** 설정 복원 대기 안전망(ms) — 복원 실패로 hydrated가 영영 안 켜져도 진행한다. */
+const SETTINGS_HYDRATION_TIMEOUT_MS = 3000;
+
+/**
+ * 설정(AsyncStorage persist) 복원 완료를 기다린다.
+ * why: 헤드리스([저장] 콜드 스타트)에서는 복원이 끝나기 전에 autoCalendar를
+ * 읽을 수 있다 — 기본값(true)이 사용자가 꺼 둔 설정을 덮어 의도와 반대로
+ * 자동 등록되는 race를 막는다. 이미 복원됐으면 즉시 반환.
+ */
+async function waitForSettingsHydration(): Promise<void> {
+  if (useSettingsStore.getState().hydrated) return;
+  await new Promise<void>((resolve) => {
+    const finish = (): void => {
+      unsubscribe();
+      clearTimeout(timer);
+      resolve();
+    };
+    const unsubscribe = useSettingsStore.subscribe((state) => {
+      if (state.hydrated) finish();
+    });
+    const timer = setTimeout(finish, SETTINGS_HYDRATION_TIMEOUT_MS);
+  });
+}
+
+/**
+ * 자동 캘린더 등록 — 설정(autoCalendar) ON + 구글 캘린더 연결 상태일 때,
+ * 캡처에서 감지된 일정(제목·시간)을 사용자의 구글 캘린더에 자동 등록한다.
+ *
+ * 실패해도 캡처 저장 자체에는 영향이 없다(비치명 — 로그만 남기고 계속).
+ * 헤드리스([저장] 백그라운드)에서도 동작해야 하므로 calendar-store가 아직
+ * 복원 전이면 SecureStore에서 토큰을 먼저 복원한다(restore는 멱등).
+ *
+ * @returns 등록했으면 true(호출 측이 목록 갱신 신호를 보낼 수 있게).
+ */
+async function autoRegisterCalendarIfEnabled(
+  result: ProcessCaptureResult,
+): Promise<boolean> {
+  try {
+    if (!result.event) return false;
+    await waitForSettingsHydration();
+    if (!useSettingsStore.getState().autoCalendar) return false;
+
+    const calendar = useCalendarStore.getState();
+    if (!calendar.hydrated) {
+      await calendar.restore();
+    }
+    if (useCalendarStore.getState().status !== 'connected') return false;
+
+    await useCalendarStore.getState().registerCapture({
+      captureId: result.capture_id,
+      event: result.event,
+    });
+    return true;
+  } catch (error) {
+    // 자동 등록 실패는 조용히 넘긴다(무음 정책) — 사용자는 상세/캘린더 탭에서 수동 등록 가능.
+    console.error('[capture] 자동 캘린더 등록 실패:', error);
+    return false;
+  }
 }
 
 export const useCaptureStore = create<CaptureStore>((set, get) => ({
@@ -185,6 +253,13 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         result,
       });
       set({ savedCount: get().savedCount + 1 });
+
+      // ⑥ 자동 캘린더 등록(설정 ON + 연결 시). 등록되면 목록에 '캘린더 추가됨'이
+      // 반영되도록 신호를 한 번 더 보낸다. 실패는 비치명(저장은 이미 완료).
+      const registered = await autoRegisterCalendarIfEnabled(result);
+      if (registered) {
+        set({ savedCount: get().savedCount + 1 });
+      }
       return { saved: true };
     } catch (error) {
       // 단계는 현재 draft에서 추정(가장 최근 전이 stage). silent는 추적 안 하므로 uploading.

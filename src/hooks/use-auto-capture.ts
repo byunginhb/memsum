@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 
 import { useToast } from '@/design/components/Toast/useToast';
 import { t } from '@/i18n';
-import { ensureNotificationPermission, notifyLocal } from '@/lib/notifications';
+import { ensureNotificationPermission } from '@/lib/notifications';
 import { useCaptureStore } from '@/stores/capture-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
@@ -115,9 +115,6 @@ export function useAutoCapture(): void {
         const input = toCaptureInput({ uri });
         if (!input) return;
         enqueue(async () => {
-          if (AppState.currentState === 'active') {
-            toast.show({ tone: 'info', title: t('autoCapture.detected') });
-          }
           await runPipeline(input);
         });
       } catch (error) {
@@ -177,13 +174,15 @@ export function useAutoCapture(): void {
         return;
       }
 
-      // 앱 사용 중: 묻지 않고 즉시 정리(토스트로 진행·결과 안내).
+      // 앱 사용 중: 묻지 않고 조용히 정리한다(무음 정책 — 저장되면 목록 갱신이 곧 피드백).
       rememberProcessed(processedIds, screenshotId);
-      toast.show({ tone: 'info', title: t('autoCapture.detected') });
       await runPipeline(input);
     }
 
-    /** 파이프라인 실행 + 결과 안내(포그라운드 토스트 / 백그라운드 시스템 알림). */
+    /**
+     * 파이프라인 실행 — 무음 정책: 성공해도 알리지 않는다(목록 자동 갱신이 피드백).
+     * 실패만 포그라운드 토스트로 알린다(데이터 유실은 사용자가 알아야 함).
+     */
     async function runPipeline(input: StartCaptureInput): Promise<void> {
       // 성공 판별은 반환값으로(전역 savedCount 폴링은 동시 캡처에서 오판 — 리뷰 HIGH).
       // 타임아웃 race: 동결 중 끊긴 네트워크가 큐를 영구 차단하지 않게 한다.
@@ -200,16 +199,7 @@ export function useAutoCapture(): void {
         console.error('[auto-capture] 처리 실패:', error);
       }
 
-      // 결과 안내: 완료 시점의 앱 상태로 토스트/시스템 알림을 분기한다.
-      const isActiveNow = AppState.currentState === 'active';
-      if (saved) {
-        if (isActiveNow) {
-          toast.show({ tone: 'success', title: t('autoCapture.saved') });
-        } else {
-          await notifyLocal(t('autoCapture.notifTitle'), t('autoCapture.saved'));
-        }
-      } else if (isActiveNow) {
-        // 실패는 포그라운드에서만 토스트(백그라운드 실패 알림은 소음 — 재시도 가능).
+      if (!saved && AppState.currentState === 'active') {
         toast.show({ tone: 'danger', title: t('autoCapture.error') });
       }
     }

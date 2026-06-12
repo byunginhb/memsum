@@ -12,6 +12,7 @@ import { ToastProvider } from '@/design/components/Toast';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
 import { useAutoCapture } from '@/hooks/use-auto-capture';
+import { useWeeklyReportNotification } from '@/hooks/use-weekly-report-notification';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 
@@ -61,6 +62,8 @@ export default function RootLayout() {
               <ThemedStatusBar />
               {/* 스크린샷 자동 감지 → 백그라운드 캡처(앱 핵심 기능). UI 없음. */}
               <AutoCaptureGate />
+              {/* 주 1회 리포트 알림(일요일 저녁) — 설정 토글과 동기화. UI 없음. */}
+              <WeeklyReportGate />
               <OnboardingGate>
                 <Stack screenOptions={{ headerShown: false }} />
               </OnboardingGate>
@@ -135,5 +138,14 @@ function ThemedStatusBar() {
  */
 function AutoCaptureGate() {
   useAutoCapture();
+  return null;
+}
+
+/**
+ * 주간 리포트 알림 게이트 — UI 없는 마운트 지점.
+ * 설정의 weeklyReport 토글과 일요일 저녁 예약 알림을 동기화하고, 탭 시 리포트로 이동한다.
+ */
+function WeeklyReportGate() {
+  useWeeklyReportNotification();
   return null;
 }

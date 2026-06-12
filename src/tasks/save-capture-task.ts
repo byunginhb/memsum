@@ -2,15 +2,15 @@
 //
 // 질문 알림의 [저장] 액션 → SaveCaptureReceiver → HeadlessJsTaskService가 이 태스크를
 // 화면 없이 실행한다(앱 전환 없음 — 사용자 작업 비방해). 업로드→온디바이스 OCR→GPT→저장
-// 파이프라인(capture-store.startCapture silent)을 그대로 재사용하고, 결과는 시스템
-// 알림으로만 알린다. 등록: 루트 index.js의 AppRegistry('MemsumSaveCapture').
+// 파이프라인(capture-store.startCapture silent)을 그대로 재사용한다.
+//
+// 알림 정책: 결과 알림 없음(완전 무음). 평소엔 조용히 쌓이고, 주 1회 리포트만 알린다.
+// 등록: 루트 index.js의 AppRegistry('MemsumSaveCapture').
 
 import {
   isProcessedScreenshot,
   markProcessedScreenshot,
 } from '@/hooks/use-auto-capture';
-import { t } from '@/i18n';
-import { notifyLocal } from '@/lib/notifications';
 import { useCaptureStore } from '@/stores/capture-store';
 
 import { markHandled } from '../../modules/photo-library-watcher';
@@ -33,13 +33,11 @@ export async function saveCaptureTask(
   if (isProcessedScreenshot(uri)) return;
   markProcessedScreenshot(uri);
 
-  let saved = false;
   try {
-    const result = await useCaptureStore.getState().startCapture(
+    await useCaptureStore.getState().startCapture(
       { imageUri: uri, sourcePlatform: 'android', uri },
       { silent: true },
     );
-    saved = result.saved;
   } catch (error) {
     console.error('[save-capture-task] 백그라운드 저장 실패:', error);
   }
@@ -48,10 +46,5 @@ export async function saveCaptureTask(
   if (typeof data?.media_id === 'number' && Number.isFinite(data.media_id)) {
     markHandled(data.media_id);
   }
-
-  // 앱은 백그라운드(화면 없음)이므로 결과는 시스템 알림으로만 알린다.
-  await notifyLocal(
-    t('autoCapture.notifTitle'),
-    saved ? t('autoCapture.saved') : t('autoCapture.error'),
-  );
+  // 결과 알림 없음(무음 정책) — 다음에 앱을 열면 목록에 들어와 있다.
 }

@@ -129,7 +129,12 @@ class ScreenshotAskJobService : JobService() {
       )
     }
 
-    val notifId = latest.id.toInt()
+    // 질문 알림은 항상 최신 1건만 유지(고정 id → 새 질문이 이전 질문을 교체).
+    // why: mediaId 기반 가변 id로 누적되면 OS가 자동 그룹으로 묶어 [저장]/[무시]
+    // 액션 버튼이 가려진다. 응답 없는 옛 질문은 앱 복귀 시 캐치업(checkNow)이
+    // 회수하므로 교체로 잃는 것이 없다. PendingIntent도 고정 requestCode +
+    // FLAG_UPDATE_CURRENT라 extras(uri·media_id)가 최신 항목으로 갱신된다.
+    val notifId = ASK_NOTIF_ID
 
     // 본문 탭 = "열어서 보기": 앱을 열며 딥링크로 저장까지 잇는다(보고 싶은 사용자용).
     val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
@@ -182,6 +187,8 @@ class ScreenshotAskJobService : JobService() {
   companion object {
     private const val TAG = "PhotoLibraryWatcher"
     private const val JOB_ID = 1011
+    /** 질문 알림 고정 id — 최신 질문 1건만 유지(교체 게시). JOB_ID와 겹치지 않게. */
+    private const val ASK_NOTIF_ID = 1012
     const val PREFS = "photo_watcher"
     const val KEY_LAST_ASKED = "last_asked_id"
     const val CHANNEL_ASK = "capture-ask"
