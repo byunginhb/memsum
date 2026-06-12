@@ -143,6 +143,7 @@ function page({ lang, title, body, altHref, altLabel }) {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${title}</title>
 <meta name="robots" content="index,follow" />
+<meta name="google-site-verification" content="ZExuZuVV_F2gY39RAdQoDeu3AYF26yYg81-mjzeWJwM" />
 <style>
 :root{--primary:#7C6FE8;--ink:#1F2430;--ink-soft:#5A6172;--line:#E7E4F4;--bg:#FAFAFD;--card:#FFFFFF;}
 *{box-sizing:border-box;}
