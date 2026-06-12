@@ -49,6 +49,41 @@ pnpm android   # = expo run:android
 
 ---
 
+## 🔴 배포 직전 체크리스트 — 남은 것은 4가지 (2026-06-12 갱신)
+
+코드·검증·문서·정책 호스팅까지 끝났습니다. **아래 4가지만 하시면 스토어 제출이 가능합니다.**
+(순서 = 리드타임 긴 순. 1·2·3은 오늘 시작 권장)
+
+### 1. Google OAuth 동의화면 "게시" + 검증 신청 — 가장 오래 걸림(수일~수주)
+- https://console.cloud.google.com → `memsum` 프로젝트 → **OAuth 동의 화면 → 앱 게시(Publish)**
+- 검증 폼에 입력할 값 (전부 준비됨):
+  - 홈페이지: `https://byunginhb.github.io/memsum/`
+  - 개인정보처리방침: `https://byunginhb.github.io/memsum/privacy.html`
+  - 스코프 정당화: `calendar.events` — "스크린샷에서 추출한 일정을 사용자의 구글 캘린더에 등록"
+- 검증 완료 전에도 테스트 사용자 100명까지는 동작하므로, 출시 일정과 병렬 진행 가능
+
+### 2. Apple Developer Program 가입 — $99/년
+- https://developer.apple.com/programs/ (개인 등록 기준 1~2일 소요 가능)
+
+### 3. Google Play Console 가입 — $25 1회
+- https://play.google.com/console/signup (신원 확인 1~2일 소요 가능)
+
+### 4. EAS 로그인 (계정 가입 후)
+```bash
+eas login && eas init      # projectId가 app.json에 자동 기록됨
+```
+→ 여기까지 되면 제가 production 빌드·제출 명령과 콘솔 입력값을 순서대로 안내합니다.
+
+### ✅ 제가 이번에 끝낸 것 (2026-06-12)
+- **개인정보처리방침 게시**: https://byunginhb.github.io/memsum/privacy.html (영문: /privacy-en.html, 랜딩: /)
+  - 원본은 `docs/store/privacy-policy.*.md` (SSOT) — 수정 시 `node scripts/gen-web-policy.mjs` 재실행 후 gh-pages 푸시
+- **스토어 문서 확정값 반영**: 운영자명 Byungin Song / 지원 이메일 byunginhb@gmail.com /
+  정책·지원 URL / 시행일 2026-06-12 / 삭제 요청 채널 / 데이터 리전 등 일괄 기입
+  - 남은 플레이스홀더는 제출 시 결정 항목 4개뿐: 이용약관 URL(선택), 앱 이름·부제 최종안, 연령 등급 설문
+- **iOS 재빌드 + 검증**: 무음 자동 저장 PASS(DB +1, 토스트 없음, 홈 카드 갱신), 캘린더·JS 에러 0건
+
+---
+
 ## ✅ 알림 정책 확정 — "평소엔 완전 무음, 일요일 저녁에 짜잔" (2026-06-12)
 
 요청하신 정책을 구현하고 Android 에뮬레이터에서 라이브 검증까지 완료했습니다.

@@ -1,7 +1,7 @@
 # Memsum Privacy Policy
 
-**Effective date: [[Effective date YYYY-MM-DD]]**
-**Last updated: [[Last updated YYYY-MM-DD]]**
+**Effective date: 2026-06-12**
+**Last updated: 2026-06-12**
 
 Memsum ("we," "us," or the "Service") values your privacy and complies with applicable data protection laws, including the Korean Personal Information Protection Act (PIPA) and, where applicable, the EU General Data Protection Regulation (GDPR). This Privacy Policy explains what information the Memsum mobile application (iOS and Android, package identifier `app.memsum`) processes, for what purposes, and how we protect it.
 
@@ -114,22 +114,12 @@ To exercise these rights, contact us using the details in Section 9. We will act
 For questions about data processing, to exercise your rights, or to file a complaint, please contact:
 
 - Service name: Memsum
-- Data protection officer / operator: [[Operator or business name]]
-- Contact email: [[Support email address]]
-- Policy URL: [[Privacy policy hosting URL]]
+- Data protection officer / operator: Byungin Song
+- Contact email: byunginhb@gmail.com
+- Policy URL: https://byunginhb.github.io/memsum/privacy-en.html
 
 ---
 
 ## 10. Changes to This Policy
 
 We may update this Privacy Policy to reflect changes in law or the Service. For material changes, we will provide notice through the app or the policy page before the effective date. The updated Policy takes effect on the effective date above.
-
----
-
-## Placeholders to fill in (must be finalized before release)
-
-- [[Effective date YYYY-MM-DD]] — Policy effective date
-- [[Last updated YYYY-MM-DD]] — Policy last updated date
-- [[Operator or business name]] — Data protection officer (individual or business name)
-- [[Support email address]] — Email for user inquiries and rights requests
-- [[Privacy policy hosting URL]] — Public policy URL to enter during store submission
