@@ -19,6 +19,9 @@ class PhotoLibraryWatcherModule : Module() {
   private var observer: ContentObserver? = null
   private var lastSeenId: Long = 0L
 
+  // 캐치업 1회당 회수 상한. 리스너 부재 동안 쌓일 수 있는 현실적 최대치보다 넉넉하게.
+  private val catchUpLimit = 20
+
   // checkNow(캐치업) 전용 마커. lastSeenId와 분리한 이유: 옵저버가 백그라운드에서
   // 발화하며 lastSeenId를 마킹한 직후 프로세스가 동결되면 JS 전달이 유실되는데,
   // 같은 마커를 쓰면 복귀 후 checkNow가 "이미 본 항목"으로 건너뛴다. checkNow는
@@ -148,10 +151,15 @@ class PhotoLibraryWatcherModule : Module() {
     }
   }
 
-  // 캐치업 조회(checkNow 전용): 최신 이미지 1건이 (1) 스크린샷이고 (2) 앱 시작 이후
-  // 추가됐고 (3) checkNow로 아직 재발화하지 않았다면 발화한다. lastSeenId(옵저버 마커)와
-  // 독립적으로 동작해, 옵저버 발화 직후 동결로 JS 전달이 유실된 항목도 복귀 시 회수된다.
+  // 캐치업 조회(checkNow 전용): 리스너 부재 동안(JS 로딩·백그라운드 동결·서스펜드)
+  // 쌓인 스크린샷을 전부 회수한다. lastSeenId(옵저버 마커)와 독립적으로 동작해,
+  // 옵저버 발화 직후 동결로 JS 전달이 유실된 항목도 복귀 시 회수된다.
   // (옵저버가 정상 전달한 항목을 한 번 더 보낼 수 있으나 JS processedIds가 걸러낸다.)
+  //
+  // why 멀티 회수: 연속 캡처 후 복귀 시 LIMIT 1이면 마지막 1장만 처리되고 나머지는
+  // 마커 전진으로 영구 유실된다(데모 시드 5건 중 1건만 저장되는 실측으로 확인).
+  // 최신 catchUpLimit건 안에서 마커(lastCheckNowId)·시작시각 이후 스크린샷을
+  // 오래된 순으로 모두 발화한다(상한 초과분은 과거 오발화 방지와의 트레이드오프).
   private fun queryForCatchUp(resolver: ContentResolver) {
     val projection = arrayOf(
       MediaStore.Images.Media._ID,
@@ -170,7 +178,7 @@ class PhotoLibraryWatcherModule : Module() {
           ContentResolver.QUERY_ARG_SORT_DIRECTION,
           ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
         )
-        putInt(ContentResolver.QUERY_ARG_LIMIT, 1)
+        putInt(ContentResolver.QUERY_ARG_LIMIT, catchUpLimit)
       }
       resolver.query(
         MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, queryArgs, null
@@ -183,32 +191,44 @@ class PhotoLibraryWatcherModule : Module() {
       )
     }
 
+    data class CatchUpItem(val id: Long, val name: String, val dateAdded: Long)
+    val items = mutableListOf<CatchUpItem>()
+
     cursor?.use { c ->
-      if (!c.moveToFirst()) return
-      val id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
-      val name = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: ""
-      val path = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)) ?: ""
-      val dateAdded = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
+      var scanned = 0
+      while (c.moveToNext() && scanned < catchUpLimit) {
+        scanned += 1
+        val id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+        val name = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: ""
+        val path = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)) ?: ""
+        val dateAdded = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
 
-      if (id == lastCheckNowId) return
-      if (dateAdded < startTimeSec) return
-      val isScreenshot = path.contains("Screenshots", true) ||
-        name.contains("Screenshot", true)
-      if (!isScreenshot) return
+        if (id <= lastCheckNowId) continue
+        if (dateAdded < startTimeSec) continue
+        val isScreenshot = path.contains("Screenshots", true) ||
+          name.contains("Screenshot", true)
+        if (!isScreenshot) continue
 
-      lastCheckNowId = id
-      // 옵저버의 후속 중복 발화도 줄인다(JS 중복 가드가 있지만 이벤트 수 자체를 절약).
-      lastSeenId = id
+        items.add(CatchUpItem(id, name, dateAdded))
+      }
+    }
+    if (items.isEmpty()) return
+
+    // 오래된 순으로 발화해 캡처 순서대로 처리되게 한다. 마커는 가장 새 항목까지 전진
+    // (옵저버의 후속 중복 발화도 줄인다 — JS 중복 가드가 있지만 이벤트 수 자체를 절약).
+    for (item in items.sortedBy { it.id }) {
+      if (item.id > lastCheckNowId) lastCheckNowId = item.id
+      if (item.id > lastSeenId) lastSeenId = item.id
 
       val contentUri = Uri.withAppendedPath(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString()
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, item.id.toString()
       )
       sendEvent(
         "onScreenshot",
         mapOf(
           "uri" to contentUri.toString(),
-          "displayName" to name,
-          "createdAt" to dateAdded
+          "displayName" to item.name,
+          "createdAt" to item.dateAdded
         )
       )
     }

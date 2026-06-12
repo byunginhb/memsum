@@ -124,7 +124,9 @@ public class PhotoLibraryWatcherModule: Module {
       options.predicate = datePredicate
     }
     options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-    options.fetchLimit = 5
+    // 연속 캡처 후 복귀 시 일괄 회수 상한(Android catchUpLimit와 동일 기준).
+    // sentIds 가드가 있어 반복 호출에도 중복 발화는 없다.
+    options.fetchLimit = 20
 
     let fetch = PHAsset.fetchAssets(with: .image, options: options)
     var assets: [PHAsset] = []
