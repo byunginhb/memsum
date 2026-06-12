@@ -54,13 +54,25 @@ pnpm android   # = expo run:android
 코드·검증·문서·정책 호스팅까지 끝났습니다. **아래 4가지만 하시면 스토어 제출이 가능합니다.**
 (순서 = 리드타임 긴 순. 1·2·3은 오늘 시작 권장)
 
-### 1. Google OAuth 동의화면 "게시" + 검증 신청 — 가장 오래 걸림(수일~수주)
-- https://console.cloud.google.com → `memsum` 프로젝트 → **OAuth 동의 화면 → 앱 게시(Publish)**
-- 검증 폼에 입력할 값 (전부 준비됨):
-  - 홈페이지: `https://byunginhb.github.io/memsum/`
-  - 개인정보처리방침: `https://byunginhb.github.io/memsum/privacy.html`
-  - 스코프 정당화: `calendar.events` — "스크린샷에서 추출한 일정을 사용자의 구글 캘린더에 등록"
-- 검증 완료 전에도 테스트 사용자 100명까지는 동작하므로, 출시 일정과 병렬 진행 가능
+### 1. Google OAuth 검증 — ⏸️ 보류 중 (커스텀 도메인 필요 — 2026-06-12 확인)
+**진행 결과**: 브랜딩 입력(앱명·지원이메일·로고·홈페이지·정책 링크) 완료, 프로덕션 게시 완료,
+Search Console 소유 확인 완료(`/memsum/` + 루트 둘 다). 그러나 **브랜딩 인증이 반복 거부**.
+
+**원인(구글 공식 정책)**: `*.github.io` 같은 **공유 호스팅 서브도메인은 Search Console
+확인을 해도 "내 소유"로 인정하지 않음** (Trust & Safety 팀: "github.io 등은 피해야 한다").
+Firebase web.app 사용자들도 동일하게 막힘 — 해결책은 커스텀 도메인뿐.
+
+**현재 상태로 되는 것 / 안 되는 것**:
+- ✅ 앱의 모든 기능(감지·정리·리포트)은 검증과 무관하게 정상
+- ✅ 캘린더 연동도 동작하지만, 연결 시 "확인되지 않은 앱" 경고 화면이 뜸
+  (고급 → "memsum(안전하지 않음)으로 이동"으로 진행 가능, 신규 사용자 100명 한도)
+- ❌ 경고 없는 깔끔한 동의 화면은 검증 통과 후에만
+
+**출시 직전에 할 일** (도메인 구매 결정 시 — 이후 설정은 Claude가 전부 자동 처리):
+1. 도메인 구매 (추천: `memsum.app`, 연 $14~20 — Cloudflare Registrar/Namecheap/가비아)
+2. Claude가: GitHub Pages CNAME 연결 → 정책 페이지·스토어 문서 URL 전부 교체 →
+   DNS 레코드값 안내(등록처에 붙여넣기) → Search Console 도메인 속성 → 브랜딩 재제출
+3. 브랜딩 통과 → Data access(민감 스코프) 검증 제출(정당화 문구 준비됨) — 보통 2~3영업일+α
 
 ### 2. Apple Developer Program 가입 — $99/년
 - https://developer.apple.com/programs/ (개인 등록 기준 1~2일 소요 가능)
