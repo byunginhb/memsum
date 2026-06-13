@@ -21,6 +21,7 @@
   "exclude": [
     "node_modules",
     "supabase/functions",
-    "memsum-web"
+    "memsum-web",
+    "**/__tests__/**"
   ]
 }

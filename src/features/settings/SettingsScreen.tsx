@@ -89,11 +89,6 @@ export function SettingsScreen(): ReactNode {
     router.back();
   }, [router]);
 
-  // 미구현 데이터 동작(백업·내보내기) — 토스트로 준비 중 안내(공통 핸들러로 중복 제거).
-  const showComingSoon = useCallback(() => {
-    toast.show({ tone: 'info', title: t('settings.comingSoon') });
-  }, [toast]);
-
   // 실제 삭제 수행(확인 후). 본인 캡처·이미지·리포트를 영구 삭제하고 목록을 비운다.
   const runDeleteAllData = useCallback(async (): Promise<void> => {
     if (!userId) {
@@ -239,18 +234,9 @@ export function SettingsScreen(): ReactNode {
           />
         </Section>
 
-        {/* 데이터 섹션 — 백업·내보내기는 준비 중(토스트), "내 데이터 삭제"는 실제 동작 */}
+        {/* 데이터 섹션 — "내 데이터 삭제"는 실제 동작. 백업·내보내기는 미구현이라
+            1.0에서 노출하지 않는다(준비 중 토스트 스텁 제거 — 구현 시 재노출). */}
         <Section header={t('settings.section.data')}>
-          <ListItem
-            title={t('settings.data.backup')}
-            trailing={<Icon name="chevron-right" size={20} color="textSecondary" />}
-            onPress={showComingSoon}
-          />
-          <ListItem
-            title={t('settings.data.export')}
-            trailing={<Icon name="chevron-right" size={20} color="textSecondary" />}
-            onPress={showComingSoon}
-          />
           <ListItem
             title={t('settings.data.delete')}
             // 삭제는 수십 초 걸릴 수 있어(다량 캡처) 진행 중 스피너로 피드백한다.
