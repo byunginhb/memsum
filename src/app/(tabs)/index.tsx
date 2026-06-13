@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
 
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
@@ -16,13 +15,10 @@ import { WeeklyStatsCard } from '@/features/home/WeeklyStatsCard';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCaptures } from '@/hooks/use-captures';
 import { useCategoryGroups } from '@/hooks/use-category-groups';
+import { usePhotoImport } from '@/hooks/use-photo-import';
 import { useWeeklyStats } from '@/hooks/use-weekly-stats';
 import { t } from '@/i18n';
 import type { CategoryKey } from '@/lib/categories';
-import { useCaptureStore } from '@/stores/capture-store';
-
-// 샘플 스크린샷(시뮬레이션용). 구 홈과 동일 에셋을 빈 상태 CTA의 캡처 흐름 트리거에 재사용.
-const SAMPLE_KO = require('@/assets/ocr-test/sample-ko.png');
 
 // 홈 "최근 캡처"는 헤드라인 미리보기이므로 상위 N개만 노출(전체 목록은 검색·탭으로).
 const RECENT_LIMIT = 6;
@@ -48,7 +44,7 @@ export default function HomeScreen(): ReactNode {
   const captures = useCaptures();
   const weeklyStats = useWeeklyStats();
   const categoryGroups = useCategoryGroups();
-  const { onSimulate } = useSampleCapture();
+  const { onImport } = usePhotoImport();
 
   // 빈 상태 판정: 캡처 0건 && 최초 로드 중이 아님. 로딩 중에는 깜빡임 방지로 빈 상태를 숨긴다.
   const isEmpty = captures.items.length === 0 && !captures.isLoading;
@@ -107,7 +103,7 @@ export default function HomeScreen(): ReactNode {
       <HomeGreeting topInset={insets.top} />
 
       {isEmpty ? (
-        <HomeEmptyState onSimulate={onSimulate} />
+        <HomeEmptyState onImport={onImport} />
       ) : (
         <View style={styles.sections}>
           <View style={styles.block}>
@@ -153,66 +149,25 @@ function SectionLabel({ label }: SectionLabelProps): ReactNode {
 }
 
 type HomeEmptyStateProps = {
-  onSimulate: () => void;
+  onImport: () => void;
 };
 
 /**
  * 홈 빈 상태 — 브랜드 모먼트.
  * 디자인 EmptyState에 애니메이션 DotsGrid(9점 로고)를 일러스트로 주입하고,
- * 샘플 캡처 CTA로 첫 경험을 유도한다(design.md §26·빈 상태 가이드).
+ * "사진 가져와 정리하기" CTA로 첫 경험을 유도한다(design.md §26·빈 상태 가이드).
  */
-function HomeEmptyState({ onSimulate }: HomeEmptyStateProps): ReactNode {
+function HomeEmptyState({ onImport }: HomeEmptyStateProps): ReactNode {
   return (
     <View style={styles.empty}>
       <EmptyState
         illustration={<DotsGrid size={EMPTY_ILLUSTRATION_SIZE} animated />}
         title={t('home.empty.title')}
         body={t('home.empty.body')}
-        action={{ label: t('home.capture.sample'), onPress: onSimulate }}
+        action={{ label: t('home.capture.import'), onPress: onImport }}
       />
     </View>
   );
-}
-
-/**
- * 샘플 캡처 트리거 훅(구 홈 onSimulate 로직 재사용).
- * 번들 sample-ko.png를 localUri로 확보한 뒤 startCapture로 캡처 흐름을 시작한다.
- * 저장 완료 시 capture-store.savedCount가 증가하고, 데이터 훅들이 이를 구독해 자동 새로고침한다.
- */
-function useSampleCapture(): { onSimulate: () => void; isSimulating: boolean } {
-  const startCapture = useCaptureStore((state) => state.startCapture);
-  const [isSimulating, setIsSimulating] = useState(false);
-  // 언마운트 후 setState 경고 방지.
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  const onSimulate = useCallback((): void => {
-    setIsSimulating(true);
-    void (async () => {
-      try {
-        const asset = Asset.fromModule(SAMPLE_KO);
-        await asset.downloadAsync();
-        const uri = asset.localUri ?? asset.uri;
-        if (!uri) {
-          throw new Error('샘플 이미지 경로를 확인할 수 없습니다.');
-        }
-        // 시뮬레이터에서 현재 OS를 sourcePlatform으로. OCR/업로드 모두 uri 경로.
-        const sourcePlatform = Platform.OS === 'ios' ? 'ios' : 'android';
-        await startCapture({ imageUri: uri, sourcePlatform, uri });
-      } catch (error) {
-        console.error('[capture] 샘플 시뮬레이션 실패:', error);
-      } finally {
-        if (mounted.current) setIsSimulating(false);
-      }
-    })();
-  }, [startCapture]);
-
-  return { onSimulate, isSimulating };
 }
 
 const styles = StyleSheet.create({

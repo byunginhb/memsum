@@ -1,19 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Asset } from 'expo-asset';
 
 import { Icon } from '@/design/icons/Icon';
 import type { IconName } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
+import { usePhotoImport } from '@/hooks/use-photo-import';
 import { t } from '@/i18n';
-import { useCaptureStore } from '@/stores/capture-store';
 
 import type { BottomBarProps, BottomBarTab } from './BottomBar.types';
-
-// 샘플 스크린샷(시뮬레이션용). 홈 FAB와 동일 에셋을 캡처 흐름 트리거에 재사용한다.
-const SAMPLE_KO = require('@/assets/ocr-test/sample-ko.png');
 
 // 최소 탭 터치 영역 — 디자인시스템.md §10 (44pt).
 const MIN_TOUCH = 44;
@@ -42,14 +38,14 @@ const TRAILING_TABS: readonly BottomBarTab[] = [
  *
  * expo-router Tabs의 커스텀 tabBar로 주입된다(레이아웃: (tabs)/_layout.tsx).
  * 4개 탭은 state.routes에서 name으로 찾아 매핑하고, 활성 판별은 state.index를 쓴다.
- * 중앙 캡처+는 라우트가 아니라 샘플 캡처 흐름을 트리거하는 액션 버튼이다
- * (capture-store.startCapture 직접 호출 — 홈 FAB의 useSampleCapture 패턴 재사용).
+ * 중앙 캡처+는 라우트가 아니라 "사진첩에서 골라 정리"(수동 반입)를 여는 액션 버튼이다
+ * (usePhotoImport — 시스템 사진 선택기 → 캡처 파이프라인).
  * 색·간격·반경은 토큰만 사용하고, safe-area 하단 inset을 반영한다.
  */
 export function BottomBar({ state, navigation }: BottomBarProps): React.ReactNode {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { onCapture, isCapturing } = useSampleCapture();
+  const { onImport, isImporting } = usePhotoImport();
 
   // 현재 활성 라우트 이름(state.index 기준)으로 탭 활성 여부를 판별한다.
   const activeRouteName = state.routes[state.index]?.name;
@@ -94,7 +90,7 @@ export function BottomBar({ state, navigation }: BottomBarProps): React.ReactNod
       <View style={[styles.row, { height: BAR_HEIGHT }]}>
         {LEADING_TABS.map(renderTab)}
 
-        <CaptureButton onPress={onCapture} disabled={isCapturing} />
+        <CaptureButton onPress={onImport} disabled={isImporting} />
 
         {TRAILING_TABS.map(renderTab)}
       </View>
@@ -166,46 +162,6 @@ function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
       </Pressable>
     </View>
   );
-}
-
-/**
- * 샘플 캡처 트리거 훅 — 홈 FAB의 useSampleCapture와 동일 로직.
- * 번들 sample-ko.png를 localUri로 확보한 뒤 startCapture로 캡처 흐름을 시작한다.
- * Sheet는 (tabs)/_layout.tsx에 상주하므로 여기서는 트리거만 담당한다.
- */
-function useSampleCapture(): { onCapture: () => void; isCapturing: boolean } {
-  const startCapture = useCaptureStore((s) => s.startCapture);
-  const [isCapturing, setIsCapturing] = useState(false);
-  // 언마운트 후 setState 경고 방지.
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  const onCapture = useCallback((): void => {
-    setIsCapturing(true);
-    void (async () => {
-      try {
-        const asset = Asset.fromModule(SAMPLE_KO);
-        await asset.downloadAsync();
-        const uri = asset.localUri ?? asset.uri;
-        if (!uri) {
-          throw new Error('샘플 이미지 경로를 확인할 수 없습니다.');
-        }
-        const sourcePlatform = Platform.OS === 'ios' ? 'ios' : 'android';
-        await startCapture({ imageUri: uri, sourcePlatform, uri });
-      } catch (error) {
-        console.error('[capture] 샘플 시뮬레이션 실패:', error);
-      } finally {
-        if (mounted.current) setIsCapturing(false);
-      }
-    })();
-  }, [startCapture]);
-
-  return { onCapture, isCapturing };
 }
 
 const styles = StyleSheet.create({

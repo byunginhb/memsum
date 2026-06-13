@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Animated,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +27,12 @@ import type { CaptureDraft, CaptureEvent, CaptureStage } from './types';
 
 // Sheet 상단 Glass 핸들 밴드 높이. design.md §20 "Sheet 상단 64px Glass".
 const GLASS_HANDLE_HEIGHT = 64;
+
+// 핸들 스와이프 다운 닫기 판정 — 이동 거리(px) 또는 릴리즈 속도(px/ms) 중 하나만 넘으면 닫는다.
+const DISMISS_DRAG_DISTANCE = 96;
+const DISMISS_FLING_VELOCITY = 0.8;
+// 수평 스크롤·탭과 구분하기 위한 제스처 시작 임계(아래 방향 px).
+const DRAG_START_THRESHOLD = 6;
 
 // 진행 중(스피너) 단계 → 라벨 i18n 키.
 const PROGRESS_LABEL_KEY: Record<'uploading' | 'ocr' | 'processing', string> = {
@@ -95,6 +103,41 @@ export function CaptureSheet() {
     });
   }, [current, startCapture]);
 
+  // 핸들 드래그 추적값 — 손가락을 따라 시트가 내려가고, 임계 미만이면 스프링 복귀한다.
+  // useRef(...).current는 렌더 중 ref 접근이라 React Compiler 린트에 걸린다 — useMemo로 고정.
+  const dragY = useMemo(() => new Animated.Value(0), []);
+
+  // 닫힐 때(또는 재오픈 전) 드래그 오프셋을 초기화해 다음 열림이 제자리에서 시작되게 한다.
+  useEffect(() => {
+    if (!isSheetOpen) dragY.setValue(0);
+  }, [isSheetOpen, dragY]);
+
+  // 핸들 밴드 전용 스와이프 다운 제스처(시트 본문 스크롤과 충돌하지 않도록 핸들에만 부착).
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          gesture.dy > DRAG_START_THRESHOLD && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderMove: (_event, gesture) => {
+          // 위로는 끌리지 않게 0에서 클램프.
+          dragY.setValue(Math.max(0, gesture.dy));
+        },
+        onPanResponderRelease: (_event, gesture) => {
+          const shouldDismiss =
+            gesture.dy > DISMISS_DRAG_DISTANCE || gesture.vy > DISMISS_FLING_VELOCITY;
+          if (shouldDismiss) {
+            closeSheet();
+            return;
+          }
+          Animated.spring(dragY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [dragY, closeSheet],
+  );
+
   return (
     <Modal
       visible={isSheetOpen}
@@ -111,21 +154,31 @@ export function CaptureSheet() {
           accessibilityRole="button"
           accessibilityLabel={t('capture.action.close')}
         />
-        <View
+        <Animated.View
           style={[
             styles.sheet,
             { backgroundColor: colors.bgElevated, paddingBottom: insets.bottom + spacing.lg },
+            { transform: [{ translateY: dragY }] },
           ]}
           accessibilityLabel={t('capture.sheet.title')}
         >
-          {/* Calm Glass: 상단 핸들 영역만 Liquid Glass(잠깐 떠 있다 사라진다는 신호) — design.md §20 */}
-          <SheetGlassHandle isDark={isDark} />
+          {/* Calm Glass: 상단 핸들 영역만 Liquid Glass — 스와이프 다운(또는 스크린리더 탭)으로 닫는다. */}
+          <View {...panResponder.panHandlers}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('capture.action.close')}
+              accessibilityHint={t('capture.sheet.dismissHint')}
+              onPress={closeSheet}
+            >
+              <SheetGlassHandle isDark={isDark} />
+            </Pressable>
+          </View>
           <ScrollView contentContainerStyle={styles.content}>
             {current ? (
               <SheetBody draft={current} onClose={closeSheet} onRetry={handleRetry} />
             ) : null}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
