@@ -9,7 +9,7 @@
   "onboarding.value2.title": "Plans land on\nyour calendar.",
   "onboarding.value2.body": "Spot a date and place, and we'll quietly add it to your calendar.",
   "onboarding.value3.title": "Every Sunday,\nthe top 5.",
-  "onboarding.value3.body": "We pick the 5 lines that mattered most from everything you tossed in this week.",
+  "onboarding.value3.body": "Every Sunday, we resurface the 5 things — info and plans — you'd otherwise forget.",
   "onboarding.next": "Next",
   "onboarding.skip": "Skip",
   "onboarding.start": "Get Started",
@@ -103,7 +103,7 @@
   "report.feedback.up": "Helpful",
   "report.feedback.down": "Not helpful",
   "report.empty.title": "A quiet week",
-  "report.empty.body": "No worries — I'll round things up again next week.",
+  "report.empty.body": "No worries. Once 5 pile up, I'll resurface what you'd forgotten, every Sunday.",
   "report.retry": "Retry",
   "report.error.generic": "Couldn't load the report",
   "settings.title": "Settings",
@@ -195,6 +195,6 @@
   "settings.googleCalendar.connected": "Connected",
   "settings.googleCalendar.disconnect": "Disconnect",
   "captures.detail.action.openInCalendar": "Open in Calendar",
-  "weeklyNotif.title": "Your Sunday top-5 report is ready",
-  "weeklyNotif.body": "We picked the 5 highlights from this week's captures"
+  "weeklyNotif.title": "The 5 you'd forgotten, brought back",
+  "weeklyNotif.body": "The 5 from this week worth looking at again"
 }

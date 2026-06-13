@@ -9,7 +9,7 @@
   "onboarding.value2.title": "약속도 자동으로\n캘린더에.",
   "onboarding.value2.body": "날짜와 장소가 보이면, 캘린더에 살며시 올려둘게요.",
   "onboarding.value3.title": "매주 일요일,\n핵심 5개.",
-  "onboarding.value3.body": "한 주에 던진 것들 중 가장 중요한 5줄만 골라드려요.",
+  "onboarding.value3.body": "묻어둘 뻔한 정보와 약속 중 핵심 5개를, 일요일에 다시 떠올려드려요.",
   "onboarding.next": "다음",
   "onboarding.skip": "건너뛰기",
   "onboarding.start": "시작하기",
@@ -103,7 +103,7 @@
   "report.feedback.up": "좋아요",
   "report.feedback.down": "별로예요",
   "report.empty.title": "이번 주는 좀 쉬어가셨네요",
-  "report.empty.body": "괜찮아요. 다음 주에 다시 챙겨드릴게요.",
+  "report.empty.body": "괜찮아요. 5개만 모이면, 잊고 있던 것들을 일요일에 다시 떠올려드려요.",
   "report.retry": "다시 시도",
   "report.error.generic": "리포트를 불러오지 못했어요",
   "settings.title": "설정",
@@ -195,6 +195,6 @@
   "settings.googleCalendar.connected": "연결됨",
   "settings.googleCalendar.disconnect": "연결 해제",
   "captures.detail.action.openInCalendar": "캘린더에서 열기",
-  "weeklyNotif.title": "일요일 5줄 리포트가 도착했어요",
-  "weeklyNotif.body": "이번 주 캡처에서 핵심 5개만 골라뒀어요"
+  "weeklyNotif.title": "잊고 있던 5개, 다시 가져왔어요",
+  "weeklyNotif.body": "이번 주 던진 것들 중 다시 보면 좋을 핵심 5개예요"
 }

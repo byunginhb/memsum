@@ -52,6 +52,24 @@ const OCR_TRUNCATE_LEN = 300;
 // 한 주 범위를 넘겨 후보를 받되, 입력 비용을 막기 위해 상한을 둔다.
 const MAX_CANDIDATES = 50;
 
+// OpenAI 샘플링 온도. 0.6: 리마인드 톤에 자연스러운 변주를 주되, json_object 강제 +
+// capture_id 화이트리스트 + 사후 검증(normalizeOpenAiItems)이 형식·구조를 잡으므로
+// 창의성은 summary 문장 표현에만 작용한다. 0.7+는 사실 가드레일 위반 위험이 커 비권장.
+const REPORT_TEMPERATURE = 0.6;
+
+// 캡처 카테고리 6종(process-capture·src/lib/categories.ts와 동일).
+// Deno↔RN 경계라 의도적으로 복제한다. 카테고리별 리마인드 톤을 입히기 위해
+// 후보 payload에 category를 함께 실어 모델에 전달한다.
+const CATEGORY_KEYS = [
+  "marketing",
+  "event",
+  "receipt",
+  "shopping",
+  "info",
+  "etc",
+] as const;
+const CATEGORY_SET: ReadonlySet<string> = new Set(CATEGORY_KEYS);
+
 // KST. 주(월~일) 경계 계산 기준 타임존.
 const TIMEZONE = "Asia/Seoul";
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -66,11 +84,14 @@ interface WeeklyReportBody {
 }
 
 // captures 테이블에서 후보로 가져오는 최소 컬럼.
+// category: process-capture가 분류해 둔 6종. 카테고리별 리마인드 톤을 입히기 위해
+//   후보 payload에 함께 싣는다(과거 행/누락 대비 string | null로 받고 사용 시 정규화).
 interface CaptureCandidate {
   readonly id: string;
   readonly ocr_text: string | null;
   readonly parsed_event: { title?: string | null; summary?: string | null } | null;
   readonly image_url: string | null;
+  readonly category: string | null;
   readonly created_at: string;
 }
 
@@ -169,6 +190,11 @@ function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) : text;
 }
 
+// 저장된 category를 화이트리스트 6종으로 좁힌다. 누락/이상값은 'etc'(중립 톤).
+function normalizeCategory(raw: string | null): string {
+  return raw !== null && CATEGORY_SET.has(raw) ? raw : "etc";
+}
+
 // 후보의 표시용 폴백 제목: parsed_event.title → ocr_text 첫 줄 → 빈 문자열.
 function fallbackTitle(c: CaptureCandidate): string {
   const fromParsed = c.parsed_event?.title?.trim();
@@ -185,15 +211,50 @@ function fallbackSummary(c: CaptureCandidate): string {
 
 function buildSystemPrompt(): string {
   return [
-    "당신은 사용자의 한 주치 스크린샷 캡처 목록에서 '다시 볼 가치가 가장 큰' 항목을 선별하는 큐레이터입니다.",
-    `목록에서 가장 의미 있는 항목 ${REPORT_ITEM_COUNT}개를 고르고, 중요도 순으로 1~${REPORT_ITEM_COUNT} 랭크를 매깁니다.`,
-    "각 항목에는 한 줄 제목(title)과 한 줄 요약(summary)을 한국어로 작성합니다. 원문에 없는 사실을 지어내지 않습니다.",
-    "약속·일정·할 일·중요 정보가 담긴 캡처를 단순 스크린샷보다 우선합니다.",
+    "당신은 사용자의 한 주치 스크린샷 캡처에서 '다시 볼 가치가 가장 큰' 항목을 골라,",
+    "잊고 있던 것을 따뜻하게 다시 떠올려주는 Memsum의 큐레이터입니다.",
     "",
-    "입력은 캡처 배열입니다. 각 항목은 { capture_id, text } 형태이며 text는 OCR 텍스트(일부)입니다.",
-    `반드시 입력에 존재하는 capture_id만 사용하고, 정확히 ${REPORT_ITEM_COUNT}개를 선택합니다.`,
+    "[역할]",
+    `- 목록에서 가장 의미 있는 항목 ${REPORT_ITEM_COUNT}개를 골라 중요도 순으로 1~${REPORT_ITEM_COUNT} 랭크를 매깁니다.`,
+    "- 각 항목에 한 줄 제목(title)과 한 줄 요약(summary)을 한국어로 씁니다.",
+    "- 약속·일정·할 일·다시 찾게 될 정보가 담긴 캡처를 단순 스크린샷보다 우선합니다.",
     "",
-    "반드시 아래 JSON 스키마로만 응답합니다. 그 외 텍스트를 출력하지 않습니다:",
+    "[입력 형식]",
+    "- 입력은 캡처 배열입니다. 각 항목: { capture_id, category, title_hint, summary_hint, text }.",
+    "  - category: 캡처 분류(marketing/event/receipt/shopping/info/etc). 톤 선택의 기준입니다.",
+    "  - title_hint, summary_hint: 사전 추출된 제목·요약 힌트(빈 문자열일 수 있음).",
+    "  - text: OCR 원문 일부입니다.",
+    `- 반드시 입력에 존재하는 capture_id만 사용하고, 정확히 ${REPORT_ITEM_COUNT}개를 선택합니다.`,
+    "",
+    "[title 작성 규칙]",
+    "- 무엇에 관한 캡처인지 한눈에 알 수 있는 짧은 명사형 제목(12자 내외, 최대 24자).",
+    "- title_hint가 있으면 다듬어 쓰고, 없으면 text에서 핵심을 뽑습니다. 이모지·과한 따옴표 금지.",
+    "",
+    "[summary 작성 규칙 — 카테고리에 맞춘 따뜻한 한 줄]",
+    "- summary는 '요약'이 아니라, 사용자가 잊고 있었을 그 캡처를 다시 떠올리게 하는 한 마디입니다.",
+    "- 35자 내외(최대 45자), 부드러운 존댓말. 카테고리별로 톤을 다르게 합니다(결만 맞추고 문장은 매번 새로 쓸 것):",
+    "  - info(정보·아티클): 잊고 있던 정보를 되살려주는 따뜻한 리마인드. 이 결을 가장 분명하게 살립니다.",
+    "    예) '전세 계약 정보, 나중에 다시 보고 싶으셨죠? 여기 챙겨뒀어요.'",
+    "    핵심 뉘앙스: '까먹을 뻔했는데 덕분에 다시 보게 되어 다행이에요.'",
+    "  - shopping(쇼핑): 고민하던 것을 부담 없이 환기. 압박·세일 문구가 아니라 가볍게.",
+    "    예) '담아두셨던 그 이어폰, 아직 마음에 두고 계세요?'",
+    "  - event(약속·이벤트): 다가오는 일정을 안심시키듯 환기.",
+    "    예) '18일 워크숍 약속, 잊지 않으셨죠?'",
+    "  - marketing·receipt·etc: 감정 톤을 입히지 말고 담백하게, 사실 중심의 차분한 한 줄.",
+    "    (업무 자료·결제 내역·분류가 불확실한 항목에 사적인 감정 톤은 오히려 어색합니다.)",
+    "    예) marketing '여름 프리퀀시 이벤트 안내', receipt '치과 진료비 결제 내역'.",
+    "",
+    "[사실 가드레일 — 어김 없이]",
+    "- title_hint·summary_hint·text에 실제로 있는 내용만 씁니다. 원문에 없는 날짜·금액·장소·수치·고유명사를 지어내지 않습니다.",
+    "- 과장·홍보성 미사여구·없는 감정 부풀리기 금지. 단정 못 할 건 단정하지 않습니다.",
+    "- 정보가 빈약하면 톤을 억지로 끼우지 말고, title을 차분히 보여주는 담백한 summary로 둡니다.",
+    "",
+    "[반복 방지 — 5줄이 지루해지지 않게]",
+    "- 5개 summary가 같은 문장 틀로 복붙된 것처럼 보이면 안 됩니다. 문장 시작·서술어·어미를 서로 다르게 씁니다.",
+    "- '~죠?'처럼 되묻는 말끝은 5줄 중 최대 2번까지만. 같은 단어(특히 '다시')를 모든 줄에 반복하지 않습니다.",
+    "",
+    "[출력]",
+    "- 반드시 아래 JSON 스키마로만 응답합니다. 그 외 텍스트를 출력하지 않습니다.",
     "{",
     '  "items": [',
     '    { "capture_id": string, "rank": number, "title": string, "summary": string }',
@@ -281,9 +342,14 @@ async function callOpenAiOnce(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
 
-  // 토큰 절약: capture_id + 잘린 OCR 텍스트만 전달.
+  // 카테고리 인지 + 토큰 절약: capture_id, category, 사전 추출 힌트(title/summary),
+  // 잘린 OCR 텍스트를 전달한다. category·힌트는 process-capture가 이미 만든 값이라
+  // 모델이 재추론할 필요가 없어 사실 안정성↑·토큰↓.
   const userPayload = candidates.map((c) => ({
     capture_id: c.id,
+    category: normalizeCategory(c.category),
+    title_hint: c.parsed_event?.title?.trim() ?? "",
+    summary_hint: c.parsed_event?.summary?.trim() ?? "",
     text: truncate(c.ocr_text ?? "", OCR_TRUNCATE_LEN),
   }));
 
@@ -297,7 +363,7 @@ async function callOpenAiOnce(
       body: JSON.stringify({
         model: OPENAI_MODEL,
         response_format: { type: "json_object" },
-        temperature: 0.3,
+        temperature: REPORT_TEMPERATURE,
         messages: [
           { role: "system", content: buildSystemPrompt() },
           { role: "user", content: JSON.stringify({ captures: userPayload }) },
@@ -438,7 +504,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { fromUtc, toUtc } = weekBoundsUtc(weekStart);
     const { data: rows, error: capError } = await supabase
       .from("captures")
-      .select("id, ocr_text, parsed_event, image_url, created_at")
+      .select("id, ocr_text, parsed_event, image_url, category, created_at")
       // RLS로도 본인 행만 보이지만, 방어적으로 명시 필터를 둔다(defense in depth).
       .eq("user_id", userId)
       .gte("created_at", fromUtc)
