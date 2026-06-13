@@ -376,6 +376,11 @@ function DetailActions({ item }: { item: CaptureListItem }) {
     }
   }, [busy, item.event, item.id, connect, registerCapture, toast]);
 
+  // 캘린더 액션(등록/열기)이 있을 때만 하단 액션 영역을 노출한다. 공유는 준비 중이라
+  // 비활성 버튼으로 자리만 차지해 미완성 인상을 주므로 렌더하지 않는다(구현 시 재노출).
+  const hasCalendarAction = isRegistered || (item.hasEvent && !!item.event);
+  if (!hasCalendarAction) return null;
+
   return (
     <View style={styles.actions}>
       {isRegistered ? (
@@ -389,7 +394,7 @@ function DetailActions({ item }: { item: CaptureListItem }) {
         >
           {t('captures.detail.action.openInCalendar')}
         </Button>
-      ) : item.hasEvent && item.event ? (
+      ) : (
         <Button
           variant="primary"
           size="lg"
@@ -400,18 +405,7 @@ function DetailActions({ item }: { item: CaptureListItem }) {
         >
           {t('captures.detail.action.addToCalendar')}
         </Button>
-      ) : null}
-      {/* 공유 기능 준비 중: 의도적으로 비활성 유지(기존 동작 보존). */}
-      <Button
-        variant="secondary"
-        size="lg"
-        disabled
-        onPress={() => undefined}
-        accessibilityLabel={t('captures.detail.action.share')}
-        leftIcon={<Icon name="share-2" size={20} color="primary" />}
-      >
-        {t('captures.detail.action.share')}
-      </Button>
+      )}
     </View>
   );
 }

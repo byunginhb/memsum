@@ -70,6 +70,11 @@ export default function HomeScreen(): ReactNode {
     [router],
   );
 
+  // 주간 5줄 리포트로의 유일한 인앱 진입점(이전엔 푸시 알림 딥링크만 존재).
+  const handleOpenReport = useCallback((): void => {
+    router.push('/report/weekly');
+  }, [router]);
+
   // 최근 캡처: 전체 목록의 상위 N개만 헤드라인으로.
   const recentItems = useMemo(
     (): CaptureListItem[] => captures.items.slice(0, RECENT_LIMIT),
@@ -107,7 +112,11 @@ export default function HomeScreen(): ReactNode {
       ) : (
         <View style={styles.sections}>
           <View style={styles.block}>
-            <WeeklyStatsCard stats={weeklyStats.stats} isLoading={weeklyStats.isLoading} />
+            <WeeklyStatsCard
+              stats={weeklyStats.stats}
+              isLoading={weeklyStats.isLoading}
+              onPress={handleOpenReport}
+            />
           </View>
 
           <View style={styles.section}>

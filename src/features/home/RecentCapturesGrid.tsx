@@ -42,7 +42,11 @@ export function RecentCapturesGrid({
 
   if (items.length === 0) return null;
 
-  const safeColumns = columns >= 1 ? columns : 1;
+  // 1~2장 구간 폴백: 3열 그리드에 카드 1장만 있으면 1/3 폭으로 외롭게 떠 "깨진 듯"
+  // 보인다. 항목 수에 맞춰 열 수를 줄이되(1·2장 → 2열 폭) 최대 columns(기본 3)로 제한해,
+  // 1장은 절반 폭, 2장은 나란히 절반씩 차지하게 한다.
+  const effectiveColumns = Math.min(Math.max(items.length, 2), columns);
+  const safeColumns = effectiveColumns >= 1 ? effectiveColumns : 1;
   // 측정 전(width=0)에는 셀을 그리지 않아 잘못된 폭으로 깜빡이지 않게 한다.
   // floor로 1px 미만 여유를 둬, 셀 합+gap이 컨테이너 폭과 같아질 때 반올림 오차로
   // 마지막 열이 줄바꿈되는 것을 막는다(정확히 columns개가 한 줄에 들어가게).

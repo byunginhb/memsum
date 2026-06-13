@@ -77,7 +77,9 @@ export const lightColors: SemanticColors = {
   bgMuted: palette.ivory200,
 
   textPrimary: palette.gray900,
-  textSecondary: palette.gray500,
+  // 보조 텍스트. gray500(#6D6D80)은 bgMuted 위에서 약 4.4:1로 WCAG AA(4.5)에
+  // 살짝 못 미쳐, 위계를 해치지 않는 선에서 한 단계 어둡게 조정(모든 라이트 배경 4.9:1+).
+  textSecondary: '#66667A',
   textOnAccent: '#FFFFFF',
   textDisabled: palette.gray300,
 

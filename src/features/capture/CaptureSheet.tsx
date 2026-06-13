@@ -46,6 +46,16 @@ function isProgress(stage: CaptureStage): stage is 'uploading' | 'ocr' | 'proces
 }
 
 /**
+ * 시트 본문 제목을 단계에 맞춘다. 캡처는 무음 자동 저장되므로 "저장할까요?"가 아니라,
+ * 진행 중엔 "정리하고 있어요", 완료엔 "이렇게 정리했어요", 오류엔 문제를 알리는 문구를 쓴다.
+ */
+function sheetHeadingKey(stage: CaptureStage): string {
+  if (stage === 'done') return 'capture.sheet.titleDone';
+  if (stage === 'error') return 'capture.sheet.titleError';
+  return 'capture.sheet.titleProgress';
+}
+
+/**
  * "투명도 줄이기"(reduce transparency) 접근성 설정 구독 훅 — design.md P1-4.
  * 켜져 있으면 Liquid Glass 대신 불투명 폴백을 써야 가독성이 유지된다.
  * 초기값을 비동기로 읽고, 변경 이벤트를 구독한다. cleanup에서 리스너 해제.
@@ -228,7 +238,7 @@ function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
   return (
     <View style={styles.body}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>
-        {t('capture.sheet.title')}
+        {t(sheetHeadingKey(draft.stage))}
       </Text>
 
       <Image
@@ -385,10 +395,10 @@ function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
           variant={isDone ? 'primary' : 'secondary'}
           size="md"
           onPress={onClose}
-          accessibilityLabel={isDone ? t('capture.action.save') : t('capture.action.close')}
+          accessibilityLabel={isDone ? t('capture.action.done') : t('capture.action.close')}
           leftIcon={<Icon name="check" size={16} color={isDone ? 'onPrimary' : 'primary'} />}
         >
-          {isDone ? t('capture.action.save') : t('capture.action.close')}
+          {isDone ? t('capture.action.done') : t('capture.action.close')}
         </Button>
       </View>
 

@@ -317,7 +317,11 @@ function Segmented<T extends string>({
   onChange,
   groupLabel,
 }: SegmentedProps<T>): ReactNode {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  // 선택칸 채움 색: 흰 텍스트(onPrimary)와 WCAG AA(4.5:1)를 양 테마에서 모두 만족시키려면
+  // 라이트는 더 진한 primaryHover(lavender700, 흰 글씨 6:1+), 다크는 primary(lavender300,
+  // 어두운 글씨 6.4:1)를 쓴다. primary 단일 채움은 라이트에서 흰 글씨 3.97:1로 AA 미달.
+  const selectedBg = isDark ? colors.primary : colors.primaryHover;
   return (
     <View
       style={[styles.segmentGroup, { backgroundColor: colors.bgMuted }]}
@@ -335,19 +339,29 @@ function Segmented<T extends string>({
             accessibilityLabel={t(option.labelKey)}
             style={({ pressed }) => [
               styles.segment,
-              isSelected ? { backgroundColor: colors.primaryMuted } : null,
               pressed ? styles.segmentPressed : null,
             ]}
           >
-            <Text
+            {/* 채움 배경은 plain View에 둔다: NativeWind가 Pressable의 inline
+                backgroundColor를 누락시켜(BottomBar 캡처 원과 동일 버그) 선택칸 채움이
+                렌더되지 않는다. 배경이 정상 적용되는 일반 View로 pill을 그린다.
+                채움(fill) 자체가 색 비의존 선택 단서가 된다(색맹·저시력 대응). */}
+            <View
               style={[
-                styles.segmentLabel,
-                { color: isSelected ? colors.primary : colors.textSecondary },
+                styles.segmentFill,
+                isSelected ? { backgroundColor: selectedBg } : null,
               ]}
-              numberOfLines={1}
             >
-              {t(option.labelKey)}
-            </Text>
+              <Text
+                style={[
+                  styles.segmentLabel,
+                  { color: isSelected ? colors.onPrimary : colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {t(option.labelKey)}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
@@ -392,13 +406,19 @@ const styles = StyleSheet.create({
   },
   segment: {
     minHeight: SEGMENT_MIN_HEIGHT,
-    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.sm,
   },
   segmentPressed: {
     opacity: PRESSED_OPACITY,
+  },
+  // 선택 채움 pill(일반 View). 터치 영역(segment, 44pt)과 분리해 시각 칩만 담당한다.
+  segmentFill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   segmentLabel: {
     fontSize: typography.bodySm.size,

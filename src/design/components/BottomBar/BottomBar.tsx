@@ -150,14 +150,17 @@ function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
         accessibilityRole="button"
         accessibilityState={{ disabled }}
         accessibilityLabel={t('home.tab.capture')}
+        accessibilityHint={t('home.tab.captureHint')}
         android_ripple={{ borderless: true }}
         style={styles.captureButton}
       >
         {/* 색 원은 내부 View에 둔다: NativeWind 래핑 Pressable은 inline
             backgroundColor를 누락시켜(투명 원) 흰 아이콘만 보이게 되므로,
-            배경색이 정상 적용되는 일반 View로 원을 그린다. */}
+            배경색이 정상 적용되는 일반 View로 원을 그린다.
+            아이콘은 '촬영'으로 오인되는 카메라 대신 사진첩(images)을 써서
+            "사진첩에서 골라 정리"라는 실제 동작을 시각적으로 알린다. */}
         <View style={[styles.captureCircle, { backgroundColor: colors.primary }]}>
-          <Icon name="camera" size={24} color="onPrimary" />
+          <Icon name="images" size={24} color="onPrimary" />
         </View>
       </Pressable>
     </View>
