@@ -13,8 +13,10 @@ import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, spacing, typography } from '@/design/tokens';
 import type { ReportFeedback, WeeklyReport } from '@/features/report/types';
 import { ReportCard } from '@/features/report/ReportCard';
+import { ReportCoachmark } from '@/features/report/ReportCoachmark';
 import { useWeeklyReport } from '@/hooks/use-weekly-report';
 import { getLocale, t } from '@/i18n';
+import { useOnboardingStore } from '@/stores/onboarding-store';
 
 type WeeklyReportScreenProps = {
   /** "YYYY-MM-DD"(KST 월요일). 미지정 시 이번 주. */
@@ -105,6 +107,10 @@ function Body({
   onViewArchive,
 }: BodyProps): ReactNode {
   const { colors } = useTheme();
+  // 코치마크 1회 노출 제어(영속 플래그). 훅은 조기 반환 전에 무조건 호출한다(Rules of Hooks).
+  const coachmarkHydrated = useOnboardingStore((s) => s.hydrated);
+  const coachmarkSeen = useOnboardingStore((s) => s.reportCoachmarkSeen);
+  const seeReportCoachmark = useOnboardingStore((s) => s.seeReportCoachmark);
 
   // 최초 로딩(데이터 없음) — 중앙 스피너.
   if (isLoading && !report) {
@@ -155,8 +161,12 @@ function Body({
     ? t('report.weeklySubtitle', { name: nickname.trim(), total })
     : t('report.weeklySubtitleNoName', { total });
 
+  // items가 있는 리포트를 처음 볼 때만 코치마크 1회 노출(복원 완료 후, 미열람 시).
+  const showCoachmark = coachmarkHydrated && !coachmarkSeen;
+
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={contentStyle}>
+    <>
+      <ScrollView style={styles.flex} contentContainerStyle={contentStyle}>
       {/* 주차 캡션 */}
       <Text style={[styles.weekCaption, { color: colors.textSecondary }]}>
         {t('report.weekRange', {
@@ -201,7 +211,10 @@ function Body({
           {t('report.viewArchive')}
         </Button>
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <ReportCoachmark visible={showCoachmark} onDismiss={seeReportCoachmark} />
+    </>
   );
 }
 

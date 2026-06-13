@@ -5,10 +5,14 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 type OnboardingState = {
   /** 온보딩을 끝까지 본 적이 있는지. 기본 false(첫 실행). */
   completed: boolean;
+  /** 주간 리포트 첫 진입 코치마크를 본 적이 있는지. 기본 false(1회만 노출). */
+  reportCoachmarkSeen: boolean;
   /** AsyncStorage 복원이 끝났는지. 복원 전 라우팅 게이트는 대기한다(깜빡임 방지). */
   hydrated: boolean;
   /** 온보딩 완료 표시(영속). */
   complete: () => void;
+  /** 리포트 코치마크 노출 완료 표시(영속). 다시 뜨지 않게 한다. */
+  seeReportCoachmark: () => void;
   /** 복원 완료 플래그 전환(내부용 — onRehydrateStorage에서 호출). */
   setHydrated: () => void;
 };
@@ -24,16 +28,21 @@ export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set) => ({
       completed: false,
+      reportCoachmarkSeen: false,
       hydrated: false,
       // 불변 업데이트: zustand set은 새 부분 상태를 머지한다.
       complete: () => set({ completed: true }),
+      seeReportCoachmark: () => set({ reportCoachmarkSeen: true }),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
       name: 'memsum-onboarding',
       storage: createJSONStorage(() => AsyncStorage),
       // hydrated는 영속 대상이 아니라 복원 직후 런타임에 켠다.
-      partialize: (state) => ({ completed: state.completed }),
+      partialize: (state) => ({
+        completed: state.completed,
+        reportCoachmarkSeen: state.reportCoachmarkSeen,
+      }),
       // 복원이 끝난(또는 실패한) 시점에 hydrated를 켜 게이트를 깨운다.
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
