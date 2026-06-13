@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { AnalyticsEvent, track } from '@/lib/analytics';
 import { processCapture } from '@/lib/api';
 import { uploadCaptureImage } from '@/lib/storage';
 import { useAuthStore } from '@/stores/auth-store';
@@ -253,6 +254,13 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         result,
       });
       set({ savedCount: get().savedCount + 1 });
+
+      // 분석(비차단): 캡처 정리 완료 — 습관 형성 지표. 일정 감지 여부·플랫폼을 남긴다.
+      // (카테고리 분포는 captures.category로 DB 집계 — 이벤트엔 결과 계약을 넓히지 않는다.)
+      track(AnalyticsEvent.CaptureCompleted, {
+        hasEvent: Boolean(result.event),
+        source: input.sourcePlatform,
+      });
 
       // ⑥ 자동 캘린더 등록(설정 ON + 연결 시). 등록되면 목록에 '캘린더 추가됨'이
       // 반영되도록 신호를 한 번 더 보낸다. 실패는 비치명(저장은 이미 완료).

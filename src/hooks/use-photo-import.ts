@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
+import { AnalyticsEvent, track } from '@/lib/analytics';
 import { useCaptureStore } from '@/stores/capture-store';
 
 /**
@@ -41,6 +42,8 @@ export function usePhotoImport(): { onImport: () => void; isImporting: boolean }
         if (mounted.current) setIsImporting(true);
         // OCR·업로드 모두 선택기가 내려준 로컬 사본 uri 경로를 쓴다(iOS 포함).
         const sourcePlatform = Platform.OS === 'ios' ? 'ios' : 'android';
+        // 분석(비차단): 수동 반입 시작 — 자동 감지가 놓친 옛 스크린샷 정리 경로 사용량.
+        track(AnalyticsEvent.PhotoImported, { source: sourcePlatform });
         await startCapture({ imageUri: uri, sourcePlatform, uri });
       } catch (error) {
         console.error('[capture] 사진 반입 실패:', error);

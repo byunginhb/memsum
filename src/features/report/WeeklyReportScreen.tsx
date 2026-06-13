@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import { ReportCard } from '@/features/report/ReportCard';
 import { ReportCoachmark } from '@/features/report/ReportCoachmark';
 import { useWeeklyReport } from '@/hooks/use-weekly-report';
 import { getLocale, t } from '@/i18n';
+import { AnalyticsEvent, track } from '@/lib/analytics';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 
 type WeeklyReportScreenProps = {
@@ -46,6 +47,15 @@ export function WeeklyReportScreen({
   const { report, isLoading, error, refresh, setFeedback } =
     useWeeklyReport(weekStart);
 
+  // 분석(비차단): 항목 있는 리포트 열람 = 핵심 가치 모먼트 도달(BM 검증 퍼널).
+  useEffect(() => {
+    if (!report || report.items.length === 0) return;
+    track(AnalyticsEvent.ReportViewed, {
+      itemCount: report.items.length,
+      totalCaptures: report.totalCaptures,
+    });
+  }, [report]);
+
   const contentStyle = useMemo(
     () => ({
       paddingHorizontal: spacing.xl,
@@ -57,10 +67,12 @@ export function WeeklyReportScreen({
   );
 
   const handlePressOriginal = (captureId: string): void => {
+    track(AnalyticsEvent.ReportItemOpened, {});
     router.push({ pathname: '/captures/[id]', params: { id: captureId } });
   };
 
   const handleFeedback = (captureId: string, rating: ReportFeedback): void => {
+    track(AnalyticsEvent.ReportFeedback, { rating });
     void setFeedback(captureId, rating);
   };
 
@@ -164,6 +176,12 @@ function Body({
   // items가 있는 리포트를 처음 볼 때만 코치마크 1회 노출(복원 완료 후, 미열람 시).
   const showCoachmark = coachmarkHydrated && !coachmarkSeen;
 
+  // 코치마크 닫기: 영속 플래그 + 분석(교육 도달) 함께 처리.
+  const handleDismissCoachmark = (): void => {
+    track(AnalyticsEvent.ReportCoachmarkDismissed, {});
+    seeReportCoachmark();
+  };
+
   return (
     <>
       <ScrollView style={styles.flex} contentContainerStyle={contentStyle}>
@@ -213,7 +231,7 @@ function Body({
       </View>
       </ScrollView>
 
-      <ReportCoachmark visible={showCoachmark} onDismiss={seeReportCoachmark} />
+      <ReportCoachmark visible={showCoachmark} onDismiss={handleDismissCoachmark} />
     </>
   );
 }
