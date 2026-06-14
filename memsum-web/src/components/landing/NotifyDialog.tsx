@@ -229,7 +229,7 @@ export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
               알림 받기
             </button>
             <p className="mt-3 text-center text-xs leading-relaxed break-keep text-(--color-ink-faint)">
-              약속: 출시 소식 1통만. 광고·스팸 없음.
+              약속: 출시 소식 1통만. 스팸 없이 한 번만 보내드려요.
             </p>
           </form>
         )}

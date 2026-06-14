@@ -35,7 +35,7 @@ const ROWS: readonly Row[] = [
   {
     label: '시작',
     other: '가입·온보딩',
-    memsum: '익명 · 바로',
+    memsum: '무료로 바로',
   },
 ] as const;
 

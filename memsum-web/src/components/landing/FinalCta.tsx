@@ -66,7 +66,7 @@ export function FinalCta() {
           delay={380}
           className="mt-6 text-sm break-keep text-white/80"
         >
-          가입 없이 바로 시작 · 광고 없음 · 생산성 카테고리
+          지금 무료로 시작 · 생산성 카테고리
         </Reveal>
       </div>
     </section>

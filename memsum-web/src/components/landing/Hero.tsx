@@ -91,7 +91,7 @@ export function Hero() {
             delay={560}
             className="mt-5 text-sm break-keep text-(--color-ink-faint)"
           >
-            가입 없이 바로 시작 · 광고 없음
+            지금 무료로 이용해보세요
           </Reveal>
         </div>
 
