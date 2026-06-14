@@ -7,18 +7,18 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} — 스크린샷을 기억으로`,
+    default: `${SITE_NAME} 멤섬 — 스크린샷 정리·캘린더 자동·주간 요약`,
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    '스크린샷, 찍기만 하세요. Memsum이 자동으로 정리하고, 날짜가 보이면 캘린더에 등록하고, 일요일 저녁 5줄 리포트로 알려드려요.',
+    '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
   verification: { google: GOOGLE_SITE_VERIFICATION },
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
-    title: `${SITE_NAME} — 스크린샷을 기억으로`,
+    title: '찍기만 하세요. Memsum이 알아서.',
     description:
-      '스크린샷을 자동으로 정리하고 캘린더에 등록하고 주간 리포트로 알려주는 앱.',
+      '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
     images: ['/og.png'],
   },
   twitter: {
