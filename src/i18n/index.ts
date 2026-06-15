@@ -1,11 +1,27 @@
+import { getLocales } from 'expo-localization';
+
 import en from './en.json';
 import ko from './ko.json';
 
 const dictionaries = { ko, en } as const;
 export type Locale = keyof typeof dictionaries;
 
-// Week 1: 한국어 기본. expo-localization 연동은 다음 단계.
-let currentLocale: Locale = 'ko';
+/**
+ * 기기(시스템) 언어로 초기 로케일을 정한다 — 한국어면 'ko', 그 외는 'en'.
+ * why: 사용자는 별도 언어 설정 없이 시스템 언어를 따라가길 원한다(설정에 언어 토글 없음).
+ * getLocales()는 동기 호출(캐시된 기기 로케일)이라 모듈 로드 시점에 안전하게 읽는다.
+ * 실패(드묾) 시 1차 시장인 한국어로 폴백한다.
+ */
+function detectSystemLocale(): Locale {
+  try {
+    const code = getLocales()[0]?.languageCode;
+    return code === 'ko' ? 'ko' : 'en';
+  } catch {
+    return 'ko';
+  }
+}
+
+let currentLocale: Locale = detectSystemLocale();
 
 export function setLocale(locale: Locale): void {
   currentLocale = locale;
