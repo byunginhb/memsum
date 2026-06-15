@@ -112,7 +112,7 @@ export function Hero({ copy }: { copy: LandingCopy }) {
             >
               <div className="overflow-hidden rounded-3xl border border-(--color-line) bg-(--color-card) shadow-(--shadow-float)">
                 <Image
-                  src="/shots/report.png"
+                  src={copy.shots.report}
                   alt={c.reportAlt}
                   width={1080}
                   height={2400}
@@ -127,7 +127,7 @@ export function Hero({ copy }: { copy: LandingCopy }) {
             >
               <div className="overflow-hidden rounded-3xl border border-(--color-line) bg-(--color-card) shadow-(--shadow-float)">
                 <Image
-                  src="/shots/home.png"
+                  src={copy.shots.home}
                   alt={c.homeAlt}
                   width={1080}
                   height={2400}

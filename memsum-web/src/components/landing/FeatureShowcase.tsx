@@ -51,7 +51,7 @@ export function FeatureShowcase({ copy }: { copy: LandingCopy }) {
             <div className="relative mx-auto max-w-[260px]">
               <div className="relative overflow-hidden rounded-3xl border border-(--color-line) bg-(--color-card) shadow-(--shadow-float)">
                 <Image
-                  src="/shots/home.png"
+                  src={copy.shots.home}
                   alt={c.phoneAlt}
                   width={1080}
                   height={2400}

@@ -14,6 +14,16 @@ export type LandingCopy = {
   /** 한국어에서만 `break-keep`(단어 단위 줄바꿈)을 적용하기 위한 플래그. */
   isKorean: boolean;
 
+  /**
+   * 로케일별 폰 목업 스크린샷 경로.
+   * 화면 속 텍스트가 이미지에 구워져 있어 번역되지 않으므로 로케일마다 별도 PNG를 둔다
+   * (en은 `.en.png` — 영어 앱 화면). Hero·FeatureShowcase가 참조.
+   */
+  shots: {
+    home: string;
+    report: string;
+  };
+
   meta: {
     titleDefault: string;
     titleTemplate: string;
@@ -137,6 +147,11 @@ export type LandingCopy = {
 
 const KO: LandingCopy = {
   isKorean: true,
+
+  shots: {
+    home: '/shots/home.png',
+    report: '/shots/report.png',
+  },
 
   meta: {
     titleDefault: 'Memsum 멤섬 — 스크린샷 정리·캘린더 자동·주간 요약',
@@ -353,6 +368,11 @@ const KO: LandingCopy = {
 
 const EN: LandingCopy = {
   isKorean: false,
+
+  shots: {
+    home: '/shots/home.en.png',
+    report: '/shots/report.en.png',
+  },
 
   meta: {
     titleDefault: 'Memsum — Screenshots, sorted for you',

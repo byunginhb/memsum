@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     siteName: 'Memsum',
     title: enCopy.meta.ogTitle,
     description: enCopy.meta.ogDescription,
-    images: ['/og.png'],
+    images: ['/og.en.png'],
   },
   twitter: {
     card: 'summary_large_image',
