@@ -1,17 +1,14 @@
 import { Check } from 'lucide-react';
 
+import type { LandingCopy } from '@/lib/landing-copy';
+
 import { Reveal, RevealGroup } from './Reveal';
 
-/** 02 §5 4항목 원문. */
-const AUDIENCE: readonly string[] = [
-  '사진첩 스크린샷이 수백, 수천 장 쌓여 있는 분',
-  '인스타·유튜브에서 좋은 자료를 반사적으로 캡처하는 분',
-  '약속·영수증·정보를 찍어두고 다시 못 찾는 분',
-  '메모 앱을 따로 켜기 번거로운 분',
-] as const;
-
 /** S5 타깃 — 자기확인·자격부여. card 블록 + 체크 리스트 스태거 + 강조 인용. */
-export function AudienceSection() {
+export function AudienceSection({ copy }: { copy: LandingCopy }) {
+  const c = copy.audience;
+  const bk = copy.isKorean ? 'break-keep' : '';
+
   return (
     <section
       aria-labelledby="audience-title"
@@ -21,13 +18,13 @@ export function AudienceSection() {
         <Reveal
           as="h2"
           id="audience-title"
-          className="text-center text-2xl font-bold tracking-tight break-keep sm:text-4xl"
+          className={`text-center text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
         >
-          Memsum은 이런 분을 위해 만들었어요
+          {c.title}
         </Reveal>
 
         <RevealGroup className="mx-auto mt-10 grid max-w-3xl gap-3">
-          {AUDIENCE.map((item) => (
+          {c.items.map((item) => (
             <Reveal
               key={item}
               className="group flex items-start gap-3 rounded-2xl border-l-2 border-transparent py-2 pl-3 transition-colors hover:border-(--color-accent)"
@@ -37,7 +34,7 @@ export function AudienceSection() {
                 aria-hidden="true"
                 className="mt-0.5 shrink-0 text-(--color-accent)"
               />
-              <span className="text-base leading-relaxed break-keep sm:text-lg">
+              <span className={`text-base leading-relaxed ${bk} sm:text-lg`}>
                 {item}
               </span>
             </Reveal>
@@ -49,17 +46,16 @@ export function AudienceSection() {
           delay={120}
           className="mx-auto mt-12 max-w-2xl rounded-(--radius-block) bg-(--color-primary-soft) p-8 text-center"
         >
-          <p className="text-xl font-bold tracking-tight break-keep sm:text-2xl">
-            노션·옵시디언이 안 맞으셨던 분께.
+          <p className={`text-xl font-bold tracking-tight ${bk} sm:text-2xl`}>
+            {c.quoteHeadline}
           </p>
           <Reveal
             as="p"
             variant="fade"
             delay={200}
-            className="mt-3 text-base leading-relaxed break-keep text-(--color-ink-soft) sm:text-lg"
+            className={`mt-3 text-base leading-relaxed ${bk} text-(--color-ink-soft) sm:text-lg`}
           >
-            정리 시스템을 만들고 싶은 게 아니라, 그냥 안 잃어버리고 싶은
-            거잖아요.
+            {c.quoteSub}
           </Reveal>
         </Reveal>
       </div>

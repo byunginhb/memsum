@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { ChevronDown } from 'lucide-react';
 
 import { SITE_NAME } from '@/lib/site';
+import type { LandingCopy } from '@/lib/landing-copy';
 
 import { AnimatedDotsLogo } from './AnimatedDotsLogo';
 import { Reveal } from './Reveal';
@@ -10,9 +11,16 @@ import { StoreBadge } from './StoreBadge';
 /**
  * S1 Hero — 후킹·즉시 설치 욕구·스크롤 유도.
  * 텍스트는 SSR(LCP 보호), 모션은 Reveal/AnimatedDotsLogo가 마운트 후 트리거.
- * 카피는 02 §1 원문 그대로.
+ * 카피는 로케일 사전(`copy.hero`)에서 주입(원문 그대로).
  */
-export function Hero() {
+export function Hero({ copy }: { copy: LandingCopy }) {
+  const c = copy.hero;
+  // 한국어만 단어 단위 줄바꿈(영어는 자연 줄바꿈이 자연스럽다).
+  const bk = copy.isKorean ? 'break-keep' : '';
+  // 브랜드명 치환 — H1 라인2/서브라인2는 ko/en 공통으로 {site} 토큰을 쓴다.
+  const h1Line2 = c.h1Line2.replace('{site}', SITE_NAME);
+  const subLine2 = c.subLine2.replace('{site}', SITE_NAME);
+
   return (
     <section
       aria-labelledby="hero-title"
@@ -40,12 +48,12 @@ export function Hero() {
               aria-hidden="true"
               className="h-1.5 w-1.5 rounded-full bg-(--color-accent)"
             />
-            스크린샷 정리 · 캘린더 자동 · 주간 요약
+            {c.eyebrow}
           </Reveal>
 
           <h1
             id="hero-title"
-            className="mt-6 font-extrabold tracking-tight break-keep"
+            className={`mt-6 font-extrabold tracking-tight ${bk}`}
             style={{
               fontSize: 'clamp(2.125rem, 6vw, 3.75rem)',
               lineHeight: 1.12,
@@ -53,10 +61,10 @@ export function Hero() {
             }}
           >
             <Reveal as="span" delay={90} className="block">
-              찍기만 하세요.
+              {c.h1Line1}
             </Reveal>
             <Reveal as="span" delay={180} className="block">
-              {SITE_NAME}이 알아서.
+              {h1Line2}
               {/* 라인2 끝 코랄 점 — 브랜드 9닷 코랄 메타포 */}
               <span
                 aria-hidden="true"
@@ -68,20 +76,19 @@ export function Hero() {
           <Reveal
             as="p"
             delay={300}
-            className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed break-keep text-(--color-ink-soft) lg:mx-0 lg:text-xl"
+            className={`mx-auto mt-6 max-w-2xl text-lg leading-relaxed ${bk} text-(--color-ink-soft) lg:mx-0 lg:text-xl`}
           >
-            사진첩에 쌓이기만 하던 스크린샷, 이제 다시 쓸모 있게.
+            {c.subLine1}
             <br />
-            {SITE_NAME}이 캡처 속 글자를 읽어 정리하고, 일정은 캘린더에 넣고, 한
-            주는 5줄로 돌려드려요.
+            {subLine2}
           </Reveal>
 
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap lg:justify-start">
             <Reveal variant="scale-in" delay={420}>
-              <StoreBadge store="appstore" />
+              <StoreBadge store="appstore" copy={copy} />
             </Reveal>
             <Reveal variant="scale-in" delay={480}>
-              <StoreBadge store="googleplay" />
+              <StoreBadge store="googleplay" copy={copy} />
             </Reveal>
           </div>
 
@@ -89,9 +96,9 @@ export function Hero() {
             as="p"
             variant="fade"
             delay={560}
-            className="mt-5 text-sm break-keep text-(--color-ink-faint)"
+            className={`mt-5 text-sm ${bk} text-(--color-ink-faint)`}
           >
-            지금 무료로 이용해보세요
+            {c.helper}
           </Reveal>
         </div>
 
@@ -106,7 +113,7 @@ export function Hero() {
               <div className="overflow-hidden rounded-3xl border border-(--color-line) bg-(--color-card) shadow-(--shadow-float)">
                 <Image
                   src="/shots/report.png"
-                  alt="Memsum 주간 리포트 화면 — 이번 주 핵심 5개를 5줄로 보여주는 모습"
+                  alt={c.reportAlt}
                   width={1080}
                   height={2400}
                   sizes="(max-width: 768px) 35vw, 18vw"
@@ -121,7 +128,7 @@ export function Hero() {
               <div className="overflow-hidden rounded-3xl border border-(--color-line) bg-(--color-card) shadow-(--shadow-float)">
                 <Image
                   src="/shots/home.png"
-                  alt="Memsum 홈 화면 — 이번 주 캡처가 카드로 자동 정리된 모습"
+                  alt={c.homeAlt}
                   width={1080}
                   height={2400}
                   sizes="(max-width: 768px) 45vw, 22vw"
@@ -143,7 +150,7 @@ export function Hero() {
           href="#how-it-works"
           className="flex flex-col items-center gap-1.5 text-sm text-(--color-ink-soft) transition-colors hover:text-(--color-ink)"
         >
-          <span className="break-keep">이렇게 작동해요</span>
+          <span className={bk}>{c.scrollHint}</span>
           <ChevronDown
             size={20}
             aria-hidden="true"

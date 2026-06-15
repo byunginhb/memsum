@@ -42,6 +42,11 @@ body {
   background: var(--color-cream);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* 가로 오버플로 방지: 장식 요소(글로우 blob·회전 폰·9닷 bleed)나 긴 번역 문자열이
+     좁은 화면에서 페이지 폭을 넘겨도 가로 스크롤/우측 잘림이 생기지 않게 클립한다.
+     overflow-x:hidden 대신 clip을 쓰는 이유: hidden은 스크롤 컨테이너를 만들어
+     sticky 헤더를 깨뜨릴 수 있으나 clip은 그렇지 않다. */
+  overflow-x: clip;
 }
 
 /* ── 포커스 가시성 — 키보드 접근 시 코랄 아웃라인 ─────────────── */

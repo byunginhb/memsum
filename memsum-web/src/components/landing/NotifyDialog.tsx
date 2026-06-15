@@ -5,10 +5,12 @@ import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
 
 import { SUPPORT_EMAIL } from '@/lib/site';
+import type { LandingCopy } from '@/lib/landing-copy';
 
 type NotifyDialogProps = {
   open: boolean;
   onClose: () => void;
+  copy: LandingCopy;
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,8 +20,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * 앱 미출시 → 가짜 스토어 링크 대신 이 모달로 연결한다(정직 규칙 §7).
  * 제출은 mailto 폴백(서버 불필요): 사용자의 메일 클라이언트로 신청 메일을 연다.
  * focus trap · Esc 닫기 · 배경 스크롤 잠금 · 닫으면 트리거로 포커스 복귀.
+ * 모든 문구는 로케일 사전(`copy.notifyDialog`)에서 주입.
  */
-export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
+export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
+  const c = copy.notifyDialog;
+  const bk = copy.isKorean ? 'break-keep' : '';
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -101,22 +106,27 @@ export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
   // document 미존재(SSR) 시에도 안전하게 null.
   if (!open || typeof document === 'undefined') return null;
 
+  const mailtoHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+    c.mailtoSubject,
+  )}`;
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmed = email.trim();
     if (!EMAIL_RE.test(trimmed)) {
-      setError('올바른 이메일 주소를 입력해 주세요.');
+      setError(c.validationError);
       return;
     }
     setError(null);
     // mailto 폴백 — 신청 메일을 연다(서버 의존성 없음).
-    const subject = encodeURIComponent('Memsum 출시 알림 신청');
-    const body = encodeURIComponent(
-      `출시되면 알림을 받고 싶어요.\n\n신청 이메일: ${trimmed}`,
-    );
+    const subject = encodeURIComponent(c.mailtoSubject);
+    const body = encodeURIComponent(c.mailtoBody.replace('{email}', trimmed));
     window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
     setSubmitted(true);
   };
+
+  // 성공 설명문은 {email} 토큰을 링크된 주소로 치환 — 토큰 앞뒤 텍스트를 분리해 렌더.
+  const [successBefore, successAfter] = c.successDescription.split('{email}');
 
   return createPortal(
     <div
@@ -131,7 +141,7 @@ export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
           tabIndex=-1. Tab trap이 배경 버튼으로 새지 않게 한다. */}
       <button
         type="button"
-        aria-label="닫기"
+        aria-label={c.closeAria}
         tabIndex={-1}
         className="absolute inset-0 bg-(--color-ink)/40 backdrop-blur-sm"
         onClick={onClose}
@@ -142,7 +152,7 @@ export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
       >
         <button
           type="button"
-          aria-label="닫기"
+          aria-label={c.closeAria}
           onClick={onClose}
           className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-(--color-ink-soft) transition-colors hover:bg-(--color-primary-soft) hover:text-(--color-ink)"
         >
@@ -156,50 +166,47 @@ export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
             </span>
             <h2
               id="notify-title"
-              className="mt-4 text-xl font-bold tracking-tight break-keep"
+              className={`mt-4 text-xl font-bold tracking-tight ${bk}`}
             >
-              신청 완료! 출시되면 가장 먼저 알려드릴게요.
+              {c.successTitle}
             </h2>
             <p
               id="notify-desc"
-              className="mt-2 text-sm leading-relaxed break-keep text-(--color-ink-soft)"
+              className={`mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}
             >
-              메일 앱이 열리지 않았다면{' '}
+              {successBefore}
               <a
                 className="font-semibold text-(--color-primary) underline underline-offset-2"
-                href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
-                  'Memsum 출시 알림 신청',
-                )}`}
+                href={mailtoHref}
               >
                 {SUPPORT_EMAIL}
               </a>
-              로 보내주세요.
+              {successAfter}
             </p>
             <button
               type="button"
               onClick={onClose}
               className="mt-6 w-full rounded-full bg-(--color-primary) px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-strong)"
             >
-              닫기
+              {c.close}
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate>
             <h2
               id="notify-title"
-              className="text-xl font-bold tracking-tight break-keep"
+              className={`text-xl font-bold tracking-tight ${bk}`}
             >
-              가장 먼저 받아보세요
+              {c.formTitle}
             </h2>
             <p
               id="notify-desc"
-              className="mt-2 text-sm leading-relaxed break-keep text-(--color-ink-soft)"
+              className={`mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}
             >
-              iOS·Android 출시 준비 중이에요. 알림을 신청하면 가장 먼저
-              알려드릴게요.
+              {c.formDescription}
             </p>
             <label htmlFor="notify-email" className="sr-only">
-              이메일 주소
+              {c.emailLabel}
             </label>
             <input
               ref={inputRef}
@@ -226,10 +233,10 @@ export function NotifyDialog({ open, onClose }: NotifyDialogProps) {
               type="submit"
               className="mt-4 w-full rounded-full bg-(--color-primary) px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-strong) active:scale-[0.98]"
             >
-              알림 받기
+              {c.submit}
             </button>
-            <p className="mt-3 text-center text-xs leading-relaxed break-keep text-(--color-ink-faint)">
-              약속: 출시 소식 1통만. 스팸 없이 한 번만 보내드려요.
+            <p className={`mt-3 text-center text-xs leading-relaxed ${bk} text-(--color-ink-faint)`}>
+              {c.promise}
             </p>
           </form>
         )}

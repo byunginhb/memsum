@@ -13,6 +13,14 @@ export const metadata: Metadata = {
   description:
     '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
   verification: { google: GOOGLE_SITE_VERIFICATION },
+  // hreflang — 한/영 페이지를 상호 대안으로 선언. x-default는 한국어(기본 도메인 루트).
+  alternates: {
+    languages: {
+      ko: SITE_URL,
+      en: `${SITE_URL}/en`,
+      'x-default': SITE_URL,
+    },
+  },
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,

@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 
+import type { LandingCopy } from '@/lib/landing-copy';
+
 import { NotifyDialog } from './NotifyDialog';
 
 type NotifyContextValue = {
@@ -19,8 +21,15 @@ const NotifyContext = createContext<NotifyContextValue | null>(null);
 /**
  * 출시 알림 모달을 전역 단일 인스턴스로 제공한다.
  * 모든 StoreBadge / CTA가 이 컨텍스트를 통해 같은 모달을 연다(가짜 스토어 링크 0건).
+ * 모달 문구는 로케일 사전(`copy`)을 그대로 흘려보낸다.
  */
-export function NotifyProvider({ children }: { children: ReactNode }) {
+export function NotifyProvider({
+  children,
+  copy,
+}: {
+  children: ReactNode;
+  copy: LandingCopy;
+}) {
   const [open, setOpen] = useState(false);
   const openNotify = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
@@ -28,7 +37,7 @@ export function NotifyProvider({ children }: { children: ReactNode }) {
   return (
     <NotifyContext.Provider value={{ openNotify }}>
       {children}
-      <NotifyDialog open={open} onClose={close} />
+      <NotifyDialog open={open} onClose={close} copy={copy} />
     </NotifyContext.Provider>
   );
 }

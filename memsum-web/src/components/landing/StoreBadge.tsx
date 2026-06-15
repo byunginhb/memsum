@@ -2,30 +2,21 @@
 
 import { Apple, Play } from 'lucide-react';
 
+import type { LandingCopy } from '@/lib/landing-copy';
+
 import { useNotify } from './NotifyProvider';
 
 type Store = 'appstore' | 'googleplay';
 
 type StoreBadgeProps = {
   store: Store;
-  /** 우상단 리본 문구. 기본 "출시 준비 중". */
+  /** 로케일 카피 사전(라벨·리본 문구 출처). */
+  copy: LandingCopy;
+  /** 리본 문구 override. 기본은 copy.storeBadge.ribbon(컴팩트 시 ribbonCompact). */
   ribbon?: string;
   /** 컴팩트 모드(MobileCtaBar용). */
   compact?: boolean;
   className?: string;
-};
-
-const LABELS: Record<Store, { top: string; bottom: string; aria: string }> = {
-  appstore: {
-    top: 'Download on the',
-    bottom: 'App Store',
-    aria: '출시 알림 신청 — App Store',
-  },
-  googleplay: {
-    top: 'GET IT ON',
-    bottom: 'Google Play',
-    aria: '출시 알림 신청 — Google Play',
-  },
 };
 
 /**
@@ -33,16 +24,21 @@ const LABELS: Record<Store, { top: string; bottom: string; aria: string }> = {
  * 시각적으로는 정식 스토어 배지처럼 설치 욕구를 자극하되,
  * 앱 미출시 상태이므로 클릭 시 외부 스토어로 가지 않고 출시 알림 모달을 연다(정직 규칙 §7).
  * 스크린리더에는 "출시 알림 신청"으로 읽혀 오인을 방지한다.
+ * 리본은 컴팩트 바에서 가장 좁으므로 ribbonCompact(영어 "Soon")로 폴백한다.
  */
 export function StoreBadge({
   store,
-  ribbon = '출시 준비 중',
+  copy,
+  ribbon,
   compact = false,
   className,
 }: StoreBadgeProps) {
   const { openNotify } = useNotify();
-  const meta = LABELS[store];
+  const meta = copy.storeBadge[store];
   const Icon = store === 'appstore' ? Apple : Play;
+  // 컴팩트(모바일 바)는 가장 좁은 자리 → 짧은 최종형 리본.
+  const ribbonText =
+    ribbon ?? (compact ? copy.storeBadge.ribbonCompact : copy.storeBadge.ribbon);
 
   return (
     <div className={`relative inline-block ${className ?? ''}`}>
@@ -76,7 +72,7 @@ export function StoreBadge({
           compact ? 'text-[9px]' : 'text-[10px]'
         }`}
       >
-        {ribbon}
+        {ribbonText}
       </span>
     </div>
   );

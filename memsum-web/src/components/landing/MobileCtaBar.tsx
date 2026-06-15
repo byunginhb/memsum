@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 
+import type { LandingCopy } from '@/lib/landing-copy';
+
 import { StoreBadge } from './StoreBadge';
 
 /**
  * 모바일 상시 전환 유도 바.
  * 히어로를 벗어나면(스크롤 > 80vh) slide-up 등장. safe-area 패딩.
- * 모바일 전용(lg:hidden).
+ * 모바일 전용(lg:hidden). 컴팩트 배지 리본은 가장 좁아 ribbonCompact를 쓴다.
  */
-export function MobileCtaBar() {
+export function MobileCtaBar({ copy }: { copy: LandingCopy }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -35,8 +37,8 @@ export function MobileCtaBar() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-center justify-center gap-3 px-4 py-3">
-        <StoreBadge store="appstore" compact />
-        <StoreBadge store="googleplay" compact />
+        <StoreBadge store="appstore" copy={copy} compact />
+        <StoreBadge store="googleplay" copy={copy} compact />
       </div>
     </div>
   );
