@@ -22,8 +22,9 @@ const CARRIER_HINTS: readonly { pattern: RegExp; name: string }[] = [
   { pattern: /(롯데\s*글로벌|롯데택배|롯데)/, name: '롯데택배' },
   { pattern: /(로젠택배|로젠)/, name: '로젠택배' },
   { pattern: /(쿠팡\s*로지스틱스|쿠팡|CLS)/i, name: '쿠팡' },
-  { pattern: /(GS\s*Postbox|GS25|반값택배|GS택배)/i, name: 'GS Postbox' },
-  { pattern: /(CU\s*편의점|CU택배|CVSnet|씨유)/i, name: 'CU 편의점택배' },
+  // CU를 GS보다 먼저 판별한다 — "CU반값택배"의 '반값택배'가 GS 패턴에 먼저 걸리지 않도록.
+  { pattern: /(CU\s*반값택배|CU\s*편의점|CU\s*알뜰|CU택배|CVSnet|씨유)/i, name: 'CU 편의점택배' },
+  { pattern: /(GS\s*Postbox|GS25|GS\s*반값|반값택배|GS택배)/i, name: 'GS Postbox' },
   { pattern: /(경동택배|경동)/, name: '경동택배' },
   { pattern: /(대신택배|대신)/, name: '대신택배' },
   { pattern: /(일양로지스|일양)/, name: '일양로지스' },
@@ -112,11 +113,21 @@ export function resolveCarrier(
 ): ParcelCarrier | null {
   if (candidates.length === 0) return null;
   if (hint) {
-    const token = hint.replace(/택배|대한통운|로지스틱스|편의점|Postbox/gi, '').trim();
-    const matched = candidates.find(
-      (c) => c.name.includes(hint) || (token.length >= 2 && c.name.includes(token)),
+    // 1순위: 정확/근접 매칭(양방향 포함). "CU 편의점택배"가 그대로 후보에 있으면 그것.
+    //   recommend가 후보를 못 좁혀 전체 택배사를 줄 때 약한 토큰("CU"→"CUBEFLOW")에 오매칭되지 않도록
+    //   완전 포함을 먼저 본다.
+    const strong = candidates.find(
+      (c) => c.name === hint || c.name.includes(hint) || hint.includes(c.name),
     );
-    if (matched) return matched;
+    if (strong) return strong;
+    // 2순위: 핵심 토큰 매칭 — 단 후보가 정확히 1개일 때만(복수면 모호 → 사용자 선택).
+    const token = hint
+      .replace(/택배|대한통운|로지스틱스|편의점|Postbox|글로벌|특송/gi, '')
+      .trim();
+    if (token.length >= 2) {
+      const tokenMatches = candidates.filter((c) => c.name.includes(token));
+      if (tokenMatches.length === 1) return tokenMatches[0];
+    }
   }
   return candidates.length === 1 ? candidates[0] : null;
 }
