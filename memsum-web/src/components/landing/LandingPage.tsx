@@ -10,6 +10,7 @@ import { FinalCta } from './FinalCta';
 import { Hero } from './Hero';
 import { MobileCtaBar } from './MobileCtaBar';
 import { NotifyProvider } from './NotifyProvider';
+import { ParcelSection } from './ParcelSection';
 import { ProblemSection } from './ProblemSection';
 import { ScrollProgress } from './ScrollProgress';
 import { StepFlow } from './StepFlow';
@@ -53,6 +54,7 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <ProblemSection copy={copy} />
         <StepFlow copy={copy} />
         <FeatureShowcase copy={copy} />
+        {copy.isKorean && <ParcelSection copy={copy} />}
         <AudienceSection copy={copy} />
         <CompareTable copy={copy} />
         <Faq copy={copy} />
