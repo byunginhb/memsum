@@ -59,11 +59,16 @@ const CATEGORY_SET: ReadonlySet<string> = new Set(CATEGORY_KEYS);
 
 type SourcePlatform = "ios" | "android";
 
+// 출력(title/summary) 언어. 클라이언트 앱 로케일을 그대로 받는다(기본 ko).
+type Locale = "ko" | "en";
+const DEFAULT_LOCALE: Locale = "ko";
+
 interface ProcessCaptureBody {
   readonly capture_id?: string;
   readonly ocr_text: string;
   readonly image_url?: string;
   readonly source_platform: SourcePlatform;
+  readonly locale: Locale;
 }
 
 interface ExtractedEvent {
@@ -116,19 +121,25 @@ function parseBody(raw: unknown): ProcessCaptureBody {
   if (body.image_url !== undefined && typeof body.image_url !== "string") {
     throw new Error("image_url은 문자열이어야 합니다.");
   }
+  // locale 미지정/이상값은 기본 ko로 폴백한다(구버전 클라이언트 호환).
+  const locale: Locale = body.locale === "en" ? "en" : DEFAULT_LOCALE;
 
   return {
     ocr_text: body.ocr_text,
     source_platform: body.source_platform,
     capture_id: body.capture_id as string | undefined,
     image_url: body.image_url as string | undefined,
+    locale,
   };
 }
 
 // ── OpenAI 후처리 ─────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(nowIso: string): string {
+function buildSystemPrompt(nowIso: string, locale: Locale): string {
   // 왜: 모델이 상대 날짜("다음 주 화")를 절대 시각으로 변환하려면 기준 현재 시각이 필요하다.
+  if (locale === "en") {
+    return buildSystemPromptEn(nowIso);
+  }
   return [
     "당신은 한국어 스크린샷 OCR 텍스트를 정제하고 일정 이벤트를 추출하는 어시스턴트입니다.",
     `현재 시각은 ${nowIso} (${TIMEZONE}, KST) 입니다. 모든 상대 날짜·시간은 이 기준으로 해석합니다.`,
@@ -150,6 +161,39 @@ function buildSystemPrompt(nowIso: string): string {
     "종료 시각이 명시되지 않으면 ends_at은 null, 장소가 없으면 location은 null 입니다.",
     "",
     "반드시 아래 JSON 스키마로만 응답합니다. 그 외 텍스트를 출력하지 않습니다:",
+    '{',
+    '  "clean_text": string,',
+    '  "title": string,',
+    '  "summary": string,',
+    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null },',
+    '  "category": "marketing" | "event" | "receipt" | "shopping" | "info" | "etc"',
+    '}',
+  ].join("\n");
+}
+
+// 영어 사용자용 프롬프트. clean_text는 원문 언어를 보존하되, title·summary는 자연스러운 영어로.
+function buildSystemPromptEn(nowIso: string): string {
+  return [
+    "You are an assistant that cleans up OCR text from screenshots and extracts calendar events.",
+    `The current time is ${nowIso} (${TIMEZONE}, KST). Interpret all relative dates and times against this reference.`,
+    "",
+    "You are given raw OCR text. Do the following:",
+    "1. Produce cleaned text (clean_text) with typos, spacing, and line breaks fixed. Keep clean_text in the SAME language as the source text. Never add anything not in the original.",
+    "2. Write a one-line title and a one-line summary in natural English. Write them in English even if the source text is in another language.",
+    "3. If a calendar event (appointment, meeting, reservation, etc.) is detected, extract it as the event object. Otherwise event is null.",
+    "4. Classify the capture into exactly one of these six categories (use these exact keys):",
+    "   - marketing: ads, promotions, discounts, coupons, brand campaigns",
+    "   - event: appointments, schedules, events, reservations, invitations — anything where a date/time is central",
+    "   - receipt: receipts, payment records, order confirmations, invoices",
+    "   - shopping: products, carts, wishlists, store screens",
+    "   - info: articles, information, tips, know-how, things to read",
+    "   - etc: anything that doesn't clearly fit the above",
+    "",
+    "Interpret everyday date/time expressions. Examples: 'next Tue 2pm', '6/15 Sat 14:00', 'tomorrow at 10:30am'.",
+    "starts_at and ends_at are ISO8601 with the KST offset (+09:00). Example: '2026-06-15T14:00:00+09:00'.",
+    "If no end time is given, ends_at is null; if no location is given, location is null.",
+    "",
+    "Respond ONLY with the JSON schema below. Output no other text:",
     '{',
     '  "clean_text": string,',
     '  "title": string,',
@@ -205,6 +249,7 @@ async function callOpenAiOnce(
   apiKey: string,
   ocrText: string,
   nowIso: string,
+  locale: Locale,
 ): Promise<OpenAiResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
@@ -221,7 +266,7 @@ async function callOpenAiOnce(
         response_format: { type: "json_object" },
         temperature: 0.2,
         messages: [
-          { role: "system", content: buildSystemPrompt(nowIso) },
+          { role: "system", content: buildSystemPrompt(nowIso, locale) },
           { role: "user", content: ocrText },
         ],
       }),
@@ -267,12 +312,13 @@ async function callOpenAiWithRetry(
   apiKey: string,
   ocrText: string,
   nowIso: string,
+  locale: Locale,
 ): Promise<OpenAiResult> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < BACKOFF_DELAYS_MS.length; attempt++) {
     try {
-      return await callOpenAiOnce(apiKey, ocrText, nowIso);
+      return await callOpenAiOnce(apiKey, ocrText, nowIso, locale);
     } catch (error) {
       lastError = error;
       const retryable = (error as Error & { retryable?: boolean }).retryable === true;
@@ -350,7 +396,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const nowIso = new Date().toLocaleString("sv-SE", { timeZone: TIMEZONE })
       .replace(" ", "T") + "+09:00";
 
-    const result = await callOpenAiWithRetry(openAiKey, body.ocr_text, nowIso);
+    const result = await callOpenAiWithRetry(openAiKey, body.ocr_text, nowIso, body.locale);
 
     // captures 스키마(0001)에는 title/summary/embedding 컬럼이 없다.
     // → 전체 추출 JSON을 parsed_event(jsonb)에 저장하고, ocr_text는 정제본으로 갱신한다.

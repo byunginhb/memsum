@@ -79,8 +79,13 @@ const DAYS_PER_WEEK = 7;
 
 // ── 타입 ─────────────────────────────────────────────────────────────────────
 
+// 리포트 문구(title/summary) 언어. 클라이언트 앱 로케일을 그대로 받는다(기본 ko).
+type Locale = "ko" | "en";
+const DEFAULT_LOCALE: Locale = "ko";
+
 interface WeeklyReportBody {
   readonly week_start?: string;
+  readonly locale: Locale;
 }
 
 // captures 테이블에서 후보로 가져오는 최소 컬럼.
@@ -135,18 +140,20 @@ function isIsoDate(value: string): boolean {
 }
 
 function parseBody(raw: unknown): WeeklyReportBody {
-  // 본문이 비어 있거나 객체가 아니면 week_start 미지정으로 본다(현재 주).
+  // 본문이 비어 있거나 객체가 아니면 week_start 미지정(현재 주) + 기본 로케일로 본다.
   if (typeof raw !== "object" || raw === null) {
-    return {};
+    return { locale: DEFAULT_LOCALE };
   }
   const body = raw as Record<string, unknown>;
+  // locale 미지정/이상값은 기본 ko로 폴백한다(구버전 클라이언트 호환).
+  const locale: Locale = body.locale === "en" ? "en" : DEFAULT_LOCALE;
   if (body.week_start === undefined) {
-    return {};
+    return { locale };
   }
   if (typeof body.week_start !== "string" || !isIsoDate(body.week_start)) {
     throw new Error("week_start는 'YYYY-MM-DD' 형식이어야 합니다.");
   }
-  return { week_start: body.week_start };
+  return { week_start: body.week_start, locale };
 }
 
 // 주어진(또는 현재) 시점이 속한 주의 월요일(KST)을 "YYYY-MM-DD"로 반환.
@@ -209,7 +216,10 @@ function fallbackSummary(c: CaptureCandidate): string {
 
 // ── OpenAI 선별·랭킹 ───────────────────────────────────────────────────────────
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(locale: Locale): string {
+  if (locale === "en") {
+    return buildSystemPromptEn();
+  }
   return [
     "당신은 사용자의 한 주치 스크린샷 캡처에서 '다시 볼 가치가 가장 큰' 항목을 골라,",
     "잊고 있던 것을 따뜻하게 다시 떠올려주는 Memsum의 큐레이터입니다.",
@@ -255,6 +265,61 @@ function buildSystemPrompt(): string {
     "",
     "[출력]",
     "- 반드시 아래 JSON 스키마로만 응답합니다. 그 외 텍스트를 출력하지 않습니다.",
+    "{",
+    '  "items": [',
+    '    { "capture_id": string, "rank": number, "title": string, "summary": string }',
+    "  ]",
+    "}",
+  ].join("\n");
+}
+
+// 영어 사용자용 — 한국어판과 동일한 "따뜻한 리마인드" 결을 자연스러운 영어로 옮긴 프롬프트.
+function buildSystemPromptEn(): string {
+  return [
+    "You are Memsum's curator. From a user's screenshots this week, you pick the ones most worth a",
+    "second look, and warmly bring back to mind the things they'd half-forgotten.",
+    "",
+    "[Role]",
+    `- Choose the ${REPORT_ITEM_COUNT} most meaningful items from the list and rank them 1–${REPORT_ITEM_COUNT} by importance.`,
+    "- Write a one-line title and a one-line summary for each, in natural English.",
+    "- Favor captures with plans, appointments, to-dos, or info they'll want to find again over plain screenshots.",
+    "",
+    "[Input format]",
+    "- Input is an array of captures. Each item: { capture_id, category, title_hint, summary_hint, text }.",
+    "  - category: the capture's class (marketing/event/receipt/shopping/info/etc). It guides the tone.",
+    "  - title_hint, summary_hint: pre-extracted title/summary hints (may be empty strings).",
+    "  - text: part of the raw OCR text.",
+    `- Use only capture_ids that exist in the input, and select exactly ${REPORT_ITEM_COUNT}.`,
+    "",
+    "[Title rules]",
+    "- A short noun phrase (about 3–6 words, max ~40 characters) that says at a glance what the capture is about.",
+    "- Refine title_hint if present; otherwise pull the gist from text. No emojis, and avoid wrapping the title in quotation marks.",
+    "",
+    "[Summary rules — one warm line tuned to the category]",
+    "- The summary isn't a recap; it's one line that brings the capture back to mind — something they'd forgotten.",
+    "- Keep it short (one sentence, ideally under ~90 characters), gentle and friendly. Vary the tone by category (match the feel, but write a fresh sentence every time):",
+    "  - info (articles, knowledge): a warm reminder that revives something they'd set aside. Lean into this feel the most.",
+    "    e.g. 'That lease guide you meant to revisit — saved right here for you.'",
+    "    The nuance: 'you almost let it slip, but here it is again.'",
+    "  - shopping: gently bring back what they were mulling over — light, never pushy or salesy.",
+    "    e.g. 'Those earbuds you saved — still on your mind?'",
+    "  - event (plans, appointments): a reassuring nudge about something coming up.",
+    "    e.g. 'Your workshop on the 18th — you've got it, right?'",
+    "  - marketing, receipt, etc: no emotional tone. Keep it plain and factual, one calm line.",
+    "    (A personal, sentimental tone feels off on work files, payment records, or unclear items.)",
+    "    e.g. marketing 'Summer rewards event details', receipt 'Dental visit payment record'.",
+    "",
+    "[Factual guardrails — no exceptions]",
+    "- Write only what is actually in title_hint, summary_hint, or text. Never invent dates, amounts, places, numbers, or names that aren't there.",
+    "- No hype, no promotional flourish, no manufactured emotion. Don't assert what you can't be sure of.",
+    "- If a capture is thin on detail, don't force a tone — leave a plain summary that calmly states the title.",
+    "",
+    `[Avoid repetition — so the ${REPORT_ITEM_COUNT} lines don't get dull]`,
+    `- The ${REPORT_ITEM_COUNT} summaries must not read like the same template pasted over. Vary the openings, verbs, and endings.`,
+    "- Use a rhetorical question ending ('…right?') at most twice. Don't repeat the same word (especially 'again') on every line.",
+    "",
+    "[Output]",
+    "- Respond ONLY with the JSON schema below. Output no other text.",
     "{",
     '  "items": [',
     '    { "capture_id": string, "rank": number, "title": string, "summary": string }',
@@ -338,6 +403,7 @@ function toFallbackItem(c: CaptureCandidate, rank: number): ReportItemRow {
 async function callOpenAiOnce(
   apiKey: string,
   candidates: CaptureCandidate[],
+  locale: Locale,
 ): Promise<ReportItemRow[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
@@ -365,7 +431,7 @@ async function callOpenAiOnce(
         response_format: { type: "json_object" },
         temperature: REPORT_TEMPERATURE,
         messages: [
-          { role: "system", content: buildSystemPrompt() },
+          { role: "system", content: buildSystemPrompt(locale) },
           { role: "user", content: JSON.stringify({ captures: userPayload }) },
         ],
       }),
@@ -411,12 +477,13 @@ async function callOpenAiOnce(
 async function callOpenAiWithRetry(
   apiKey: string,
   candidates: CaptureCandidate[],
+  locale: Locale,
 ): Promise<ReportItemRow[]> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < BACKOFF_DELAYS_MS.length; attempt++) {
     try {
-      return await callOpenAiOnce(apiKey, candidates);
+      return await callOpenAiOnce(apiKey, candidates, locale);
     } catch (error) {
       lastError = error;
       const retryable = (error as Error & { retryable?: boolean }).retryable === true;
@@ -485,10 +552,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const weekEnd = addDays(weekStart, DAYS_PER_WEEK - 1); // 일요일
 
   try {
-    // (1) 캐시 조회 — 있으면 OpenAI 0회로 즉시 반환.
+    // (1) 캐시 조회 — 로케일이 일치하면 OpenAI 0회로 즉시 반환.
+    //     로케일이 다르면(사용자가 언어를 바꿈) 같은 주라도 해당 언어로 다시 생성한다.
+    //     legacy 행(locale null)은 ko로 간주(마이그레이션 이전 데이터 호환).
     const { data: cached, error: cacheError } = await supabase
       .from("weekly_reports")
-      .select("week_start, week_end, total_captures, items")
+      .select("week_start, week_end, total_captures, items, locale")
       .eq("user_id", userId)
       .eq("week_start", weekStart)
       .maybeSingle();
@@ -497,7 +566,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new Error(`weekly_reports 캐시 조회 실패: ${cacheError.message}`);
     }
     if (cached) {
-      return jsonResponse(toResponse(cached), 200);
+      const cachedLocale =
+        (cached as { locale?: string | null }).locale === "en" ? "en" : "ko";
+      if (cachedLocale === body.locale) {
+        return jsonResponse(toResponse(cached), 200);
+      }
     }
 
     // (2) 그 주 캡처 후보 조회(최신순, 상한 MAX_CANDIDATES).
@@ -542,7 +615,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     } else {
       // (4) gpt-4o-mini 선별·랭킹. 실패 시 created_at desc 상위 5 폴백.
       try {
-        items = await callOpenAiWithRetry(openAiKey, candidates);
+        items = await callOpenAiWithRetry(openAiKey, candidates, body.locale);
       } catch (error) {
         const message = error instanceof Error ? error.message : "알 수 없는 오류";
         console.error("[weekly-report] OpenAI 실패 — 폴백 사용:", message);
@@ -562,11 +635,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
           total_captures: totalCaptures,
           selected_capture_ids: selectedCaptureIds,
           items,
+          locale: body.locale,
           generated_at: new Date().toISOString(),
         },
         { onConflict: "user_id,week_start" },
       )
-      .select("week_start, week_end, total_captures, items")
+      // locale도 함께 재조회 — 캐시 select(위)와 컬럼 목록을 대칭으로 맞춘다.
+      .select("week_start, week_end, total_captures, items, locale")
       .single();
 
     if (upsertError || !upserted) {

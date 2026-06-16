@@ -17,6 +17,7 @@ import type {
   WeeklyReport,
   WeeklyReportItem,
 } from '@/features/report/types';
+import { getLocale } from '@/i18n';
 import { getSupabase } from '@/lib/supabase';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
@@ -186,8 +187,11 @@ export async function getWeeklyReport(weekStart?: string): Promise<WeeklyReport>
   }
 
   try {
-    // week_start 미지정 시 빈 본문 → 함수가 현재 주를 계산한다.
-    const requestBody = weekStart ? { week_start: weekStart } : {};
+    // week_start 미지정 시 함수가 현재 주를 계산한다.
+    // locale: 앱 언어를 넘겨 리포트 문구를 사용자 언어로 생성하게 한다(기본 ko).
+    const requestBody = weekStart
+      ? { week_start: weekStart, locale: getLocale() }
+      : { locale: getLocale() };
     const { data, error } = await supabase.functions.invoke(FUNCTION_NAME, {
       body: requestBody,
     });

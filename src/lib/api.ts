@@ -15,6 +15,7 @@ import type {
   ProcessCaptureResult,
   CaptureEvent,
 } from '@/features/capture/types';
+import { getLocale } from '@/i18n';
 import { getSupabase } from '@/lib/supabase';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
@@ -121,11 +122,13 @@ export async function processCapture(
       FUNCTION_NAME,
       {
         // snake_case 계약(process-capture/index.ts). invoke가 Record를 JSON 직렬화한다.
+        // locale: 앱 언어를 넘겨 title·summary를 사용자 언어로 생성하게 한다(기본 ko).
         body: {
           ocr_text: input.ocrText,
           source_platform: input.sourcePlatform,
           image_url: input.imageUrl,
           capture_id: input.captureId,
+          locale: getLocale(),
         },
       },
     );
