@@ -12,6 +12,7 @@ import { ToastProvider } from '@/design/components/Toast';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
 import { useAutoCapture } from '@/hooks/use-auto-capture';
+import { useParcelAutoRefresh } from '@/hooks/use-parcel-auto-refresh';
 import { useWeeklyReportNotification } from '@/hooks/use-weekly-report-notification';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { useOnboardingStore } from '@/stores/onboarding-store';
@@ -64,6 +65,8 @@ export default function RootLayout() {
               <AutoCaptureGate />
               {/* 주 1회 리포트 알림(일요일 저녁) — 설정 토글과 동기화. UI 없음. */}
               <WeeklyReportGate />
+              {/* 택배 자동 새로고침(ko + 토글 ON) — 포그라운드 복귀 시 폴링 + 알림 탭 라우팅. UI 없음. */}
+              <ParcelGate />
               <OnboardingGate>
                 <Stack screenOptions={{ headerShown: false }} />
               </OnboardingGate>
@@ -147,5 +150,15 @@ function AutoCaptureGate() {
  */
 function WeeklyReportGate() {
   useWeeklyReportNotification();
+  return null;
+}
+
+/**
+ * 택배 자동 새로고침 게이트 — UI 없는 마운트 지점.
+ * ko + parcelTracking ON일 때만 포그라운드 복귀 시 활성 택배를 폴링하고,
+ * 상태 전이 시 로컬 알림을 띄운다. 알림 탭 시 상세 화면으로 이동한다.
+ */
+function ParcelGate() {
+  useParcelAutoRefresh();
   return null;
 }

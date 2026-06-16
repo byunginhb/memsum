@@ -13,6 +13,9 @@ import { t } from '@/i18n';
 // 주간 리포트 알림 채널(Android). 주 1회의 하이라이트라 헤드업(HIGH)으로 띄운다.
 const CHANNEL_WEEKLY = 'weekly-report';
 
+// 택배 상태 전이 알림 채널(Android). 배송 출발/완료는 즉시 확인 가치가 커 헤드업(HIGH).
+const CHANNEL_PARCEL = 'parcel-status';
+
 /** 주간 리포트 예약 알림 식별자(같은 id로 재예약하면 교체된다). */
 const WEEKLY_IDENTIFIER = 'weekly-report';
 
@@ -48,6 +51,10 @@ async function ensureChannels(): Promise<void> {
   try {
     await Notifications.setNotificationChannelAsync(CHANNEL_WEEKLY, {
       name: '주간 리포트',
+      importance: Notifications.AndroidImportance.HIGH,
+    });
+    await Notifications.setNotificationChannelAsync(CHANNEL_PARCEL, {
+      name: '택배 상태',
       importance: Notifications.AndroidImportance.HIGH,
     });
     channelReady = true;
@@ -113,4 +120,81 @@ export async function cancelWeeklyReportNotification(): Promise<void> {
   } catch (error) {
     console.error('[notifications] 주간 알림 해제 실패:', error);
   }
+}
+
+/** 택배 상태 전이 알림 입력(즉시 표시). 탭하면 해당 추적 상세로 이동한다. */
+export type ParcelNotificationInput = {
+  /** parcel_tracks.id — 탭 시 상세 라우팅 키. */
+  trackId: string;
+  /** 표시용 택배사명(없으면 "택배"로 폴백). */
+  carrierName: string;
+  /** estimate 시간대 문구(있으면 본문에 포함). */
+  estimate?: string | null;
+  /** 배송완료 시각 문구(delivered 본문용). */
+  deliveredAt?: string | null;
+};
+
+/**
+ * 택배 상태 전이 알림을 즉시 표시한다(예약 아님 — trigger:null).
+ * 푸시/원격이 아니라 클라이언트 폴링이 상태 전이를 감지했을 때 직접 게시하는 로컬 알림이다.
+ * 권한 거부 시 false. 실패해도 throw하지 않는다(폴링 흐름을 막지 않음).
+ */
+async function presentParcelNotification(
+  title: string,
+  body: string,
+  trackId: string,
+): Promise<boolean> {
+  try {
+    const granted = await ensureNotificationPermission();
+    if (!granted) return false;
+    await ensureChannels();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data: { url: `/parcel/${trackId}` },
+      },
+      // trigger:null → 즉시 표시.
+      trigger: null,
+      ...(Platform.OS === 'android' ? { channelId: CHANNEL_PARCEL } : null),
+    });
+    return true;
+  } catch (error) {
+    console.error('[notifications] 택배 알림 표시 실패:', error);
+    return false;
+  }
+}
+
+/**
+ * 배송 출발(level 5) 알림 — "오늘 도착 예상". estimate 유무에 따라 본문 분기.
+ * 단정형 금지(가능성형 i18n 카피 사용).
+ */
+export async function presentParcelOutForDelivery(
+  input: ParcelNotificationInput,
+): Promise<boolean> {
+  const carrier = input.carrierName.length > 0 ? input.carrierName : t('parcel.sectionTitle');
+  const hasTime = typeof input.estimate === 'string' && input.estimate.length > 0;
+  const body = hasTime
+    ? t('push.parcel.outForDelivery.bodyWithTime', { time: input.estimate as string })
+    : t('push.parcel.outForDelivery.bodyNoTime');
+  return presentParcelNotification(
+    t('push.parcel.outForDelivery.title', { carrier }),
+    body,
+    input.trackId,
+  );
+}
+
+/** 배송 완료(level 6) 알림 — 도착 시각 문구를 본문에 포함. */
+export async function presentParcelDelivered(
+  input: ParcelNotificationInput,
+): Promise<boolean> {
+  const carrier = input.carrierName.length > 0 ? input.carrierName : t('parcel.sectionTitle');
+  const date = typeof input.deliveredAt === 'string' && input.deliveredAt.length > 0
+    ? input.deliveredAt
+    : '';
+  return presentParcelNotification(
+    t('push.parcel.delivered.title', { carrier }),
+    t('push.parcel.delivered.body', { date }),
+    input.trackId,
+  );
 }

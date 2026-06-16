@@ -20,6 +20,7 @@ import { Card } from '@/design/components/Card/Card';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { glass, radius, spacing, typography, zIndex } from '@/design/tokens';
+import { ParcelCaptureBlock } from '@/features/parcel/components/ParcelCaptureBlock';
 import { getLocale, t } from '@/i18n';
 import { useCaptureStore } from '@/stores/capture-store';
 
@@ -260,6 +261,7 @@ function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
           title={draft.result.title}
           summary={draft.result.summary}
           ocrText={draft.result.clean_text || draft.ocrText || ''}
+          captureId={draft.result.capture_id}
           event={event}
         />
       ) : null}
@@ -322,10 +324,12 @@ type ResultBlockProps = {
   title: string;
   summary: string;
   ocrText: string;
+  /** 서버 발급 capture_id(택배 추적 등록 시 연결용). */
+  captureId: string;
   event: CaptureEvent | null;
 };
 
-function ResultBlock({ title, summary, ocrText, event }: ResultBlockProps) {
+function ResultBlock({ title, summary, ocrText, captureId, event }: ResultBlockProps) {
   const { colors } = useTheme();
   return (
     <View style={styles.resultBlock}>
@@ -335,6 +339,9 @@ function ResultBlock({ title, summary, ocrText, event }: ResultBlockProps) {
       ) : null}
 
       {event ? <EventCard event={event} /> : null}
+
+      {/* 택배 SMS 감지 시 추적 시작 블록(ko + 토글 ON일 때만, 컴포넌트 자체 게이트). */}
+      <ParcelCaptureBlock ocrText={ocrText} captureId={captureId} />
 
       {ocrText ? (
         <View style={styles.ocrBlock}>

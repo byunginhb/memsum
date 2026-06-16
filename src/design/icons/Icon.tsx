@@ -1,10 +1,14 @@
 import {
+  AlertCircle,
   Bell,
   Calendar,
   Camera,
   Check,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  Copy,
   FileText,
   Home,
   Images,
@@ -12,6 +16,7 @@ import {
   Loader,
   MoreHorizontal,
   Newspaper,
+  Package,
   Pencil,
   Plus,
   Receipt,
@@ -26,6 +31,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  Truck,
   User,
   X,
 } from 'lucide-react-native';
@@ -69,6 +75,12 @@ const ICONS = {
   newspaper: Newspaper,
   folder: Folder,
   loader: Loader,
+  package: Package,
+  truck: Truck,
+  'alert-circle': AlertCircle,
+  'check-circle': CheckCircle,
+  copy: Copy,
+  clock: Clock,
 } as const;
 
 export type IconName = keyof typeof ICONS;

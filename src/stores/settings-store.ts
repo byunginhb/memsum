@@ -16,6 +16,10 @@ type SettingsState = {
   weeklyReport: boolean;
   /** GPT 후처리 말투. 기본 friendly. */
   tone: ToneStyle;
+  /** 택배 SMS 인식·추적 사용 여부(한국 한정·옵션). 기본 false. */
+  parcelTracking: boolean;
+  /** 택배 기능 온보딩(한계 고지) 시트를 본 적 있는지. */
+  parcelOnboarded: boolean;
   /** AsyncStorage 복원이 끝났는지(런타임 전용, 영속 제외). */
   hydrated: boolean;
   setNickname: (nickname: string) => void;
@@ -23,6 +27,8 @@ type SettingsState = {
   setAutoCalendar: (autoCalendar: boolean) => void;
   setWeeklyReport: (weeklyReport: boolean) => void;
   setTone: (tone: ToneStyle) => void;
+  setParcelTracking: (parcelTracking: boolean) => void;
+  setParcelOnboarded: (parcelOnboarded: boolean) => void;
   /** 복원 완료 플래그 전환(내부용 — onRehydrateStorage에서 호출). */
   setHydrated: () => void;
 };
@@ -42,6 +48,8 @@ export const useSettingsStore = create<SettingsState>()(
       autoCalendar: true,
       weeklyReport: true,
       tone: 'friendly',
+      parcelTracking: false,
+      parcelOnboarded: false,
       hydrated: false,
       // 불변 업데이트: zustand set은 새 부분 상태를 머지한다.
       setNickname: (nickname) => set({ nickname }),
@@ -49,6 +57,8 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoCalendar: (autoCalendar) => set({ autoCalendar }),
       setWeeklyReport: (weeklyReport) => set({ weeklyReport }),
       setTone: (tone) => set({ tone }),
+      setParcelTracking: (parcelTracking) => set({ parcelTracking }),
+      setParcelOnboarded: (parcelOnboarded) => set({ parcelOnboarded }),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
@@ -61,6 +71,8 @@ export const useSettingsStore = create<SettingsState>()(
         autoCalendar: state.autoCalendar,
         weeklyReport: state.weeklyReport,
         tone: state.tone,
+        parcelTracking: state.parcelTracking,
+        parcelOnboarded: state.parcelOnboarded,
       }),
       // 복원이 끝난(또는 실패한) 시점에 hydrated를 켠다.
       onRehydrateStorage: () => (state) => {

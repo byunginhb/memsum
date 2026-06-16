@@ -22,7 +22,8 @@ import { useThemeStore } from '@/design/theme/theme-store';
 import type { ThemeMode } from '@/design/theme/theme-store';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
-import { t } from '@/i18n';
+import { ParcelOnboardingSheet } from '@/features/parcel/components/ParcelOnboardingSheet';
+import { getLocale, t } from '@/i18n';
 import { deleteAllUserData } from '@/lib/account';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCaptureStore } from '@/stores/capture-store';
@@ -69,17 +70,51 @@ export function SettingsScreen(): ReactNode {
   const autoCalendar = useSettingsStore((state) => state.autoCalendar);
   const weeklyReport = useSettingsStore((state) => state.weeklyReport);
   const tone = useSettingsStore((state) => state.tone);
+  const parcelTracking = useSettingsStore((state) => state.parcelTracking);
+  const parcelOnboarded = useSettingsStore((state) => state.parcelOnboarded);
   const setAutoCapture = useSettingsStore((state) => state.setAutoCapture);
   const setAutoCalendar = useSettingsStore((state) => state.setAutoCalendar);
   const setWeeklyReport = useSettingsStore((state) => state.setWeeklyReport);
   const setTone = useSettingsStore((state) => state.setTone);
+  const setParcelTracking = useSettingsStore((state) => state.setParcelTracking);
+  const setParcelOnboarded = useSettingsStore((state) => state.setParcelOnboarded);
 
   // 다크모드는 theme-store가 단일 진실(설정 스토어에 중복 저장하지 않는다).
   const themeMode = useThemeStore((state) => state.mode);
   const setThemeMode = useThemeStore((state) => state.setMode);
 
   const [isNicknameSheetOpen, setNicknameSheetOpen] = useState(false);
+  const [isParcelOnboardingOpen, setParcelOnboardingOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // 택배 토글은 한국(ko) 로케일에서만 노출한다.
+  const showParcelSection = getLocale() === 'ko';
+
+  // 택배 토글 변경. 최초 ON(미온보딩)이면 한계 고지 시트를 먼저 띄우고, 시트에서 확정될 때만
+  // 켠다(여기서는 토글만 켜고 시트를 연다 — 시트가 "나중에"면 원복). OFF는 즉시 반영.
+  const handleParcelToggle = useCallback(
+    (next: boolean): void => {
+      if (next && !parcelOnboarded) {
+        setParcelTracking(true);
+        setParcelOnboardingOpen(true);
+        return;
+      }
+      setParcelTracking(next);
+    },
+    [parcelOnboarded, setParcelTracking],
+  );
+
+  // 온보딩 "시작하기" — 온보딩 완료 플래그 커밋(토글은 이미 ON).
+  const handleParcelConfirm = useCallback((): void => {
+    setParcelOnboarded(true);
+    setParcelOnboardingOpen(false);
+  }, [setParcelOnboarded]);
+
+  // 온보딩 "나중에" — 토글 원복(OFF) + 시트 닫기.
+  const handleParcelCancel = useCallback((): void => {
+    setParcelTracking(false);
+    setParcelOnboardingOpen(false);
+  }, [setParcelTracking]);
 
   // 데이터 삭제에 필요한 본인 식별자 + 삭제 후 목록 새로고침 신호.
   const userId = useAuthStore((state) => state.userId);
@@ -208,6 +243,24 @@ export function SettingsScreen(): ReactNode {
           />
         </Section>
 
+        {/* 택배 · 배송 섹션 — 한국(ko) 로케일에서만 노출(MVP 게이트). */}
+        {showParcelSection ? (
+          <Section header={t('settings.parcel.sectionTitle')}>
+            <ListItem
+              leading={<Icon name="package" size={20} color="textSecondary" />}
+              title={t('settings.parcel.toggleLabel')}
+              subtitle={t('settings.parcel.toggleSubtitle')}
+              trailing={
+                <Switch
+                  value={parcelTracking}
+                  onValueChange={handleParcelToggle}
+                  accessibilityLabel={t('settings.parcel.toggleLabel')}
+                />
+              }
+            />
+          </Section>
+        ) : null}
+
         {/* 스타일 섹션 */}
         <Section header={t('settings.section.style')}>
           <ListItem
@@ -257,6 +310,14 @@ export function SettingsScreen(): ReactNode {
         visible={isNicknameSheetOpen}
         onClose={() => setNicknameSheetOpen(false)}
       />
+
+      {showParcelSection ? (
+        <ParcelOnboardingSheet
+          visible={isParcelOnboardingOpen}
+          onCancel={handleParcelCancel}
+          onConfirm={handleParcelConfirm}
+        />
+      ) : null}
     </View>
   );
 }

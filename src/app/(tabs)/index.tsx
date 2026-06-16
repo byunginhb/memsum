@@ -12,6 +12,7 @@ import { CategoryList } from '@/features/home/CategoryList';
 import { HomeGreeting } from '@/features/home/HomeGreeting';
 import { RecentCapturesGrid } from '@/features/home/RecentCapturesGrid';
 import { WeeklyStatsCard } from '@/features/home/WeeklyStatsCard';
+import { ParcelHomeSection } from '@/features/parcel/components/ParcelHomeSection';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCaptures } from '@/hooks/use-captures';
 import { useCategoryGroups } from '@/hooks/use-category-groups';
@@ -111,6 +112,9 @@ export default function HomeScreen(): ReactNode {
         <HomeEmptyState onImport={onImport} />
       ) : (
         <View style={styles.sections}>
+          {/* 배송 현황 — ko + 토글 ON + 활성 택배 있을 때만(컴포넌트 자체 게이트). */}
+          <ParcelHomeSection />
+
           <View style={styles.block}>
             <WeeklyStatsCard
               stats={weeklyStats.stats}
