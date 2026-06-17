@@ -67,7 +67,7 @@ export function ParcelSection({ copy }: { copy: LandingCopy }) {
             return (
               <Reveal
                 key={bullet.title}
-                className="flex flex-col gap-4 rounded-(--radius-block) border border-(--color-line) bg-(--color-bg) p-6 shadow-(--shadow-card)"
+                className="flex flex-col gap-4 rounded-(--radius-block) border border-(--color-line) bg-(--color-cream) p-6 shadow-(--shadow-card)"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-(--color-primary-soft) text-(--color-primary)">
                   <Icon size={24} aria-hidden="true" />

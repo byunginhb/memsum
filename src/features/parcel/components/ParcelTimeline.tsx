@@ -31,11 +31,17 @@ export function ParcelTimeline({ events, currentLevel }: ParcelTimelineProps): R
     );
   }
 
+  // SweetTracker는 이벤트를 과거→최신 순으로 준다. 타임라인은 최신을 맨 위(현재)에 강조해 보여주므로
+  // timeString 기준 내림차순 정렬한다(형식 "YYYY-MM-DD HH:mm:ss"는 사전식 정렬=시간순).
+  const ordered = [...events].sort((a, b) =>
+    (b.timeString ?? '').localeCompare(a.timeString ?? ''),
+  );
+
   return (
     <View accessibilityRole="list">
-      {events.map((event, index) => {
+      {ordered.map((event, index) => {
         const isFirst = index === 0;
-        const isLast = index === events.length - 1;
+        const isLast = index === ordered.length - 1;
         const delivered = currentLevel >= 6 && isFirst;
         const dotColor = delivered
           ? colors.accent
