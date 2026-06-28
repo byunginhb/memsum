@@ -55,6 +55,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "69fe853c-3143-4c40-95b1-70896b727b4f"
+      }
+    },
+    "owner": "bensong"
   }
 }
