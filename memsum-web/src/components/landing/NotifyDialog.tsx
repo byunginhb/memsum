@@ -18,7 +18,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * 출시 알림 신청 모달.
  * 앱 미출시 → 가짜 스토어 링크 대신 이 모달로 연결한다(정직 규칙 §7).
- * 제출은 mailto 폴백(서버 불필요): 사용자의 메일 클라이언트로 신청 메일을 연다.
+ * 제출은 /api/notify로 POST해 Supabase에 이메일을 저장한다(허니팟으로 봇 차단).
+ * 저장 실패 시에만 mailto 폴백 안내를 노출한다.
  * focus trap · Esc 닫기 · 배경 스크롤 잠금 · 닫으면 트리거로 포커스 복귀.
  * 모든 문구는 로케일 사전(`copy.notifyDialog`)에서 주입.
  */
@@ -28,6 +29,11 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  // 저장 실패 시에만 true — mailto 폴백 안내를 켠다.
+  const [fallback, setFallback] = useState(false);
+  // 허니팟(봇 차단) — 사람은 비워두는 숨김 필드.
+  const [company, setCompany] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +62,9 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
       setSubmitted(false);
       setError(null);
       setEmail('');
+      setSubmitting(false);
+      setFallback(false);
+      setCompany('');
       inputRef.current?.focus();
     }, 0);
 
@@ -106,27 +115,46 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
   // document 미존재(SSR) 시에도 안전하게 null.
   if (!open || typeof document === 'undefined') return null;
 
+  // 저장 실패 폴백용 mailto(제목+본문에 입력 이메일 포함).
   const mailtoHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
     c.mailtoSubject,
-  )}`;
+  )}&body=${encodeURIComponent(c.mailtoBody.replace('{email}', email.trim()))}`;
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     const trimmed = email.trim();
     if (!EMAIL_RE.test(trimmed)) {
       setError(c.validationError);
+      setFallback(false);
       return;
     }
     setError(null);
-    // mailto 폴백 — 신청 메일을 연다(서버 의존성 없음).
-    const subject = encodeURIComponent(c.mailtoSubject);
-    const body = encodeURIComponent(c.mailtoBody.replace('{email}', trimmed));
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setFallback(false);
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmed,
+          locale: copy.isKorean ? 'ko' : 'en',
+          company, // 허니팟(사람은 빈 값)
+        }),
+      });
+      if (!res.ok) throw new Error('store_failed');
+      setSubmitted(true);
+    } catch {
+      // 저장 실패 — 에러 + mailto 폴백 안내.
+      setError(c.submitError);
+      setFallback(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // 성공 설명문은 {email} 토큰을 링크된 주소로 치환 — 토큰 앞뒤 텍스트를 분리해 렌더.
-  const [successBefore, successAfter] = c.successDescription.split('{email}');
+  // 실패 폴백 안내문의 {email} 토큰을 mailto 링크로 치환 — 앞뒤 텍스트 분리.
+  const [errorHelpBefore, errorHelpAfter] = c.errorHelp.split('{email}');
 
   return createPortal(
     <div
@@ -174,14 +202,7 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
               id="notify-desc"
               className={`mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}
             >
-              {successBefore}
-              <a
-                className="font-semibold text-(--color-primary) underline underline-offset-2"
-                href={mailtoHref}
-              >
-                {SUPPORT_EMAIL}
-              </a>
-              {successAfter}
+              {c.successDescription}
             </p>
             <button
               type="button"
@@ -205,6 +226,17 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
             >
               {c.formDescription}
             </p>
+            {/* 허니팟 — 사람에겐 숨겨진 필드. 봇이 채우면 서버가 저장하지 않는다. */}
+            <input
+              type="text"
+              name="company"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              value={company}
+              onChange={(event) => setCompany(event.target.value)}
+              className="pointer-events-none absolute left-[-9999px] h-0 w-0 opacity-0"
+            />
             <label htmlFor="notify-email" className="sr-only">
               {c.emailLabel}
             </label>
@@ -217,23 +249,35 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
               placeholder="you@example.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              disabled={submitting}
               aria-invalid={error ? 'true' : 'false'}
               aria-describedby={error ? 'notify-error' : undefined}
-              className="mt-5 w-full rounded-2xl border border-(--color-line) bg-(--color-cream) px-4 py-3 text-base text-(--color-ink) outline-none transition-colors focus:border-(--color-primary)"
+              className="mt-5 w-full rounded-2xl border border-(--color-line) bg-(--color-cream) px-4 py-3 text-base text-(--color-ink) outline-none transition-colors focus:border-(--color-primary) disabled:opacity-60"
             />
             {error ? (
-              <p
-                id="notify-error"
-                className="mt-2 text-sm text-(--color-accent)"
-              >
-                {error}
+              <p id="notify-error" className={`mt-2 text-sm ${bk}`}>
+                <span className="text-(--color-accent)">{error}</span>
+                {fallback ? (
+                  <span className="text-(--color-ink-soft)">
+                    {' '}
+                    {errorHelpBefore}
+                    <a
+                      className="font-semibold text-(--color-primary) underline underline-offset-2"
+                      href={mailtoHref}
+                    >
+                      {SUPPORT_EMAIL}
+                    </a>
+                    {errorHelpAfter}
+                  </span>
+                ) : null}
               </p>
             ) : null}
             <button
               type="submit"
-              className="mt-4 w-full rounded-full bg-(--color-primary) px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-strong) active:scale-[0.98]"
+              disabled={submitting}
+              className="mt-4 w-full rounded-full bg-(--color-primary) px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-strong) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {c.submit}
+              {submitting ? c.submitting : c.submit}
             </button>
             <p className={`mt-3 text-center text-xs leading-relaxed ${bk} text-(--color-ink-faint)`}>
               {c.promise}

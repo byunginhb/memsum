@@ -133,10 +133,16 @@ export type LandingCopy = {
     emailLabel: string;
     validationError: string;
     submit: string;
+    /** 제출 진행 중 버튼 라벨. */
+    submitting: string;
     promise: string;
     successTitle: string;
-    /** {email} 토큰을 링크된 주소로 치환. */
+    /** 성공 안내(평문). */
     successDescription: string;
+    /** 저장 실패 안내. */
+    submitError: string;
+    /** 저장 실패 폴백 — {email} 토큰을 지원 메일 mailto 링크로 치환. */
+    errorHelp: string;
     close: string;
     closeAria: string;
     mailtoSubject: string;
@@ -365,19 +371,24 @@ const KO: LandingCopy = {
   },
 
   notifyDialog: {
-    formTitle: '가장 먼저 받아보세요',
+    formTitle: '가장 먼저 써보세요',
     formDescription:
-      'iOS·Android 출시 준비 중이에요. 알림을 신청하면 가장 먼저 알려드릴게요.',
+      '출시되면 신청하신 분들께 제일 먼저 사용 기회를 드려요. 이메일만 남겨주시면 출시되는 날 바로 알려드릴게요.',
     emailLabel: '이메일 주소',
     validationError: '올바른 이메일 주소를 입력해 주세요.',
-    submit: '알림 받기',
-    promise: '약속: 출시 소식 1통만. 스팸 없이 한 번만 보내드려요.',
-    successTitle: '신청 완료! 출시되면 가장 먼저 알려드릴게요.',
-    successDescription: '메일 앱이 열리지 않았다면 {email}로 보내주세요.',
+    submit: '제일 먼저 써보기',
+    submitting: '신청하는 중…',
+    promise:
+      '약속: 출시 알림 딱 한 통만 보내고 그 즉시 폐기해요. 스팸·마케팅엔 절대 쓰지 않습니다.',
+    successTitle: '신청 완료! 출시되면 가장 먼저 써보실 수 있어요.',
+    successDescription:
+      '출시되는 날 이 주소로 제일 먼저 소식을 보내드릴게요. 알림을 보낸 뒤 이메일은 폐기합니다.',
+    submitError: '잠시 문제가 생겼어요. 다시 시도해 주세요.',
+    errorHelp: '계속 안 되면 {email}로 보내주시면 직접 등록해 드릴게요.',
     close: '닫기',
     closeAria: '닫기',
     mailtoSubject: 'Memsum 출시 알림 신청',
-    mailtoBody: '출시되면 알림을 받고 싶어요.\n\n신청 이메일: {email}',
+    mailtoBody: '출시되면 가장 먼저 써보고 싶어요.\n\n신청 이메일: {email}',
   },
 
   parcel: {
@@ -609,19 +620,25 @@ const EN: LandingCopy = {
   },
 
   notifyDialog: {
-    formTitle: 'Be the first to know',
+    formTitle: 'Be the first to use it',
     formDescription:
-      "We're getting Memsum ready for iOS and Android. Sign up and we'll let you know the moment it's out.",
+      "When Memsum launches, people on this list get first access. Leave your email and we'll tell you the moment it's out.",
     emailLabel: 'Email address',
     validationError: 'Please enter a valid email address.',
-    submit: 'Notify me',
-    promise: 'Our promise: one email at launch. Just once, no spam.',
-    successTitle: "You're on the list! We'll tell you first when it launches.",
-    successDescription: "If your mail app didn't open, send a note to {email}.",
+    submit: 'Get early access',
+    submitting: 'Submitting…',
+    promise:
+      'Our promise: just one launch email, then we delete your address. No spam, no marketing.',
+    successTitle: "You're in! You'll be among the first to use Memsum.",
+    successDescription:
+      "We'll email this address the moment we launch — then delete it.",
+    submitError: 'Something went wrong. Please try again.',
+    errorHelp: "If it keeps failing, email {email} and we'll add you.",
     close: 'Close',
     closeAria: 'Close',
     mailtoSubject: 'Memsum launch notification request',
-    mailtoBody: "I'd like to be notified when Memsum launches.\n\nMy email: {email}",
+    mailtoBody:
+      "I'd like to be first to use Memsum when it launches.\n\nMy email: {email}",
   },
 
   // 택배 기능은 한국 한정이므로 영어 값은 타입 충족용만. /en에서는 렌더하지 않는다.
