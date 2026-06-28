@@ -128,6 +128,8 @@ export type LandingCopy = {
   };
 
   notifyDialog: {
+    /** 모달을 여는 외부 CTA 버튼 라벨(스토어 배지 외 별도 버튼). */
+    openCta: string;
     formTitle: string;
     formDescription: string;
     emailLabel: string;
@@ -371,6 +373,7 @@ const KO: LandingCopy = {
   },
 
   notifyDialog: {
+    openCta: '출시되면 가장 먼저 알림 받기',
     formTitle: '가장 먼저 써보세요',
     formDescription:
       '출시되면 신청하신 분들께 제일 먼저 사용 기회를 드려요. 이메일만 남겨주시면 출시되는 날 바로 알려드릴게요.',
@@ -620,6 +623,7 @@ const EN: LandingCopy = {
   },
 
   notifyDialog: {
+    openCta: 'Get notified at launch',
     formTitle: 'Be the first to use it',
     formDescription:
       "When Memsum launches, people on this list get first access. Leave your email and we'll tell you the moment it's out.",

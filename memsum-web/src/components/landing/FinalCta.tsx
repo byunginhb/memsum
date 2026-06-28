@@ -1,6 +1,7 @@
 import type { LandingCopy } from '@/lib/landing-copy';
 
 import { AnimatedDotsLogo } from './AnimatedDotsLogo';
+import { NotifyButton } from './NotifyButton';
 import { Reveal } from './Reveal';
 import { StoreBadge } from './StoreBadge';
 
@@ -51,17 +52,22 @@ export function FinalCta({ copy }: { copy: LandingCopy }) {
           {c.body}
         </Reveal>
 
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Reveal variant="scale-in" threshold={0.4} delay={240}>
-            <span className="idle-float inline-block">
-              <StoreBadge store="appstore" copy={copy} />
-            </span>
+        <div className="mt-10 flex flex-col items-center gap-5">
+          <Reveal variant="scale-in" threshold={0.4} delay={220}>
+            <NotifyButton copy={copy} onPurple />
           </Reveal>
-          <Reveal variant="scale-in" threshold={0.4} delay={300}>
-            <span className="idle-float inline-block">
-              <StoreBadge store="googleplay" copy={copy} />
-            </span>
-          </Reveal>
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Reveal variant="scale-in" threshold={0.4} delay={280}>
+              <span className="idle-float inline-block">
+                <StoreBadge store="appstore" copy={copy} />
+              </span>
+            </Reveal>
+            <Reveal variant="scale-in" threshold={0.4} delay={340}>
+              <span className="idle-float inline-block">
+                <StoreBadge store="googleplay" copy={copy} />
+              </span>
+            </Reveal>
+          </div>
         </div>
 
         <Reveal

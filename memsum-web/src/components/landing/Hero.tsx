@@ -5,6 +5,7 @@ import { SITE_NAME } from '@/lib/site';
 import type { LandingCopy } from '@/lib/landing-copy';
 
 import { AnimatedDotsLogo } from './AnimatedDotsLogo';
+import { NotifyButton } from './NotifyButton';
 import { Reveal } from './Reveal';
 import { StoreBadge } from './StoreBadge';
 
@@ -83,13 +84,18 @@ export function Hero({ copy }: { copy: LandingCopy }) {
             {subLine2}
           </Reveal>
 
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap lg:justify-start">
+          <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
             <Reveal variant="scale-in" delay={420}>
-              <StoreBadge store="appstore" copy={copy} />
+              <NotifyButton copy={copy} />
             </Reveal>
-            <Reveal variant="scale-in" delay={480}>
-              <StoreBadge store="googleplay" copy={copy} />
-            </Reveal>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap lg:justify-start">
+              <Reveal variant="scale-in" delay={480}>
+                <StoreBadge store="appstore" copy={copy} />
+              </Reveal>
+              <Reveal variant="scale-in" delay={540}>
+                <StoreBadge store="googleplay" copy={copy} />
+              </Reveal>
+            </div>
           </div>
 
           <Reveal
