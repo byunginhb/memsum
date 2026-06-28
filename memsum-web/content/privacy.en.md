@@ -116,7 +116,7 @@ For questions about data processing, to exercise your rights, or to file a compl
 - Service name: Memsum
 - Data protection officer / operator: Byungin Song
 - Contact email: byunginhb@gmail.com
-- Policy URL: https://byunginhb.github.io/memsum/privacy-en.html
+- Policy URL: https://memsum.app/en/privacy
 
 ---
 

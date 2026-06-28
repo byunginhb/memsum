@@ -116,7 +116,7 @@ Memsum이 Google API(구글 캘린더 포함)로부터 받은 정보를 이용·
 - 서비스명: Memsum
 - 개인정보 보호책임자(또는 운영자): Byungin Song
 - 이메일(문의처): byunginhb@gmail.com
-- 정책 게시 URL: https://byunginhb.github.io/memsum/privacy.html
+- 정책 게시 URL: https://memsum.app/privacy
 
 ---
 

@@ -87,8 +87,8 @@ eas login && eas init      # projectId가 app.json에 자동 기록됨
 → 여기까지 되면 제가 production 빌드·제출 명령과 콘솔 입력값을 순서대로 안내합니다.
 
 ### ✅ 제가 이번에 끝낸 것 (2026-06-12)
-- **개인정보처리방침 게시**: https://byunginhb.github.io/memsum/privacy.html (영문: /privacy-en.html, 랜딩: /)
-  - 원본은 `docs/store/privacy-policy.*.md` (SSOT) — 수정 시 `node scripts/gen-web-policy.mjs` 재실행 후 gh-pages 푸시
+- **개인정보처리방침 게시**: https://memsum.app/privacy (영문: https://memsum.app/en/privacy, 랜딩: https://memsum.app/)
+  - 원본은 `docs/store/privacy-policy.*.md` (SSOT) — 수정 시 `node scripts/gen-web-policy.mjs` 재실행 후 Vercel 재배포(memsum-web)
 - **스토어 문서 확정값 반영**: 운영자명 Byungin Song / 지원 이메일 byunginhb@gmail.com /
   정책·지원 URL / 시행일 2026-06-12 / 삭제 요청 채널 / 데이터 리전 등 일괄 기입
   - 남은 플레이스홀더는 제출 시 결정 항목 4개뿐: 이용약관 URL(선택), 앱 이름·부제 최종안, 연령 등급 설문

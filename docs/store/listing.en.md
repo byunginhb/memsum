@@ -141,9 +141,9 @@ It's okay to forget. Memsum will remind you.
 ## Placeholders (fill in before submission)
 
 - byunginhb@gmail.com — required for store registration (customer support address)
-- https://byunginhb.github.io/memsum/privacy-en.html — required by both App Store and Play (public privacy policy URL)
+- https://memsum.app/en/privacy — required by both App Store and Play (public privacy policy URL)
 - [[Terms of service URL]] — recommended (optional, but safer to provide given IAP/account policies)
-- https://byunginhb.github.io/memsum/ — App Store "Support URL" / "Marketing URL" fields
+- https://memsum.app/ — App Store "Support URL" / "Marketing URL" fields
 - Byungin Song — seller/developer name shown in consoles (individual or business)
 - © 2026 Byungin Song — e.g., `© 2026 Byungin Song`
 - [[Final app name choice]] — pick one of the candidates in section 1 (verify each store's 30-char limit)
