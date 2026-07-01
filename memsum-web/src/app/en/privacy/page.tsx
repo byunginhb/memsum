@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyEnPage() {
-  return <LegalPage contentFile="privacy.en.md" />;
+  return <LegalPage contentFile="privacy.en.md" lang="en" />;
 }
