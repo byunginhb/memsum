@@ -5,6 +5,10 @@
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? 'https://memsum.app';
 
+/** Google Play 스토어 상세 페이지(2026-07-03 정식 출시됨). 패키지 app.memsum. */
+export const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=app.memsum';
+
 export const SITE_NAME = 'Memsum';
 export const SUPPORT_EMAIL = 'byunginhb@gmail.com';
 export const OPERATOR_NAME = 'Byungin Song';

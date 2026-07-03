@@ -346,7 +346,7 @@ const KO: LandingCopy = {
       },
       {
         q: '어떤 기기에서 되나요?',
-        a: 'iOS·Android 모두. (출시 단계는 개발기획서 참조)',
+        a: 'Android는 지금 Google Play에서 받을 수 있어요. iOS는 준비 중이라, 출시 알림을 신청하면 가장 먼저 알려드려요.',
       },
     ],
   },
@@ -366,10 +366,10 @@ const KO: LandingCopy = {
     googleplay: {
       top: 'GET IT ON',
       bottom: 'Google Play',
-      aria: '출시 알림 신청 — Google Play',
+      aria: 'Google Play에서 다운로드',
     },
-    ribbon: '출시 준비 중',
-    ribbonCompact: '출시 준비 중',
+    ribbon: '출시 알림 받기',
+    ribbonCompact: '알림 받기',
   },
 
   notifyDialog: {
@@ -596,7 +596,7 @@ const EN: LandingCopy = {
       },
       {
         q: 'Which devices does it work on?',
-        a: 'Both iOS and Android.',
+        a: 'Android is available now on Google Play. iOS is on the way — sign up for launch alerts and we\'ll let you know first.',
       },
     ],
   },
@@ -616,10 +616,10 @@ const EN: LandingCopy = {
     googleplay: {
       top: 'GET IT ON',
       bottom: 'Google Play',
-      aria: 'Get notified at launch — Google Play',
+      aria: 'Download on Google Play',
     },
-    ribbon: 'Coming soon',
-    ribbonCompact: 'Soon',
+    ribbon: 'Get notified',
+    ribbonCompact: 'Notify',
   },
 
   notifyDialog: {
