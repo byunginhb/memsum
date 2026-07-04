@@ -1,0 +1,128 @@
+/* Memsum 스토어/랜딩 스크린샷 공용 스타일 — Scan 아이덴티티.
+   모든 치수를 vw/vh로 두어 Play(1080×1920)·App Store(1290×2796) 양쪽에서 비례 유지. */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+:root{
+  --quartz:#F6F4FC; --ink:#1C1826; --slate:#5E5777; --mist:#A89EBB;
+  --lav:#7C6FE8; --lavSoft:#EAE7FB; --coral:#F2A65A; --coralSoft:#FDF0E3;
+  --line:#E4DFF4; --card:#FFFFFF;
+  --mono:'SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+html,body{width:100%;height:100%;}
+.frame{
+  width:100%;height:100%;position:relative;overflow:hidden;
+  background:radial-gradient(120% 72% at 82% -8%, #E7E2FB 0%, var(--quartz) 55%);
+  font-family:'Pretendard Variable',sans-serif;color:var(--ink);
+  padding:6.4vh 8.3vw 0;
+}
+.frame.alt{background:radial-gradient(120% 68% at 16% -8%, #E7E2FB 0%, var(--quartz) 55%);}
+
+/* 브랜드 로고 */
+.logo{position:absolute;top:3.6vh;left:8.3vw;display:flex;align-items:center;gap:1.5vw;}
+.dots{width:5.2vw;height:5.2vw;background:var(--lav);border-radius:1.3vw;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:.55vw;padding:1vw;}
+.dots i{background:#fff;border-radius:50%;display:block;}
+.dots i:last-child{background:var(--coral);}
+.wordmark{font-weight:800;font-size:2.8vw;letter-spacing:-.02em;}
+
+/* eyebrow */
+.eyebrow{display:flex;align-items:center;gap:1.5vw;margin-top:5.2vh;}
+.eyebrow .rule{width:4vw;height:.2vw;background:var(--lav);}
+.eyebrow.c .rule{background:var(--coral);}
+.eyebrow span{font-family:var(--mono);font-size:2vw;font-weight:600;letter-spacing:.22em;color:var(--slate);}
+
+/* 헤드라인 800/200 */
+h1{margin-top:1.8vh;line-height:1.05;letter-spacing:-.035em;font-size:9.6vw;}
+h1 .b{font-weight:800;display:block;}
+h1 .t{font-weight:200;display:block;}
+h1 .dot{display:inline-block;width:2vw;height:2vw;border-radius:50%;background:var(--coral);margin-left:.7vw;}
+.sub{margin-top:1.8vh;font-size:3.15vw;line-height:1.5;color:var(--slate);font-weight:500;max-width:78vw;word-break:keep-all;}
+
+/* 폰 목업 — 하단 고정, 아래로 블리드 */
+.phone{position:absolute;left:50%;transform:translateX(-50%);bottom:-2.6vh;
+  width:59vw;height:63vh;background:#fff;border-radius:5.2vw;
+  box-shadow:0 3.6vw 9vw rgba(124,111,232,.26),0 .8vw 2.4vw rgba(28,24,38,.12);
+  border:.9vw solid #fff;overflow:hidden;}
+.screen{width:100%;height:100%;background:var(--quartz);padding:4vw 3.1vw;position:relative;}
+
+/* ── 공용 인폰 요소 ── */
+.s-greet{font-weight:800;font-size:3.7vw;letter-spacing:-.02em;}
+.s-label{font-family:var(--mono);font-size:1.7vw;letter-spacing:.14em;color:var(--slate);
+  margin-top:3vw;display:flex;align-items:center;gap:.9vw;}
+.s-label b{width:1.1vw;height:1.1vw;background:var(--lav);border-radius:.28vw;display:inline-block;}
+
+/* 통계 카드 */
+.stat{margin-top:1.5vw;background:var(--card);border:.09vw solid var(--line);border-radius:2.2vw;
+  padding:2.7vw 2.9vw;box-shadow:0 .8vw 2.2vw rgba(28,24,38,.06);}
+.stat .cap{font-family:var(--mono);font-size:1.7vw;color:var(--slate);letter-spacing:.1em;}
+.stat .num{font-family:'Pretendard Variable';font-weight:800;font-size:8.3vw;letter-spacing:-.03em;color:var(--lav);line-height:1;margin-top:.4vw;}
+.stat .num small{font-size:3.1vw;color:var(--ink);font-weight:700;margin-left:.5vw;}
+.stat .bar{height:1.1vw;background:var(--lavSoft);border-radius:99px;margin-top:1.8vw;overflow:hidden;}
+.stat .bar i{display:block;height:100%;width:60%;background:var(--lav);border-radius:99px;}
+.stat .pt{font-family:var(--mono);font-size:1.7vw;color:var(--slate);margin-top:1.3vw;}
+
+/* 캡처 카드 그리드 */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:1.6vw;margin-top:2vw;}
+.cc{background:var(--card);border:.09vw solid var(--line);border-radius:1.9vw;padding:1.8vw;box-shadow:0 .55vw 1.6vw rgba(28,24,38,.05);}
+.cc .band{height:.75vw;border-radius:99px;}
+.chip{display:inline-flex;align-items:center;gap:.7vw;margin-top:1.5vw;background:var(--lavSoft);color:var(--lav);
+  font-family:var(--mono);font-size:1.5vw;font-weight:700;padding:.35vw .9vw;border-radius:.75vw;}
+.cc .tt{font-weight:700;font-size:2.2vw;margin-top:1.1vw;letter-spacing:-.01em;}
+.cc .mm{font-family:var(--mono);font-size:1.5vw;color:var(--mist);margin-top:.7vw;}
+.cc .ln{height:.75vw;background:var(--line);border-radius:99px;margin-top:1.3vw;}
+.cc .ln.s{width:70%;}
+
+/* 랭크(주간 리포트) */
+.r-label{font-family:var(--mono);font-size:1.7vw;letter-spacing:.14em;color:var(--slate);}
+.r-h{font-weight:800;font-size:4.3vw;letter-spacing:-.02em;margin-top:.7vw;}
+.r-h .c{color:var(--coral);}
+.r-sub{font-size:2vw;color:var(--slate);margin-top:.9vw;}
+.rk{margin-top:1.7vw;background:var(--card);border:.09vw solid var(--line);border-radius:1.9vw;
+  padding:2vw 2.4vw;box-shadow:0 .55vw 1.6vw rgba(28,24,38,.05);display:flex;gap:2vw;align-items:center;}
+.rk1{margin-top:2.8vw;border-left:.55vw solid var(--coral);align-items:flex-start;box-shadow:0 .9vw 2.6vw rgba(28,24,38,.07);}
+.rk .n{font-family:'Pretendard Variable';font-weight:800;color:var(--lav);line-height:1;letter-spacing:-.03em;font-size:4.4vw;}
+.rk1 .n{color:var(--coral);font-size:7vw;}
+.rk .bd{flex:1;}
+.rk .tt{font-weight:700;letter-spacing:-.01em;font-size:2.4vw;}
+.rk1 .tt{font-size:3vw;}
+.rk .mm{color:var(--slate);margin-top:.5vw;line-height:1.45;font-size:1.8vw;}
+.rk1 .mm{font-size:2vw;margin-top:.8vw;}
+
+/* ── 캡처 상세(OCR 원장) ── */
+.d-img{width:100%;height:26vh;border-radius:2vw;background:linear-gradient(135deg,#EAE7FB,#FDF0E3);position:relative;overflow:hidden;border:.09vw solid var(--line);}
+.d-img .scan{position:absolute;left:0;right:0;top:42%;height:.3vw;background:var(--lav);box-shadow:0 0 2.4vw .8vw rgba(124,111,232,.5);}
+.d-img .ph{position:absolute;inset:14% 12%;display:flex;flex-direction:column;gap:1.3vw;}
+.d-img .ph i{height:1.3vw;background:rgba(28,24,38,.16);border-radius:99px;}
+.d-img .ph i:nth-child(2){width:75%;} .d-img .ph i:nth-child(4){width:55%;}
+.d-title{font-weight:800;font-size:3vw;margin-top:2.4vw;letter-spacing:-.02em;}
+.d-sum{font-size:2vw;color:var(--slate);margin-top:1vw;line-height:1.5;}
+.ledger{margin-top:2.4vw;background:var(--card);border:.09vw solid var(--line);border-radius:1.9vw;padding:.4vw 2.2vw;}
+.row{display:flex;justify-content:space-between;align-items:center;padding:1.7vw 0;border-bottom:.09vw solid var(--line);}
+.row:last-child{border-bottom:none;}
+.row .k{font-family:var(--mono);font-size:1.6vw;letter-spacing:.1em;color:var(--slate);}
+.row .v{font-family:var(--mono);font-size:2vw;color:var(--ink);font-weight:600;}
+.row .v.ko{font-family:'Pretendard Variable';font-weight:600;}
+
+/* ── 카테고리 리스트 ── */
+.cat{display:flex;align-items:center;gap:2vw;background:var(--card);border:.09vw solid var(--line);
+  border-radius:1.9vw;padding:2.1vw 2.4vw;margin-top:1.6vw;box-shadow:0 .55vw 1.6vw rgba(28,24,38,.04);}
+.cat .ic{width:5.4vw;height:5.4vw;border-radius:1.4vw;display:flex;align-items:center;justify-content:center;font-size:2.6vw;flex-shrink:0;}
+.cat .nm{flex:1;font-weight:700;font-size:2.4vw;}
+.cat .ct{font-family:var(--mono);font-size:2.2vw;color:var(--lav);font-weight:700;}
+.cat .ct small{font-family:'Pretendard Variable';font-size:1.7vw;color:var(--mist);font-weight:600;margin-left:.4vw;}
+
+/* ── 캘린더/이벤트 ── */
+.ev{background:var(--card);border:.09vw solid var(--line);border-radius:1.9vw;padding:2.2vw;margin-top:1.8vw;box-shadow:0 .55vw 1.6vw rgba(28,24,38,.05);}
+.ev .top{display:flex;align-items:center;gap:1.2vw;}
+.ev .date{font-family:var(--mono);font-size:1.8vw;color:var(--lav);font-weight:700;letter-spacing:.06em;}
+.ev .tt{font-weight:700;font-size:2.5vw;margin-top:1.2vw;letter-spacing:-.01em;}
+.ev .loc{font-size:1.9vw;color:var(--slate);margin-top:.7vw;}
+.ev .btn{margin-top:1.8vw;background:var(--lav);color:#fff;font-weight:700;font-size:2vw;text-align:center;padding:1.5vw;border-radius:1.4vw;}
+.ev .done{margin-top:1.8vw;background:var(--lavSoft);color:var(--lav);font-weight:700;font-size:2vw;text-align:center;padding:1.5vw;border-radius:1.4vw;display:flex;align-items:center;justify-content:center;gap:.8vw;}
+
+/* ── 신뢰/무료 요약 카드 ── */
+.trust{background:var(--card);border:.09vw solid var(--line);border-radius:2.2vw;padding:2.6vw;margin-top:1.8vw;box-shadow:0 .8vw 2.2vw rgba(28,24,38,.06);display:flex;gap:1.8vw;align-items:flex-start;}
+.trust .ic{width:5vw;height:5vw;border-radius:1.3vw;background:var(--lavSoft);color:var(--lav);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.trust .tt{font-weight:700;font-size:2.4vw;letter-spacing:-.01em;}
+.trust .ds{font-size:1.9vw;color:var(--slate);margin-top:.7vw;line-height:1.5;}

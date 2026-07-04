@@ -93,6 +93,13 @@ export type LandingCopy = {
     items: readonly { title: string; body: string }[];
   };
 
+  /** 앱 화면 미리보기 섹션 — 기기 목업 이미지 나열. */
+  appScreens: {
+    title: string;
+    subtitle: string;
+    items: readonly { src: string; alt: string; caption: string }[];
+  };
+
   audience: {
     title: string;
     items: readonly string[];
@@ -276,6 +283,16 @@ const KO: LandingCopy = {
         title: '무료로 시작, 정보는 안전하게',
         body: '지금은 무료로 모든 기능을 써볼 수 있어요. 구글 캘린더 연결 정보는 기기 안에만 안전하게 보관하고, 캘린더 전체를 읽지 않아요.',
       },
+    ],
+  },
+
+  appScreens: {
+    title: '받으면 이렇게 보여요',
+    subtitle: '캡처가 정리되고, 글자가 읽히고, 한 주가 5줄로.',
+    items: [
+      { src: '/store/device-home.png', alt: 'Memsum 홈 화면 — 이번 주 캡처와 최근 캡처가 정리된 모습', caption: '홈 — 이번 주 캡처 한눈에' },
+      { src: '/store/device-detail.png', alt: 'Memsum 캡처 상세 — 인식된 텍스트와 정보가 정리된 모습', caption: '캡처 속 글자를 읽어 정리' },
+      { src: '/store/device-report.png', alt: 'Memsum 주간 리포트 — 이번 주 핵심 5개', caption: '일요일 저녁, 이번 주 5줄' },
     ],
   },
 
@@ -526,6 +543,16 @@ const EN: LandingCopy = {
         title: 'Free to start, your data kept safe',
         body: 'Right now you can try every feature for free. Your Google Calendar connection stays on your device, and Memsum never reads your whole calendar.',
       },
+    ],
+  },
+
+  appScreens: {
+    title: 'Here’s what you’ll see',
+    subtitle: 'Screenshots sorted, text read, your week in 5 lines.',
+    items: [
+      { src: '/store/device-home.png', alt: 'Memsum home screen — this week’s captures at a glance', caption: 'Home — this week at a glance' },
+      { src: '/store/device-detail.png', alt: 'Memsum capture detail — recognized text and info', caption: 'Reads the text in your captures' },
+      { src: '/store/device-report.png', alt: 'Memsum weekly report — this week’s top 5', caption: 'Sunday evening, your week in 5 lines' },
     ],
   },
 

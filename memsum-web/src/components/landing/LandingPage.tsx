@@ -2,6 +2,7 @@ import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { getLandingCopy, type Lang } from '@/lib/landing-copy';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 
+import { AppScreens } from './AppScreens';
 import { AudienceSection } from './AudienceSection';
 import { CompareTable } from './CompareTable';
 import { Faq } from './Faq';
@@ -54,6 +55,7 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <ProblemSection copy={copy} />
         <StepFlow copy={copy} />
         <FeatureShowcase copy={copy} />
+        <AppScreens copy={copy} />
         {copy.isKorean && <ParcelSection copy={copy} />}
         <AudienceSection copy={copy} />
         <CompareTable copy={copy} />
