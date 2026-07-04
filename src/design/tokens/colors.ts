@@ -13,11 +13,19 @@ export const palette = {
   lavender900: '#2E2670',
 
   ivory50: '#FFFCF7',
-  ivory100: '#FFF8F0', // Brand Base
+  ivory100: '#FFF8F0',
   ivory200: '#F5EFE4',
 
-  coral400: '#FFB84D', // Accent
-  coral600: '#E89A2E',
+  // 컨셉 "Scan" 뉴트럴 — barely-lavender 쿨 계열(웹과 통일).
+  quartz: '#F6F4FC', // Brand Base — 서늘한 라벤더빛 흰색
+  quartzMuted: '#EDEAF7', // 라벤더 틴트 muted 표면
+  night: '#1C1826', // 따뜻한 보라-검정 (최상위 텍스트)
+  slate: '#5E5777', // 바이올렛 그레이 (보조 텍스트)
+  mist: '#A89EBB', // 연라벤더 그레이 (비활성·캡션)
+  lavLine: '#E4DFF4', // 라벤더 틴트 구분선
+
+  coral400: '#F2A65A', // Accent — 웹과 통일된 코랄
+  coral600: '#E08C3E',
 
   gray50: '#FAFAFB',
   gray100: '#F2F2F5',
@@ -71,20 +79,20 @@ export const lightColors: SemanticColors = {
   primaryHover: palette.lavender700,
   onPrimary: '#FFFFFF',
 
-  bgBase: palette.ivory100,
+  // 컨셉 "Scan" — 웜 아이보리 → 서늘한 barely-lavender(Quartz).
+  bgBase: palette.quartz,
   bgSurface: '#FFFFFF',
   bgElevated: '#FFFFFF',
-  bgMuted: palette.ivory200,
+  bgMuted: palette.quartzMuted,
 
-  textPrimary: palette.gray900,
-  // 보조 텍스트. gray500(#6D6D80)은 bgMuted 위에서 약 4.4:1로 WCAG AA(4.5)에
-  // 살짝 못 미쳐, 위계를 해치지 않는 선에서 한 단계 어둡게 조정(모든 라이트 배경 4.9:1+).
-  textSecondary: '#66667A',
+  textPrimary: palette.night,
+  // 보조 텍스트 — Slate(#5E5777)는 모든 라이트 배경에서 WCAG AA(4.5:1) 이상.
+  textSecondary: palette.slate,
   textOnAccent: '#FFFFFF',
-  textDisabled: palette.gray300,
+  textDisabled: palette.mist,
 
-  border: palette.gray100,
-  borderStrong: palette.gray300,
+  border: palette.lavLine,
+  borderStrong: '#D6D0E8',
 
   scrim: 'rgba(0, 0, 0, 0.4)',
 

@@ -11,6 +11,7 @@ import { Icon } from '@/design/icons/Icon';
 import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { fontFamily } from '@/design/tokens/typography';
 import type { ReportFeedback, WeeklyReport } from '@/features/report/types';
 import { ReportCard } from '@/features/report/ReportCard';
 import { ReportCoachmark } from '@/features/report/ReportCoachmark';
@@ -192,6 +193,7 @@ function Body({
           end: formatWeekDate(report.weekEnd),
         })}
       </Text>
+      <View style={[styles.hairlineDivider, { borderBottomColor: colors.border }]} />
 
       {/* 헤딩 + 서브타이틀 */}
       <View style={styles.headingBlock}>
@@ -202,7 +204,7 @@ function Body({
           {t('report.weekly')}
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {subtitle}
+          {renderWithMonoDigits(subtitle)}
         </Text>
       </View>
 
@@ -236,6 +238,22 @@ function Body({
   );
 }
 
+/**
+ * 문자열 내 연속 숫자를 mono fontFamily로 감싸 반환한다.
+ * 한글 텍스트는 Pretendard 그대로 유지하고, 라틴·숫자 부분만 mono 적용.
+ */
+function renderWithMonoDigits(text: string): ReactNode[] {
+  return text.split(/(\d+)/).map((part, i) =>
+    /^\d+$/.test(part) ? (
+      <Text key={i} style={{ fontFamily: fontFamily.mono }}>
+        {part}
+      </Text>
+    ) : (
+      part
+    ),
+  );
+}
+
 /** "YYYY-MM-DD" → 로컬 표시(월/일). 파싱 실패 시 원문 반환(앱이 깨지지 않음). */
 function formatWeekDate(dateStr: string): string {
   const date = new Date(`${dateStr}T00:00:00`);
@@ -265,6 +283,12 @@ const styles = StyleSheet.create({
     fontSize: typography.caption.size,
     lineHeight: typography.caption.line,
     fontWeight: typography.caption.weight,
+    fontFamily: fontFamily.mono,
+    letterSpacing: 1,
+  },
+  hairlineDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: spacing.xs,
   },
   headingBlock: {
     gap: spacing.xs,

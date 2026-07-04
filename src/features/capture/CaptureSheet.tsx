@@ -226,6 +226,69 @@ function SheetGlassHandle({ isDark }: { isDark: boolean }) {
   return <View style={[styles.glassHandle, { backgroundColor: g.fallback }]}>{handleBar}</View>;
 }
 
+/**
+ * 이미지 미리보기 + 처리 중 스캔라인 — 스캔 시그니처 핵심 요소.
+ * processing 단계에만 translateY 루프 애니메이션을 실행하고,
+ * 완료·오류·언마운트 시 정리한다.
+ */
+function PreviewWithScanLine({
+  imageUri,
+  isProcessing,
+}: {
+  imageUri: string;
+  isProcessing: boolean;
+}) {
+  const { colors } = useTheme();
+  const translateY = useMemo(() => new Animated.Value(0), []);
+  const [previewHeight, setPreviewHeight] = useState(PREVIEW_HEIGHT);
+
+  useEffect(() => {
+    if (!isProcessing) {
+      translateY.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.timing(translateY, {
+        toValue: previewHeight > 0 ? previewHeight : PREVIEW_HEIGHT,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      translateY.setValue(0);
+    };
+  }, [isProcessing, previewHeight, translateY]);
+
+  return (
+    <View
+      style={styles.previewWrapper}
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0) setPreviewHeight(h);
+      }}
+    >
+      <Image
+        source={{ uri: imageUri }}
+        style={styles.preview}
+        contentFit="cover"
+        accessibilityLabel={t('capture.preview.label')}
+        accessibilityRole="image"
+      />
+      {isProcessing ? (
+        <Animated.View
+          style={[
+            styles.scanLine,
+            { backgroundColor: colors.primary, transform: [{ translateY }] },
+          ]}
+          pointerEvents="none"
+        />
+      ) : null}
+    </View>
+  );
+}
+
 type SheetBodyProps = {
   draft: CaptureDraft;
   onClose: () => void;
@@ -242,13 +305,7 @@ function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
         {t(sheetHeadingKey(draft.stage))}
       </Text>
 
-      <Image
-        source={{ uri: draft.imageUri }}
-        style={styles.preview}
-        contentFit="cover"
-        accessibilityLabel={t('capture.preview.label')}
-        accessibilityRole="image"
-      />
+      <PreviewWithScanLine imageUri={draft.imageUri} isProcessing={isProgress(draft.stage)} />
 
       {isProgress(draft.stage) ? <ProgressRow stage={draft.stage} /> : null}
 
@@ -345,9 +402,12 @@ function ResultBlock({ title, summary, ocrText, captureId, event }: ResultBlockP
 
       {ocrText ? (
         <View style={styles.ocrBlock}>
-          <Text style={[styles.ocrLabel, { color: colors.textSecondary }]}>
-            {t('capture.ocr.label')}
-          </Text>
+          <View style={styles.ocrLabelRow}>
+            <View style={[styles.ocrLabelDot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.ocrLabel, { color: colors.textSecondary }]}>
+              {t('capture.ocr.label')}
+            </Text>
+          </View>
           <Text style={[styles.ocrText, { color: colors.textSecondary }]}>{ocrText}</Text>
         </View>
       ) : null}
@@ -488,10 +548,22 @@ const styles = StyleSheet.create({
     lineHeight: typography.title.line,
     fontWeight: typography.title.weight,
   },
-  preview: {
+  previewWrapper: {
     width: '100%',
     height: PREVIEW_HEIGHT,
     borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  preview: {
+    width: '100%',
+    height: '100%',
+  },
+  scanLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
   },
   progressRow: {
     flexDirection: 'row',
@@ -534,10 +606,21 @@ const styles = StyleSheet.create({
   ocrBlock: {
     gap: spacing.xs,
   },
+  ocrLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  ocrLabelDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 1,
+  },
   ocrLabel: {
     fontSize: typography.caption.size,
     lineHeight: typography.caption.line,
-    fontWeight: typography.bodyMd.weight,
+    fontWeight: typography.caption.weight,
+    letterSpacing: 1.5,
   },
   ocrText: {
     fontSize: typography.bodySm.size,

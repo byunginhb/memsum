@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { spacing, typography } from '@/design/tokens';
 import { CategoryList } from '@/features/home/CategoryList';
 import { HomeGreeting } from '@/features/home/HomeGreeting';
 import { RecentCapturesGrid } from '@/features/home/RecentCapturesGrid';
@@ -151,13 +151,19 @@ type SectionLabelProps = {
 function SectionLabel({ label }: SectionLabelProps): ReactNode {
   const { colors } = useTheme();
   return (
-    <Text
+    <View
       accessibilityRole="header"
-      style={[styles.sectionLabel, { color: colors.textSecondary }]}
-      numberOfLines={1}
+      style={styles.sectionLabelRow}
     >
-      {label}
-    </Text>
+      {/* Scan 필드 마커 — 라벤더 5px 정사각형(primary 색상). 한국어 캡션과 짝을 이룬다. */}
+      <View style={[styles.sectionMarker, { backgroundColor: colors.primary }]} />
+      <Text
+        style={[styles.sectionLabel, { color: colors.textSecondary }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -197,11 +203,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  sectionMarker: {
+    width: 5,
+    height: 5,
+  },
   sectionLabel: {
     fontSize: typography.caption.size,
     lineHeight: typography.caption.line,
     fontWeight: typography.caption.weight,
-    letterSpacing: letterSpacingFor('caption'),
+    letterSpacing: 1.5,
   },
   empty: {
     paddingHorizontal: spacing.xl,

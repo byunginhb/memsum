@@ -18,6 +18,7 @@ import { Card } from '@/design/components/Card/Card';
 import { useToast } from '@/design/components/Toast/useToast';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
+import { fontFamily } from '@/design/tokens/typography';
 import { letterSpacingFor, spacing, typography } from '@/design/tokens';
 import type { CaptureEvent } from '@/features/capture/types';
 import type { CaptureListItem } from '@/features/captures/types';
@@ -240,15 +241,20 @@ function OcrBlock({ ocrText }: { ocrText: string }) {
 
   return (
     <View style={styles.metaGroup}>
-      <Text style={[styles.label, { color: colors.textSecondary }]}>
-        {t('captures.detail.ocrLabel')}
-      </Text>
-      <Card variant="outlined">
-        <Text
-          style={[styles.ocrText, { color: hasText ? colors.textPrimary : colors.textSecondary }]}
-        >
-          {hasText ? ocrText : t('captures.detail.ocrEmpty')}
+      {/* 필드 라벨: 라벤더 정사각형 + 소문자 캡션. 한국어라 Pretendard 유지. */}
+      <View style={styles.fieldLabelRow}>
+        <View style={[styles.fieldLabelDot, { backgroundColor: colors.primary }]} />
+        <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
+          {t('captures.detail.ocrLabel')}
         </Text>
+      </View>
+      <Card variant="outlined">
+        {/* 좌측 2px 보더로 "추출된 필드" 인상. 한국어 OCR이므로 폰트는 Pretendard. */}
+        <View style={[styles.ocrBodyBorder, { borderLeftColor: colors.border }]}>
+          <Text style={[styles.ocrText, { color: colors.textSecondary }]}>
+            {hasText ? ocrText : t('captures.detail.ocrEmpty')}
+          </Text>
+        </View>
       </Card>
     </View>
   );
@@ -260,14 +266,21 @@ function MetaBlock({ item }: { item: CaptureListItem }) {
 
   return (
     <View style={styles.metaGroup}>
-      <Text style={[styles.label, { color: colors.textSecondary }]}>
-        {t('captures.detail.metaLabel')}
-      </Text>
+      {/* 필드 라벨: 라벤더 정사각형 + 소문자 캡션. 한국어라 Pretendard 유지. */}
+      <View style={styles.fieldLabelRow}>
+        <View style={[styles.fieldLabelDot, { backgroundColor: colors.primary }]} />
+        <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
+          {t('captures.detail.metaLabel')}
+        </Text>
+      </View>
       <Card variant="flat" compact>
+        {/* capturedAt 값은 숫자·라틴 문자(날짜시각)이므로 mono 적용. */}
         <MetaRow
           label={t('captures.detail.meta.capturedAt')}
           value={formatDateTime(item.createdAt)}
+          usesMono
         />
+        {/* status 값은 번역 텍스트(한국어 가능)이므로 Pretendard 유지. */}
         <MetaRow
           label={t('captures.detail.meta.status')}
           value={t(`captures.detail.status.${item.status}`)}
@@ -277,12 +290,32 @@ function MetaBlock({ item }: { item: CaptureListItem }) {
   );
 }
 
-function MetaRow({ label, value }: { label: string; value: string }) {
+function MetaRow({
+  label,
+  value,
+  usesMono = false,
+}: {
+  label: string;
+  value: string;
+  usesMono?: boolean;
+}) {
   const { colors } = useTheme();
   return (
-    <View style={styles.metaRow}>
+    <View
+      style={[
+        styles.metaRow,
+        { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+      ]}
+    >
       <Text style={[styles.metaRowLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.metaRowValue, { color: colors.textPrimary }]}>{value}</Text>
+      <Text
+        style={[
+          styles.metaRowValue,
+          { color: colors.textPrimary, fontFamily: usesMono ? fontFamily.mono : undefined },
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -495,9 +528,30 @@ const styles = StyleSheet.create({
     lineHeight: typography.caption.line,
     fontWeight: typography.caption.weight,
   },
+  /** "Scan" 필드 라벨: 라벤더 도트 + 캡션 행 */
+  fieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  /** 5×5pt 라벤더 정사각형(primary 컬러). 모서리 1px 라운드로 픽셀 아트 느낌. */
+  fieldLabelDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 1,
+  },
+  /** 캡션에 1.5pt 자간 추가로 스캔·프린트 헤더 느낌. */
+  fieldLabel: {
+    letterSpacing: 1.5,
+  },
+  /** OCR 본문 좌측 2px 보더 — "추출된 텍스트" 필드 인상. */
+  ocrBodyBorder: {
+    borderLeftWidth: 2,
+    paddingLeft: spacing.sm,
+  },
   ocrText: {
     fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
+    lineHeight: 22, // bodySm(18)보다 넓은 행간 — 모노스페이스식 여백감
     fontWeight: typography.bodySm.weight,
   },
   metaRow: {

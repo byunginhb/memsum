@@ -19,6 +19,7 @@ import { haptic } from '@/design/theme/platform';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, motion, radius, spacing, typography } from '@/design/tokens';
 import type { SemanticColorName } from '@/design/tokens';
+import { fontFamily } from '@/design/tokens/typography';
 import type { ReportFeedback, WeeklyReportItem } from '@/features/report/types';
 import { t } from '@/i18n';
 
@@ -131,7 +132,7 @@ export function ReportCard({
             style={[styles.rankBadge, { color: colors.accent }]}
             accessibilityElementsHidden
           >
-            {item.rank}
+            {`#${item.rank}`}
           </Text>
           <Thumbnail
             uri={item.thumbnailUrl}
@@ -284,10 +285,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   rankBadge: {
-    fontSize: typography.heading.size,
-    lineHeight: typography.heading.line,
+    fontSize: typography.display.size,
+    lineHeight: typography.display.line,
     fontWeight: typography.heading.weight,
     letterSpacing: letterSpacingFor('heading'),
+    fontFamily: fontFamily.mono,
   },
   heroTitle: {
     fontSize: typography.display.size,

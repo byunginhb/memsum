@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ListItem } from '@/design/components/ListItem/ListItem';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { spacing, typography } from '@/design/tokens';
+import { fontFamily, spacing, typography } from '@/design/tokens';
 import { CATEGORY_I18N_KEY, CATEGORY_ICON } from '@/lib/categories';
 import { t } from '@/i18n';
 
@@ -52,12 +52,21 @@ export function CategoryList({
 
         const trailing = (
           <View style={styles.trailing}>
-            <Text
-              style={[styles.count, { color: colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {countLabel}
-            </Text>
+            {/* 숫자(digits)는 mono, 단위 "장"은 Pretendard 유지 — 한글에 monospace 적용 금지. */}
+            <View style={styles.countWrap}>
+              <Text
+                style={[styles.countDigits, { color: colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {group.count}
+              </Text>
+              <Text
+                style={[styles.countUnit, { color: colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {'장'}
+              </Text>
+            </View>
             <Icon name="chevron-right" size={CHEVRON_SIZE} color="textSecondary" />
           </View>
         );
@@ -90,7 +99,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  count: {
+  countWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  countDigits: {
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodySm.weight,
+    fontFamily: fontFamily.mono,
+  },
+  countUnit: {
     fontSize: typography.bodySm.size,
     lineHeight: typography.bodySm.line,
     fontWeight: typography.bodySm.weight,

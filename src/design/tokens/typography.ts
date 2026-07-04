@@ -4,10 +4,16 @@
  * 한국어: Pretendard Variable / 영어·숫자: Inter Variable.
  * 폴백: iOS `-apple-system`, Android `Roboto` (useFonts 실패 시 시스템 폰트).
  */
+import { Platform } from 'react-native';
+
+/** 데이터 보이스(숫자·날짜·코드) 전용 시스템 모노 — 번들 추가 없이 진짜 monospace 렌더.
+ *  한글 글리프가 없으므로 라틴·수치에만 적용(한글은 sans로 폴백). */
+const systemMono = Platform.select({ ios: 'Menlo', default: 'monospace' }) as string;
+
 export const fontFamily = {
   sans: 'Pretendard-Variable',
   sansEn: 'Inter-Variable',
-  mono: 'JetBrainsMono',
+  mono: systemMono,
 } as const;
 
 /**

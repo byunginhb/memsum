@@ -5,7 +5,7 @@ import { Card } from '@/design/components/Card/Card';
 import { Icon } from '@/design/icons/Icon';
 import { ProgressBar } from '@/design/components/ProgressBar/ProgressBar';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { fontFamily, letterSpacingFor, spacing, typography } from '@/design/tokens';
 import { t } from '@/i18n';
 
 import type { WeeklyStats } from './types';
@@ -62,12 +62,15 @@ export function WeeklyStatsCard({
         accessible={!interactive}
         accessibilityLabel={!interactive && showStatsA11y ? a11yLabel : undefined}
       >
-        <Text
-          style={[styles.title, { color: colors.textSecondary }]}
-          numberOfLines={1}
-        >
-          {t('home.weeklyStats.title')}
-        </Text>
+        <View style={styles.titleRow}>
+          <View style={[styles.scanMarker, { backgroundColor: colors.primary }]} />
+          <Text
+            style={[styles.title, { color: colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {t('home.weeklyStats.title')}
+          </Text>
+        </View>
 
         <Text
           style={[styles.count, { color: colors.textPrimary }]}
@@ -118,16 +121,26 @@ export function WeeklyStatsCard({
 }
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  scanMarker: {
+    width: 5,
+    height: 5,
+  },
   title: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-    letterSpacing: letterSpacingFor('bodyMd'),
+    fontSize: typography.caption.size,
+    lineHeight: typography.caption.line,
+    fontWeight: typography.caption.weight,
+    letterSpacing: 1.5,
   },
   count: {
     fontSize: typography.display.size,
     lineHeight: typography.display.line,
     fontWeight: typography.display.weight,
+    fontFamily: fontFamily.mono,
     letterSpacing: letterSpacingFor('display'),
     marginTop: spacing.xs,
   },
@@ -138,6 +151,7 @@ const styles = StyleSheet.create({
     fontSize: typography.caption.size,
     lineHeight: typography.caption.line,
     fontWeight: typography.caption.weight,
+    fontFamily: fontFamily.mono,
     marginTop: spacing.sm,
   },
   pressed: {
