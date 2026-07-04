@@ -40,19 +40,20 @@ export function ProblemSection({ copy }: { copy: LandingCopy }) {
         delay={120}
         className="mx-auto mt-12 max-w-md rounded-(--radius-block) border border-(--color-line) bg-(--color-card) p-8 text-center shadow-(--shadow-card)"
       >
-        <p className={`text-sm font-medium ${bk} text-(--color-ink-soft)`}>
+        <p className={`font-mono text-[11px] font-semibold tracking-[0.2em] ${bk} text-(--color-ink-faint)`}>
           {c.counterIntro}
         </p>
-        <p className="mt-2 flex items-baseline justify-center gap-1">
+        {/* 영수증 라인 — 대형 수치를 Syne로 '찍어낸' 듯 */}
+        <p className="mt-3 flex items-baseline justify-center gap-1 border-y border-dashed border-(--color-line) py-4">
           <CountUp
             to={1847}
-            className="text-6xl font-extrabold tracking-tight text-(--color-primary) sm:text-7xl"
+            className="font-display text-6xl font-extrabold tracking-tight text-(--color-primary) sm:text-7xl"
           />
           <span className="text-3xl font-bold text-(--color-ink) sm:text-4xl">
             {c.counterUnit}
           </span>
         </p>
-        <p className={`mt-2 text-sm ${bk} text-(--color-ink-faint)`}>
+        <p className={`mt-3 text-sm ${bk} text-(--color-ink-faint)`}>
           {c.counterClosing}
         </p>
       </Reveal>
@@ -62,7 +63,7 @@ export function ProblemSection({ copy }: { copy: LandingCopy }) {
         delay={200}
         className="mx-auto mt-14 max-w-2xl"
       >
-        <blockquote className="border-l-4 border-(--color-accent) pl-5">
+        <blockquote className="border-l-4 border-(--color-primary) pl-5">
           <p className={`text-xl font-bold tracking-tight ${bk} sm:text-2xl`}>
             {c.quote}
           </p>

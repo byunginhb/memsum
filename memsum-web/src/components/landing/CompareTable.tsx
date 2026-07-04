@@ -1,14 +1,16 @@
 'use client';
 
+import { CheckCircle2, Star } from 'lucide-react';
+
 import { DotsLogo } from '@/components/DotsLogo';
 import type { LandingCopy } from '@/lib/landing-copy';
 
 import { Reveal, RevealGroup } from './Reveal';
 
 /**
- * S6 차별점 — 비교우위·반론봉쇄. primary-soft 블록.
- * 데스크톱: 표(Memsum 열 강조). 모바일: 카드 토글(가로 스크롤 금지).
- * Memsum 강조는 색+보더+9닷 마크 중복 신호(색 의존 금지).
+ * S6 차별점 — 비교우위·반론봉쇄.
+ * "영수증 카드" 2장(다른 도구 / Memsum)을 나란히 배치.
+ * 모바일에서는 세로 스택. Memsum 카드에 체크 아이콘 + accent 스타 배지.
  * 카피는 로케일 사전(`copy.compare`)에서 주입.
  */
 export function CompareTable({ copy }: { copy: LandingCopy }) {
@@ -20,92 +22,71 @@ export function CompareTable({ copy }: { copy: LandingCopy }) {
       aria-labelledby="compare-title"
       className="px-5 sm:px-6"
     >
-      <div className="mx-auto w-full max-w-5xl rounded-(--radius-block) bg-(--color-primary-soft) px-5 py-16 sm:px-10 sm:py-20">
+      <div className="mx-auto w-full max-w-5xl rounded-(--radius-block) bg-(--color-cream) px-5 py-16 sm:px-10 sm:py-20">
         <Reveal
           as="h2"
           id="compare-title"
-          className={`text-center text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
+          className={`text-center text-2xl font-bold tracking-tight text-(--color-ink) ${bk} sm:text-4xl`}
         >
           {c.title}
         </Reveal>
 
-        {/* 데스크톱 표 */}
-        <div className="mt-12 hidden md:block">
-          <table className="w-full overflow-hidden rounded-(--radius-block) border-separate border-spacing-0 bg-(--color-card) shadow-(--shadow-card)">
-            <thead>
-              <tr>
-                <th scope="col" className="w-1/4 p-5 text-left" />
-                <th
-                  scope="col"
-                  className="p-5 text-left text-base font-bold text-(--color-ink-soft)"
-                >
-                  {c.otherHeader}
-                </th>
-                <th
-                  scope="col"
-                  className="border-l-4 border-(--color-accent) bg-(--color-primary)/8 p-5 text-left"
-                >
-                  <span className="flex items-center gap-2 text-base font-bold text-(--color-primary)">
-                    <span className="coral-pulse inline-flex">
-                      <DotsLogo size={22} />
-                    </span>
-                    {c.memsumHeader}
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {c.rows.map((row) => (
-                <tr key={row.label}>
-                  <th
-                    scope="row"
-                    className={`border-t border-(--color-line) p-5 text-left text-sm font-semibold ${bk} text-(--color-ink)`}
-                  >
-                    {row.label}
-                  </th>
-                  <td className={`border-t border-(--color-line) p-5 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}>
-                    {row.other}
-                  </td>
-                  <td className={`border-l-4 border-t border-(--color-accent) border-t-(--color-line) bg-(--color-primary)/8 p-5 text-sm font-semibold leading-relaxed ${bk} text-(--color-ink)`}>
-                    {row.memsum}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* 두 장의 영수증 카드 — 모바일 세로 스택 / sm 이상 좌우 나란히 */}
+        <RevealGroup className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2">
 
-        {/* 모바일 카드 토글 */}
-        <RevealGroup className="mt-10 grid gap-4 md:hidden">
-          {c.rows.map((row) => (
-            <Reveal
-              key={row.label}
-              className="overflow-hidden rounded-(--radius-block) bg-(--color-card) shadow-(--shadow-card)"
-            >
-              <p className={`border-b border-(--color-line) px-5 py-3 text-sm font-bold ${bk}`}>
-                {row.label}
+          {/* LEFT: 다른 도구 — 음소거 카드 */}
+          <Reveal className="overflow-hidden rounded-(--radius-block) bg-(--color-primary-soft)">
+            <div className="border-b border-(--color-line) px-6 py-4">
+              <p className={`text-base font-bold text-(--color-ink-soft) ${bk}`}>
+                {c.otherHeader}
               </p>
-              <div className="grid grid-cols-2">
-                <div className="p-5">
-                  <p className="text-xs font-semibold text-(--color-ink-faint)">
-                    {c.otherHeader}
+            </div>
+            <div className="divide-y divide-(--color-line)">
+              {c.rows.map((row) => (
+                <div key={row.label} className="px-6 py-4">
+                  <p className={`font-mono text-xs text-(--color-ink-faint) ${bk}`}>
+                    {row.label}
                   </p>
-                  <p className={`mt-1 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}>
+                  <p className={`mt-1 text-sm leading-relaxed text-(--color-ink-soft) ${bk}`}>
                     {row.other}
                   </p>
                 </div>
-                <div className="border-l-4 border-(--color-accent) bg-(--color-primary)/8 p-5">
-                  <p className="flex items-center gap-1 text-xs font-semibold text-(--color-primary)">
-                    <DotsLogo size={14} />
-                    {c.memsumHeader}
+              ))}
+            </div>
+          </Reveal>
+
+          {/* RIGHT: Memsum — 강조 카드 */}
+          <Reveal className="overflow-hidden rounded-(--radius-block) border border-(--color-primary)/30 bg-(--color-card) shadow-(--shadow-card)">
+            <div className="flex items-center justify-between bg-(--color-primary) px-6 py-4">
+              <span className={`flex items-center gap-2 text-base font-bold text-white ${bk}`}>
+                <DotsLogo size={20} />
+                {c.memsumHeader}
+              </span>
+              <Star
+                className="size-4 shrink-0 fill-(--color-accent) text-(--color-accent)"
+                aria-hidden
+              />
+            </div>
+            <div className="divide-y divide-(--color-line)">
+              {c.rows.map((row) => (
+                <div key={row.label} className="px-6 py-4">
+                  <p className={`font-mono text-xs text-(--color-ink-faint) ${bk}`}>
+                    {row.label}
                   </p>
-                  <p className={`mt-1 text-sm font-semibold leading-relaxed ${bk} text-(--color-ink)`}>
-                    {row.memsum}
-                  </p>
+                  <div className="mt-1 flex items-start gap-2">
+                    <CheckCircle2
+                      className="mt-0.5 size-4 shrink-0 text-(--color-primary)"
+                      aria-hidden
+                    />
+                    <p className={`text-sm font-semibold leading-relaxed text-(--color-ink) ${bk}`}>
+                      {row.memsum}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </Reveal>
-          ))}
+              ))}
+            </div>
+          </Reveal>
+
         </RevealGroup>
       </div>
     </section>
