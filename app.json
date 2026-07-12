@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "app.memsum",
-      "versionCode": 3,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#7C6FE8",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

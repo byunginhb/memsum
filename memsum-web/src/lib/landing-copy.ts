@@ -184,11 +184,11 @@ const KO: LandingCopy = {
   },
 
   meta: {
-    titleDefault: 'Memsum 멤섬 — 스크린샷 정리·캘린더 자동·주간 요약',
+    titleDefault: 'Memsum 멤섬 — 안 까먹게, 스크린샷 속 약속 대신 기억·캘린더·주간 5줄',
     titleTemplate: '%s | Memsum',
     description:
       '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
-    ogTitle: '찍기만 하세요. Memsum이 알아서.',
+    ogTitle: '안 까먹게 해드릴게요. 찍기만 하세요.',
     ogDescription:
       '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
     appJsonLdDescription:
@@ -216,9 +216,9 @@ const KO: LandingCopy = {
   },
 
   hero: {
-    eyebrow: '스크린샷 정리 · 캘린더 자동 · 주간 요약',
-    h1Line1: '찍기만 하세요.',
-    h1Line2: '{site}이 알아서.',
+    eyebrow: '안 까먹게 · 약속은 캘린더로 · 일요일 5줄',
+    h1Line1: '까먹어도 괜찮아요.',
+    h1Line2: '{site}이 대신 기억해요.',
     subLine1: '사진첩에 쌓이기만 하던 스크린샷, 이제 다시 쓸모 있게.',
     subLine2:
       '{site}이 캡처 속 글자를 읽어 정리하고, 일정은 캘린더에 넣고, 한 주는 5줄로 돌려드려요.',
@@ -443,11 +443,11 @@ const EN: LandingCopy = {
   },
 
   meta: {
-    titleDefault: 'Memsum — Screenshots, sorted for you',
+    titleDefault: "Memsum — Never miss what's in your screenshots",
     titleTemplate: '%s | Memsum',
     description:
       'Memsum reads the text in your screenshots, sorts them for you, drops events into your calendar, and hands your week back as a 5-line recap. Free to try.',
-    ogTitle: 'Just take the screenshot. Memsum does the rest.',
+    ogTitle: 'Never miss it again. Memsum remembers for you.',
     ogDescription:
       'Memsum reads the text in your screenshots, sorts them for you, drops events into your calendar, and hands your week back as a 5-line recap. Free to try.',
     appJsonLdDescription:
@@ -475,9 +475,9 @@ const EN: LandingCopy = {
   },
 
   hero: {
-    eyebrow: 'Sort screenshots · Auto calendar · Weekly recap',
-    h1Line1: 'Take the screenshot.',
-    h1Line2: '{site} does the rest.',
+    eyebrow: 'Never miss it · Plans to calendar · Sunday 5 lines',
+    h1Line1: "It's okay to forget.",
+    h1Line2: '{site} remembers for you.',
     subLine1: 'Those screenshots piling up in your camera roll? Useful again.',
     subLine2:
       '{site} reads the text inside them, sorts them, adds events to your calendar, and hands your week back in 5 lines.',
