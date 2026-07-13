@@ -296,5 +296,11 @@
   "settings.eventReminder.hour19": "19:00",
   "settings.eventReminder.hour20": "20:00",
   "settings.eventReminder.hour21": "21:00",
-  "settings.eventReminder.hour22": "22:00"
+  "settings.eventReminder.hour22": "22:00",
+  "captures.detail.dataFlow.label": "데이터 처리",
+  "captures.detail.dataFlow.step1": "기기에서 1차 텍스트 인식(OCR)",
+  "captures.detail.dataFlow.step2": "정리·요약은 서버에서 처리, 원본 이미지는 비공개 저장소에 보관",
+  "captures.detail.dataFlow.step3": "언제든 설정에서 완전 삭제 가능",
+  "captures.detail.dataFlow.deleteLink": "내 데이터 삭제",
+  "captures.detail.sensitivity.maskHint": "카드·계좌번호 등 민감한 숫자를 가렸어요"
 }

@@ -332,7 +332,7 @@ openid, email, https://www.googleapis.com/auth/calendar.events
 - [ ] 결제 SDK가 출시 빌드에 포함되는지 확인 → 포함 시 등급 설문 "디지털 구매" Yes 🧑
 
 ### 공통 (데이터 삭제)
-- [ ] 인앱 데이터 삭제(설정 → 데이터 → "내 데이터 삭제", `account.ts deleteAllUserData`) 동작 확인 — Data safety/App Privacy의 "삭제 가능=Yes" 근거 🧑
+- [x] 인앱 데이터 삭제(설정 → 데이터 → "내 데이터 삭제", `account.ts deleteAllUserData`) 동작 확인 — Data safety/App Privacy의 "삭제 가능=Yes" 근거 (`src/lib/__tests__/account.test.ts` 페이지네이션 경계값 99/100/101/250 회귀 테스트 통과로 검증) 🧑
 - [ ] 보조 문의 채널(`byunginhb@gmail.com (인앱 삭제 + 이메일 문의)`) 확정 🧑
 
 ---

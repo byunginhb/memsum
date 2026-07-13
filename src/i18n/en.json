@@ -296,5 +296,11 @@
   "settings.eventReminder.hour19": "19:00",
   "settings.eventReminder.hour20": "20:00",
   "settings.eventReminder.hour21": "21:00",
-  "settings.eventReminder.hour22": "22:00"
+  "settings.eventReminder.hour22": "22:00",
+  "captures.detail.dataFlow.label": "Data handling",
+  "captures.detail.dataFlow.step1": "Text recognized on device first (OCR)",
+  "captures.detail.dataFlow.step2": "Sorting and summary processed on server; original image stored in a private vault",
+  "captures.detail.dataFlow.step3": "Delete everything any time in Settings",
+  "captures.detail.dataFlow.deleteLink": "Delete my data",
+  "captures.detail.sensitivity.maskHint": "Card and account numbers are masked"
 }
