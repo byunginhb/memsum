@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import {
   cancelWeeklyReportNotification,
   scheduleWeeklyReportNotification,
+  WEEKLY_IDENTIFIER,
 } from '@/lib/notifications';
 import { useSettingsStore } from '@/stores/settings-store';
 
@@ -39,6 +40,8 @@ export function useWeeklyReportNotification(): void {
   useEffect(() => {
     const handleResponse = (response: Notifications.NotificationResponse): void => {
       const request = response.notification.request;
+      // 이 훅은 주간 리포트 알림만 처리한다(reminder-* 훅과 충돌 방지).
+      if (request.identifier !== WEEKLY_IDENTIFIER) return;
       const url = (request.content.data as { url?: string } | undefined)?.url;
       if (typeof url !== 'string' || url.length === 0) return;
       if (handledResponses.current.has(request.identifier)) return;

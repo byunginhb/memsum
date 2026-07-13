@@ -52,6 +52,14 @@ const TONE_OPTIONS: readonly { value: ToneStyle; labelKey: string }[] = [
   { value: 'formal', labelKey: 'settings.tone.formal' },
 ];
 
+/** 이벤트 리마인드 시각 옵션(오후 7~10시). */
+const EVENT_REMINDER_HOUR_OPTIONS: readonly { value: string; labelKey: string }[] = [
+  { value: '19', labelKey: 'settings.eventReminder.hour19' },
+  { value: '20', labelKey: 'settings.eventReminder.hour20' },
+  { value: '21', labelKey: 'settings.eventReminder.hour21' },
+  { value: '22', labelKey: 'settings.eventReminder.hour22' },
+];
+
 /**
  * 설정 화면 — design.md §30.
  *
@@ -72,12 +80,16 @@ export function SettingsScreen(): ReactNode {
   const tone = useSettingsStore((state) => state.tone);
   const parcelTracking = useSettingsStore((state) => state.parcelTracking);
   const parcelOnboarded = useSettingsStore((state) => state.parcelOnboarded);
+  const eventReminder = useSettingsStore((state) => state.eventReminder);
+  const eventReminderHour = useSettingsStore((state) => state.eventReminderHour);
   const setAutoCapture = useSettingsStore((state) => state.setAutoCapture);
   const setAutoCalendar = useSettingsStore((state) => state.setAutoCalendar);
   const setWeeklyReport = useSettingsStore((state) => state.setWeeklyReport);
   const setTone = useSettingsStore((state) => state.setTone);
   const setParcelTracking = useSettingsStore((state) => state.setParcelTracking);
   const setParcelOnboarded = useSettingsStore((state) => state.setParcelOnboarded);
+  const setEventReminder = useSettingsStore((state) => state.setEventReminder);
+  const setEventReminderHour = useSettingsStore((state) => state.setEventReminderHour);
 
   // 다크모드는 theme-store가 단일 진실(설정 스토어에 중복 저장하지 않는다).
   const themeMode = useThemeStore((state) => state.mode);
@@ -242,6 +254,30 @@ export function SettingsScreen(): ReactNode {
               />
             }
           />
+          <ListItem
+            title={t('settings.eventReminder.toggle')}
+            subtitle={t('settings.eventReminder.toggleSubtitle')}
+            trailing={
+              <Switch
+                value={eventReminder}
+                onValueChange={setEventReminder}
+                accessibilityLabel={t('settings.eventReminder.toggle')}
+              />
+            }
+          />
+          {eventReminder ? (
+            <ListItem
+              title={t('settings.eventReminder.hour')}
+              trailing={
+                <Segmented<string>
+                  options={EVENT_REMINDER_HOUR_OPTIONS}
+                  value={String(eventReminderHour)}
+                  onChange={(v) => setEventReminderHour(parseInt(v, 10))}
+                  groupLabel={t('settings.eventReminder.hour')}
+                />
+              }
+            />
+          ) : null}
         </Section>
 
         {/* 택배 · 배송 섹션 — 한국(ko) 로케일에서만 노출(MVP 게이트). */}

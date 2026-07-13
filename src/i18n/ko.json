@@ -286,5 +286,15 @@
   "push.parcel.delivered.body": "{date} 도착했어요.",
   "confidence.badge.high": "확실",
   "confidence.badge.low": "확인 요망",
-  "capture.action.confirmAndAdd": "확인 후 추가"
+  "capture.action.confirmAndAdd": "확인 후 추가",
+  "eventReminder.notif.title": "내일 일정이 있어요",
+  "eventReminder.notif.body": "{title} · {time}",
+  "eventReminder.notif.bundleBody": "일정 {count}건 — {summary}",
+  "settings.eventReminder.toggle": "일정 전날 리마인드",
+  "settings.eventReminder.toggleSubtitle": "일정 전날 저녁에 내일 일정을 알려드려요",
+  "settings.eventReminder.hour": "알림 시각",
+  "settings.eventReminder.hour19": "19:00",
+  "settings.eventReminder.hour20": "20:00",
+  "settings.eventReminder.hour21": "21:00",
+  "settings.eventReminder.hour22": "22:00"
 }

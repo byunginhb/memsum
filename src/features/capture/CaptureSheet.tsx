@@ -20,12 +20,14 @@ import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
 import { ConfidenceBadge } from '@/design/components/ConfidenceBadge';
+import { useToast } from '@/design/components/Toast';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { glass, motion, radius, spacing, typography, zIndex } from '@/design/tokens';
 import { ParcelCaptureBlock } from '@/features/parcel/components/ParcelCaptureBlock';
 import { getLocale, t } from '@/i18n';
 import { useCaptureStore } from '@/stores/capture-store';
+import { useCalendarStore } from '@/stores/calendar-store';
 
 import type { CaptureDraft, CaptureEvent, CaptureStage } from './types';
 
@@ -369,6 +371,8 @@ function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
         stage={draft.stage}
         hasEvent={!!event}
         eventConfidence={event?.confidence}
+        captureId={draft.result?.capture_id}
+        event={event}
         onClose={onClose}
       />
     </View>
@@ -496,23 +500,44 @@ type ActionRowProps = {
   hasEvent: boolean;
   /** 이벤트 확신도. 없으면 'low'로 취급(구버전 호환). */
   eventConfidence?: 'high' | 'low';
+  /** 서버 발급 capture_id. 캘린더 등록 키. */
+  captureId?: string;
+  /** 감지된 이벤트. 캘린더 등록 페이로드. */
+  event?: CaptureEvent | null;
   onClose: () => void;
 };
 
-function ActionRow({ stage, hasEvent, eventConfidence, onClose }: ActionRowProps) {
+function ActionRow({ stage, hasEvent, eventConfidence, captureId, event, onClose }: ActionRowProps) {
   const isDone = stage === 'done';
   // confidence 없는 구버전은 안전하게 'low'로 취급한다.
   const isLowConfidence = !eventConfidence || eventConfidence === 'low';
 
-  // 캘린더 추가는 Week 9 예정. 지금은 비활성(이벤트 감지 시에만 노출).
-  const handleAddToCalendar = useCallback(() => {
-    // Week 9: Google Calendar 연동 시 구현. 현재는 비활성 버튼이라 도달하지 않는다.
-  }, []);
+  const registerCapture = useCalendarStore((state) => state.registerCapture);
+  const calendarStatus = useCalendarStore((state) => state.status);
+  const toast = useToast();
 
   // 확신 낮은 이벤트는 사용자 확인이 필요하다는 라벨로 표시(원칙5 Always Confirm).
   const calendarLabel = isLowConfidence
     ? t('capture.action.confirmAndAdd')
     : t('capture.action.addToCalendar');
+
+  const handleAddToCalendar = useCallback(() => {
+    if (!captureId || !event) return;
+    void (async () => {
+      if (calendarStatus !== 'connected') {
+        toast.show({ tone: 'warning', title: t('calendar.toast.needConnect') });
+        return;
+      }
+      try {
+        await registerCapture({ captureId, event });
+        toast.show({ tone: 'success', title: t('calendar.toast.registerSuccess') });
+        onClose();
+      } catch (error) {
+        console.error('[CaptureSheet] 캘린더 등록 실패:', error);
+        toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
+      }
+    })();
+  }, [captureId, event, calendarStatus, registerCapture, toast, onClose]);
 
   return (
     <View style={styles.actions}>
@@ -533,7 +558,6 @@ function ActionRow({ stage, hasEvent, eventConfidence, onClose }: ActionRowProps
           <Button
             variant="accent"
             size="md"
-            disabled
             onPress={handleAddToCalendar}
             accessibilityLabel={calendarLabel}
             leftIcon={<Icon name="calendar" size={16} color="textOnAccent" />}

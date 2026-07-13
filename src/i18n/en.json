@@ -286,5 +286,15 @@
   "push.parcel.delivered.body": "Arrived {date}.",
   "confidence.badge.high": "Confident",
   "confidence.badge.low": "Please check",
-  "capture.action.confirmAndAdd": "Confirm & Add"
+  "capture.action.confirmAndAdd": "Confirm & Add",
+  "eventReminder.notif.title": "Events tomorrow",
+  "eventReminder.notif.body": "{title} · {time}",
+  "eventReminder.notif.bundleBody": "{count} events — {summary}",
+  "settings.eventReminder.toggle": "Day-before reminder",
+  "settings.eventReminder.toggleSubtitle": "Get notified the evening before your events",
+  "settings.eventReminder.hour": "Reminder time",
+  "settings.eventReminder.hour19": "19:00",
+  "settings.eventReminder.hour20": "20:00",
+  "settings.eventReminder.hour21": "21:00",
+  "settings.eventReminder.hour22": "22:00"
 }

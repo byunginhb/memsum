@@ -12,6 +12,7 @@ import { ToastProvider } from '@/design/components/Toast';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
 import { useAutoCapture } from '@/hooks/use-auto-capture';
+import { useEventReminders } from '@/hooks/use-event-reminders';
 import { useParcelAutoRefresh } from '@/hooks/use-parcel-auto-refresh';
 import { useWeeklyReportNotification } from '@/hooks/use-weekly-report-notification';
 import { AuthProvider } from '@/providers/AuthProvider';
@@ -65,6 +66,8 @@ export default function RootLayout() {
               <AutoCaptureGate />
               {/* 주 1회 리포트 알림(일요일 저녁) — 설정 토글과 동기화. UI 없음. */}
               <WeeklyReportGate />
+              {/* 이벤트 전날 리마인드 — 설정 토글·시각과 하루 1건 묶음 예약을 동기화. UI 없음. */}
+              <EventReminderGate />
               {/* 택배 자동 새로고침(ko + 토글 ON) — 포그라운드 복귀 시 폴링 + 알림 탭 라우팅. UI 없음. */}
               <ParcelGate />
               <OnboardingGate>
@@ -150,6 +153,16 @@ function AutoCaptureGate() {
  */
 function WeeklyReportGate() {
   useWeeklyReportNotification();
+  return null;
+}
+
+/**
+ * 이벤트 전날 리마인드 게이트 — UI 없는 마운트 지점.
+ * 설정의 eventReminder 토글·eventReminderHour와 리마인드 예약을 동기화하고,
+ * 알림 탭 시 캘린더 탭으로 딥링크한다.
+ */
+function EventReminderGate() {
+  useEventReminders();
   return null;
 }
 
