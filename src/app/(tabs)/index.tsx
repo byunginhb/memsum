@@ -1,6 +1,7 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { AppStateStatus } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -12,11 +13,13 @@ import { spacing, typography } from '@/design/tokens';
 import { CategoryList } from '@/features/home/CategoryList';
 import { HomeGreeting } from '@/features/home/HomeGreeting';
 import { RecentCapturesGrid } from '@/features/home/RecentCapturesGrid';
+import { UpcomingSection } from '@/features/home/UpcomingSection';
 import { WeeklyStatsCard } from '@/features/home/WeeklyStatsCard';
 import { ParcelHomeSection } from '@/features/parcel/components/ParcelHomeSection';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCaptures } from '@/hooks/use-captures';
 import { useCategoryGroups } from '@/hooks/use-category-groups';
+import { useEventCaptures } from '@/hooks/use-event-captures';
 import { usePhotoImport } from '@/hooks/use-photo-import';
 import { useWeeklyStats } from '@/hooks/use-weekly-stats';
 import { t } from '@/i18n';
@@ -46,17 +49,39 @@ export default function HomeScreen(): ReactNode {
   const captures = useCaptures();
   const weeklyStats = useWeeklyStats();
   const categoryGroups = useCategoryGroups();
+  const eventCaptures = useEventCaptures();
   const { onImport } = usePhotoImport();
+
+  // D-day 계산 기준 시각. pull-to-refresh와 포그라운드 복귀 시 갱신해 신선도를 유지한다.
+  const [now, setNow] = useState<number>(Date.now);
 
   // 빈 상태 판정: 캡처 0건 && 최초 로드 중이 아님. 로딩 중에는 깜빡임 방지로 빈 상태를 숨긴다.
   const isEmpty = captures.items.length === 0 && !captures.isLoading;
 
-  // pull-to-refresh: 세 데이터 소스를 한 번에 새로고침한다.
+  // pull-to-refresh: 네 데이터 소스를 한 번에 새로고침한다. now도 갱신해 D-day를 재계산한다.
   const handleRefresh = useCallback((): void => {
+    setNow(Date.now());
     void captures.refresh();
     void weeklyStats.refresh();
     void categoryGroups.refresh();
-  }, [captures, weeklyStats, categoryGroups]);
+    void eventCaptures.refresh();
+  }, [captures, weeklyStats, categoryGroups, eventCaptures]);
+
+  // 포그라운드 복귀 시 임박 일정 + D-day 신선도 재계산.
+  // why useRef: AppState 리스너는 최신 handleRefresh를 참조해야 하므로 ref로 동기화한다.
+  const handleRefreshRef = useRef(handleRefresh);
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  }, [handleRefresh]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') {
+        handleRefreshRef.current();
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   const handleOpenCapture = useCallback(
     (id: string): void => {
@@ -113,6 +138,14 @@ export default function HomeScreen(): ReactNode {
         <HomeEmptyState onImport={onImport} />
       ) : (
         <View style={styles.sections}>
+          {/* 임박 일정 — 최상단(인사 바로 아래). 스크롤 없이 첫 화면에 노출. */}
+          <UpcomingSection
+            upcoming={eventCaptures.upcoming}
+            isLoading={eventCaptures.isLoading}
+            refresh={eventCaptures.refresh}
+            now={now}
+          />
+
           {/* 배송 현황 — ko + 토글 ON + 활성 택배 있을 때만(컴포넌트 자체 게이트). */}
           <ParcelHomeSection />
 
