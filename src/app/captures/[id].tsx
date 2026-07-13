@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 
+import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
 import { useToast } from '@/design/components/Toast/useToast';
@@ -241,9 +242,9 @@ function OcrBlock({ ocrText }: { ocrText: string }) {
 
   return (
     <View style={styles.metaGroup}>
-      {/* 필드 라벨: 라벤더 정사각형 + 소문자 캡션. 한국어라 Pretendard 유지. */}
+      {/* 필드 라벨: 9점 로고 원형 브랜드 점 + 소문자 캡션. 한국어라 Pretendard 유지. */}
       <View style={styles.fieldLabelRow}>
-        <View style={[styles.fieldLabelDot, { backgroundColor: colors.primary }]} />
+        <BrandDot />
         <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
           {t('captures.detail.ocrLabel')}
         </Text>
@@ -266,9 +267,9 @@ function MetaBlock({ item }: { item: CaptureListItem }) {
 
   return (
     <View style={styles.metaGroup}>
-      {/* 필드 라벨: 라벤더 정사각형 + 소문자 캡션. 한국어라 Pretendard 유지. */}
+      {/* 필드 라벨: 9점 로고 원형 브랜드 점 + 소문자 캡션. 한국어라 Pretendard 유지. */}
       <View style={styles.fieldLabelRow}>
-        <View style={[styles.fieldLabelDot, { backgroundColor: colors.primary }]} />
+        <BrandDot />
         <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
           {t('captures.detail.metaLabel')}
         </Text>
@@ -533,12 +534,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  /** 5×5pt 라벤더 정사각형(primary 컬러). 모서리 1px 라운드로 픽셀 아트 느낌. */
-  fieldLabelDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 1,
   },
   /** 캡션에 1.5pt 자간 추가로 스캔·프린트 헤더 느낌. */
   fieldLabel: {

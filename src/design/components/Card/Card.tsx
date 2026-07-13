@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import type { PressableStateCallbackType, ViewStyle } from 'react-native';
 
+import { haptic } from '@/design/theme/platform';
 import { useTheme } from '@/design/theme/useTheme';
 import type { Theme } from '@/design/theme/useTheme';
 import { elevation, radius, spacing } from '@/design/tokens';
@@ -59,6 +60,12 @@ function variantStyle(variant: CardVariant, colors: Theme['colors']): ViewStyle 
  * radius xl(20) 고정. highlight는 코랄 좌측 보더 4px.
  * onPress가 주어지면 Pressable로 감싸 탭 가능해지고, 없으면 비대화형 View로 렌더해
  * 불필요한 Pressable 래핑을 피한다.
+ *
+ * elevation 위계 가이드(이슈 #9 D1 · 웹 DESIGN.md "color-block first, shadow rare"):
+ * - 화면당 `elevated` 카드는 1~2개로 제한한다(그림자 남발 = 위계 소실 = 제네릭).
+ * - 기본 정보 카드는 `flat`(표면색 대비) 또는 `outlined`(hairline 보더)로 둔다.
+ * - `elevated`는 그 화면에서 가장 중요한 카드(주간 통계·Hero)에만 쓴다.
+ * - `highlight`는 "재발견/하이라이트" 시그니처(코랄 좌측 보더)에만 쓴다.
  */
 export function Card({
   variant = 'flat',
@@ -89,10 +96,16 @@ export function Card({
     [containerStyle],
   );
 
+  // 탭 가능한 카드 진입에 햅틱(iOS/Android 양쪽) — 손에 닿는 질감 일관화(이슈 #9 D6).
+  const handlePress = (): void => {
+    void haptic('light');
+    onPress?.();
+  };
+
   if (onPress) {
     return (
       <Pressable
-        onPress={onPress}
+        onPress={handlePress}
         accessibilityRole={accessibilityRole}
         android_ripple={{ color: colors.border }}
         style={(state) => [pressableStyle(state), style]}

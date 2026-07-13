@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
@@ -155,8 +156,8 @@ function SectionLabel({ label }: SectionLabelProps): ReactNode {
       accessibilityRole="header"
       style={styles.sectionLabelRow}
     >
-      {/* Scan 필드 마커 — 라벤더 5px 정사각형(primary 색상). 한국어 캡션과 짝을 이룬다. */}
-      <View style={[styles.sectionMarker, { backgroundColor: colors.primary }]} />
+      {/* 브랜드 마커 — 9점 로고 모티프의 원형 점(라벤더). 한국어 캡션과 짝을 이룬다. */}
+      <BrandDot />
       <Text
         style={[styles.sectionLabel, { color: colors.textSecondary }]}
         numberOfLines={1}
@@ -207,10 +208,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  sectionMarker: {
-    width: 5,
-    height: 5,
   },
   sectionLabel: {
     fontSize: typography.caption.size,

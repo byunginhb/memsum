@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Card } from '@/design/components/Card/Card';
 import { Icon } from '@/design/icons/Icon';
 import { ProgressBar } from '@/design/components/ProgressBar/ProgressBar';
+import { haptic } from '@/design/theme/platform';
 import { useTheme } from '@/design/theme/useTheme';
 import { fontFamily, letterSpacingFor, spacing, typography } from '@/design/tokens';
 import { t } from '@/i18n';
@@ -63,7 +65,7 @@ export function WeeklyStatsCard({
         accessibilityLabel={!interactive && showStatsA11y ? a11yLabel : undefined}
       >
         <View style={styles.titleRow}>
-          <View style={[styles.scanMarker, { backgroundColor: colors.primary }]} />
+          <BrandDot />
           <Text
             style={[styles.title, { color: colors.textSecondary }]}
             numberOfLines={1}
@@ -107,9 +109,15 @@ export function WeeklyStatsCard({
 
   if (!interactive) return card;
 
+  // 리포트 진입 탭에 햅틱(iOS/Android 양쪽) — 손에 닿는 질감 일관화(이슈 #9 D6).
+  const handlePress = (): void => {
+    void haptic('light');
+    onPress?.();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={showStatsA11y ? a11yLabel : t('home.weeklyStats.title')}
       accessibilityHint={t('home.weeklyStats.viewReportHint')}
@@ -125,10 +133,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  scanMarker: {
-    width: 5,
-    height: 5,
   },
   title: {
     fontSize: typography.caption.size,

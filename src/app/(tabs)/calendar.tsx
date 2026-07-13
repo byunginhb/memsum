@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { Header } from '@/design/components/Header/Header';
 import { useToast } from '@/design/components/Toast';
+import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
 import { spacing } from '@/design/tokens';
 import { CalendarConnectPrompt } from '@/features/calendar/CalendarConnectPrompt';
@@ -178,7 +179,7 @@ function ConnectedBody({
       {isEmpty ? (
         <View style={styles.emptyWrap}>
           <EmptyState
-            icon="calendar"
+            illustration={<DotsGrid size={96} animated />}
             title={t('calendar.empty.title')}
             body={error ?? t('calendar.empty.body')}
           />

@@ -18,8 +18,9 @@ type HomeGreetingProps = {
  * HomeGreeting — 홈 상단 개인화 인사 헤더(design.md §26 large).
  *
  * settings-store의 nickname을 읽어, trim 후 값이 있으면 "안녕 {name} 님",
- * 없으면 폴백 인사를 보여준다. heading 스케일(22pt/700, Pretendard)로 렌더하고
- * accessibilityRole="header"로 스크린리더에 제목임을 알린다(이모지 금지 §6).
+ * 없으면 폴백 인사를 보여준다. iOS large title과 정렬되도록 display 스케일
+ * (28pt/700, Pretendard) 좌측 정렬로 렌더하고(이슈 #9 D4), accessibilityRole="header"로
+ * 스크린리더에 제목임을 알린다(이모지 금지 §6).
  */
 export function HomeGreeting({ topInset = 0 }: HomeGreetingProps): ReactNode {
   const { colors } = useTheme();
@@ -50,9 +51,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   greeting: {
-    fontSize: typography.heading.size,
-    lineHeight: typography.heading.line,
-    fontWeight: typography.heading.weight,
-    letterSpacing: letterSpacingFor('heading'),
+    fontSize: typography.display.size,
+    lineHeight: typography.display.line,
+    fontWeight: typography.display.weight,
+    letterSpacing: letterSpacingFor('display'),
   },
 });

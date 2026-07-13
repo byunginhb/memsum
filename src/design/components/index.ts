@@ -10,6 +10,9 @@ export type { CardVariant, CardPadding } from './Card/Card';
 export { Badge } from './Badge/Badge';
 export type { BadgeVariant, BadgeTone } from './Badge/Badge';
 
+export { BrandDot } from './BrandDot/BrandDot';
+export type { BrandDotVariant, BrandDotTone } from './BrandDot/BrandDot';
+
 export { SearchBar } from './SearchBar/SearchBar';
 
 export { Header } from './Header/Header';

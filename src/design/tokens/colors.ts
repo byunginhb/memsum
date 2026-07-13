@@ -16,9 +16,10 @@ export const palette = {
   ivory100: '#FFF8F0',
   ivory200: '#F5EFE4',
 
-  // 컨셉 "Scan" 뉴트럴 — barely-lavender 쿨 계열(웹과 통일).
-  quartz: '#F6F4FC', // Brand Base — 서늘한 라벤더빛 흰색
-  quartzMuted: '#EDEAF7', // 라벤더 틴트 muted 표면
+  // 컨셉 "Calm Glass" 베이스 — 라벤더·아이보리 온기를 되살린 barely-lavender.
+  // 이슈 #9 D5: 쿨 무채색(#F6F4FC) → 따뜻한 라벤더-아이보리 틴트로 재조정.
+  quartz: '#F7F4F8', // Brand Base — 웜 라벤더빛 흰색 (was #F6F4FC 쿨)
+  quartzMuted: '#EFEAF0', // 라벤더 틴트 muted 표면 (was #EDEAF7 쿨)
   night: '#1C1826', // 따뜻한 보라-검정 (최상위 텍스트)
   slate: '#5E5777', // 바이올렛 그레이 (보조 텍스트)
   mist: '#A89EBB', // 연라벤더 그레이 (비활성·캡션)
@@ -79,10 +80,11 @@ export const lightColors: SemanticColors = {
   primaryHover: palette.lavender700,
   onPrimary: '#FFFFFF',
 
-  // 컨셉 "Scan" — 웜 아이보리 → 서늘한 barely-lavender(Quartz).
+  // 컨셉 "Calm Glass" — 웜 라벤더-아이보리 베이스(Quartz) + 아이보리 틴트 표면.
+  // 이슈 #9 D5: 순백 표면을 미세 아이보리로 데워 무채색 표류를 되돌린다(대비 유지).
   bgBase: palette.quartz,
-  bgSurface: '#FFFFFF',
-  bgElevated: '#FFFFFF',
+  bgSurface: '#FFFDFB', // 아주 옅은 아이보리 표면 (was 순백 #FFFFFF)
+  bgElevated: '#FFFFFF', // 중요 카드는 순백으로 베이스 대비를 살려 위계 강조
   bgMuted: palette.quartzMuted,
 
   textPrimary: palette.night,
@@ -109,10 +111,11 @@ export const darkColors: SemanticColors = {
   primaryHover: palette.lavender500,
   onPrimary: palette.gray900,
 
-  bgBase: '#16161E',
-  bgSurface: '#1E1E2A',
-  bgElevated: '#262635',
-  bgMuted: '#2A2A3A',
+  // 이슈 #9 D5: 다크 베이스에도 라벤더 온기를 미세 주입(violet 쪽으로 R·B 소폭 상향).
+  bgBase: '#17151F', // was #16161E — 보라빛 온기 강화
+  bgSurface: '#201E2C', // was #1E1E2A
+  bgElevated: '#282637', // was #262635
+  bgMuted: '#2B2839', // was #2A2A3A
 
   textPrimary: '#F5F5F8',
   textSecondary: '#A0A0B5',

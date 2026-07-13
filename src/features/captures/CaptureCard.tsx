@@ -47,7 +47,7 @@ export function CaptureCard({ item, onPress }: CaptureCardProps): ReactNode {
       accessibilityHint={title}
       style={({ pressed }) => (pressed ? styles.pressed : null)}
     >
-      <Card variant="elevated" compact>
+      <Card variant="outlined" compact>
         <View style={[styles.thumb, { backgroundColor: colors.bgMuted }]}>
           {item.thumbnailUrl ? (
             <Image

@@ -172,6 +172,7 @@ export function SettingsScreen(): ReactNode {
   return (
     <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
       <Header
+        large
         title={t('settings.title')}
         topInset={insets.top}
         left={
