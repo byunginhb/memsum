@@ -1,6 +1,13 @@
 import { useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -10,7 +17,7 @@ import { Header } from '@/design/components/Header/Header';
 import { Icon } from '@/design/icons/Icon';
 import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { letterSpacingFor, motion, spacing, typography } from '@/design/tokens';
 import { fontFamily } from '@/design/tokens/typography';
 import type { ReportFeedback, WeeklyReport } from '@/features/report/types';
 import { ReportCard } from '@/features/report/ReportCard';
@@ -125,11 +132,15 @@ function Body({
   const coachmarkSeen = useOnboardingStore((s) => s.reportCoachmarkSeen);
   const seeReportCoachmark = useOnboardingStore((s) => s.seeReportCoachmark);
 
-  // 최초 로딩(데이터 없음) — 중앙 스피너.
+  // 최초 로딩(데이터 없음) — 스피너 대신 브랜드 9점 모먼트(DotsGrid). 이슈 #9: 로딩도 브랜드 톤.
   if (isLoading && !report) {
     return (
-      <View style={[styles.flex, styles.center]} accessibilityRole="progressbar">
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View
+        style={[styles.flex, styles.center]}
+        accessibilityRole="progressbar"
+        accessibilityLabel={t('report.title')}
+      >
+        <DotsGrid size={96} animated />
       </View>
     );
   }
@@ -185,56 +196,145 @@ function Body({
 
   return (
     <>
-      <ScrollView style={styles.flex} contentContainerStyle={contentStyle}>
-      {/* 주차 캡션 */}
-      <Text style={[styles.weekCaption, { color: colors.textSecondary }]}>
-        {t('report.weekRange', {
-          start: formatWeekDate(report.weekStart),
-          end: formatWeekDate(report.weekEnd),
-        })}
-      </Text>
-      <View style={[styles.hairlineDivider, { borderBottomColor: colors.border }]} />
-
-      {/* 헤딩 + 서브타이틀 */}
-      <View style={styles.headingBlock}>
-        <Text
-          style={[styles.heading, { color: colors.textPrimary }]}
-          accessibilityRole="header"
-        >
-          {t('report.weekly')}
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {renderWithMonoDigits(subtitle)}
-        </Text>
-      </View>
-
-      {/* ReportCard 5개 (stagger reveal은 카드 내부에서 index 기반으로 처리) */}
-      {report.items.map((item, index) => (
-        <ReportCard
-          key={item.captureId}
-          item={item}
-          index={index}
-          onPressOriginal={onPressOriginal}
-          onFeedback={onFeedback}
-        />
-      ))}
-
-      {/* 자료실 보기 */}
-      <View style={styles.archiveSlot}>
-        <Button
-          variant="ghost"
-          size="md"
-          onPress={onViewArchive}
-          accessibilityLabel={t('report.viewArchive')}
-          rightIcon={<Icon name="chevron-right" size={20} color="primary" />}
-        >
-          {t('report.viewArchive')}
-        </Button>
-      </View>
-      </ScrollView>
-
+      <ReportContent
+        report={report}
+        subtitle={subtitle}
+        contentStyle={contentStyle}
+        onPressOriginal={onPressOriginal}
+        onFeedback={onFeedback}
+        onViewArchive={onViewArchive}
+      />
       <ReportCoachmark visible={showCoachmark} onDismiss={handleDismissCoachmark} />
     </>
+  );
+}
+
+/** 주차 캡션 슬라이드-인 거리(px) — 진입 세리머니. */
+const CAPTION_SLIDE_Y = 8;
+
+type ReportContentProps = {
+  report: WeeklyReport;
+  subtitle: string;
+  contentStyle: object;
+  onPressOriginal: (captureId: string) => void;
+  onFeedback: (captureId: string, rating: ReportFeedback) => void;
+  onViewArchive: () => void;
+};
+
+/**
+ * 리포트 본문 + 진입 세리머니(design.md §27, 이슈 #9 D3).
+ *
+ * 마운트(= 리포트가 준비된 그 순간) 시:
+ *  (a) 딤 오프닝 — 컨텐츠 전체가 opacity 0→1로 부드럽게 밝아진다(duration.slow).
+ *  (b) 주차 캡션이 fade + 아래→위 슬라이드로 먼저 등장(duration.base)한 뒤,
+ *      5장 카드가 index 기반 stagger로 이어진다(ReportCard 내부, ritual 예산 안).
+ * reduce-motion이면 즉시 최종 상태로 표시한다.
+ */
+function ReportContent({
+  report,
+  subtitle,
+  contentStyle,
+  onPressOriginal,
+  onFeedback,
+  onViewArchive,
+}: ReportContentProps): ReactNode {
+  const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
+
+  // (a) 딤 오프닝 — 컨텐츠 페이드인. (b) 캡션 fade + slide.
+  const contentOpacity = useSharedValue(reducedMotion ? 1 : 0);
+  const captionOpacity = useSharedValue(reducedMotion ? 1 : 0);
+  const captionTranslateY = useSharedValue(reducedMotion ? 0 : CAPTION_SLIDE_Y);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      contentOpacity.value = 1;
+      captionOpacity.value = 1;
+      captionTranslateY.value = 0;
+      return;
+    }
+
+    contentOpacity.value = withTiming(1, {
+      duration: motion.duration.slow,
+      easing: motion.easing.decel,
+    });
+    captionOpacity.value = withTiming(1, {
+      duration: motion.duration.base,
+      easing: motion.easing.decel,
+    });
+    captionTranslateY.value = withTiming(0, {
+      duration: motion.duration.base,
+      easing: motion.easing.decel,
+    });
+
+    return () => {
+      cancelAnimation(contentOpacity);
+      cancelAnimation(captionOpacity);
+      cancelAnimation(captionTranslateY);
+    };
+  }, [reducedMotion, contentOpacity, captionOpacity, captionTranslateY]);
+
+  const contentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
+  const captionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: captionOpacity.value,
+    transform: [{ translateY: captionTranslateY.value }],
+  }));
+
+  return (
+    <ScrollView style={styles.flex} contentContainerStyle={contentStyle}>
+      <Animated.View style={[styles.entrance, contentAnimatedStyle]}>
+        {/* 주차 캡션 — 세리머니의 첫 등장 */}
+        <Animated.Text
+          style={[styles.weekCaption, captionAnimatedStyle, { color: colors.textSecondary }]}
+        >
+          {t('report.weekRange', {
+            start: formatWeekDate(report.weekStart),
+            end: formatWeekDate(report.weekEnd),
+          })}
+        </Animated.Text>
+        <View style={[styles.hairlineDivider, { borderBottomColor: colors.border }]} />
+
+        {/* 헤딩 + 서브타이틀 */}
+        <View style={styles.headingBlock}>
+          <Text
+            style={[styles.heading, { color: colors.textPrimary }]}
+            accessibilityRole="header"
+          >
+            {t('report.weekly')}
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            {renderWithMonoDigits(subtitle)}
+          </Text>
+        </View>
+
+        {/* ReportCard 5개 (stagger reveal은 카드 내부에서 index 기반으로 처리) */}
+        {report.items.map((item, index) => (
+          <ReportCard
+            key={item.captureId}
+            item={item}
+            index={index}
+            revealCount={report.items.length}
+            onPressOriginal={onPressOriginal}
+            onFeedback={onFeedback}
+          />
+        ))}
+
+        {/* 자료실 보기 */}
+        <View style={styles.archiveSlot}>
+          <Button
+            variant="ghost"
+            size="md"
+            onPress={onViewArchive}
+            accessibilityLabel={t('report.viewArchive')}
+            rightIcon={<Icon name="chevron-right" size={20} color="primary" />}
+          >
+            {t('report.viewArchive')}
+          </Button>
+        </View>
+      </Animated.View>
+    </ScrollView>
   );
 }
 
@@ -265,6 +365,11 @@ function formatWeekDate(dateStr: string): string {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  // 진입 세리머니 래퍼 — 컨텐츠 페이드인. 자식 간 간격(gap)을 여기서 유지한다
+  // (ScrollView contentContainer의 단일 자식이 되므로 gap을 이 래퍼로 옮긴다).
+  entrance: {
+    gap: spacing.lg,
   },
   center: {
     flex: 1,

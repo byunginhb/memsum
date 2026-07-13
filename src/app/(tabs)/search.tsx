@@ -13,8 +13,10 @@ import type { ListRenderItemInfo } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { SearchBar } from '@/design/components/SearchBar/SearchBar';
 import { Icon } from '@/design/icons/Icon';
+import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
 import {
   letterSpacingFor,
@@ -320,7 +322,21 @@ function ListHeader({ mode, isLoading, error, resultCount }: ListHeaderProps) {
   if (resultCount === 0) {
     // 자료실/카테고리 로딩 중에는 빈 안내를 띄우지 않는다(깜빡임 방지).
     if (isLoading) return null;
-    return <StatusBlock icon="search" message={t('search.empty.noResults')} />;
+    // 빈 상태를 브랜드 9점 모먼트 + 따뜻한 카피로 통일(이슈 #9). 자료실(캡처 0)과
+    // 검색/카테고리(결과 0)를 구분해 카피를 맞춘다.
+    return mode === 'library' ? (
+      <EmptyState
+        illustration={<DotsGrid size={96} animated />}
+        title={t('search.library.emptyTitle')}
+        body={t('search.library.emptyBody')}
+      />
+    ) : (
+      <EmptyState
+        illustration={<DotsGrid size={96} animated />}
+        title={t('search.empty.noResultsTitle')}
+        body={t('search.empty.noResultsBody')}
+      />
+    );
   }
 
   return (
@@ -361,11 +377,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     zIndex: zIndex.sticky,
   },
+  // iOS large title과 정렬되는 큰 제목(display 스케일) — 이슈 #9 D4.
   screenTitle: {
-    fontSize: typography.title.size,
-    lineHeight: typography.title.line,
-    fontWeight: typography.title.weight,
-    letterSpacing: letterSpacingFor('title'),
+    fontSize: typography.display.size,
+    lineHeight: typography.display.line,
+    fontWeight: typography.display.weight,
+    letterSpacing: letterSpacingFor('display'),
   },
   row: {
     gap: spacing.md,

@@ -9,20 +9,25 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Image } from 'expo-image';
 
+import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
+import { ConfidenceBadge } from '@/design/components/ConfidenceBadge';
+import { useToast } from '@/design/components/Toast';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { glass, radius, spacing, typography, zIndex } from '@/design/tokens';
+import { glass, motion, radius, spacing, typography, zIndex } from '@/design/tokens';
 import { ParcelCaptureBlock } from '@/features/parcel/components/ParcelCaptureBlock';
 import { getLocale, t } from '@/i18n';
 import { useCaptureStore } from '@/stores/capture-store';
+import { useCalendarStore } from '@/stores/calendar-store';
 
 import type { CaptureDraft, CaptureEvent, CaptureStage } from './types';
 
@@ -34,6 +39,13 @@ const DISMISS_DRAG_DISTANCE = 96;
 const DISMISS_FLING_VELOCITY = 0.8;
 // 수평 스크롤·탭과 구분하기 위한 제스처 시작 임계(아래 방향 px).
 const DRAG_START_THRESHOLD = 6;
+
+// 측정 전(첫 프레임) 시트를 화면 밖에 숨겨 두는 폴백 오프셋(px). 열릴 때 실제 window 높이로 재설정한다.
+const SHEET_HIDDEN_OFFSET = 1000;
+// 스캔라인 "과정 자랑" 절제(이슈 #9 D9 · design.md §2 원칙2): 은은한 투명도로 결과 중심 톤 유지.
+const SCANLINE_OPACITY = 0.3;
+// 스캔라인 1회 순환 길이(ms) — motion 토큰(ritual) 참조. 느린 속도로 차분함 유지.
+const SCANLINE_CYCLE_MS = motion.duration.ritual;
 
 // 진행 중(스피너) 단계 → 라벨 i18n 키.
 const PROGRESS_LABEL_KEY: Record<'uploading' | 'ocr' | 'processing', string> = {
@@ -114,14 +126,41 @@ export function CaptureSheet() {
     });
   }, [current, startCapture]);
 
+  const { height: windowHeight } = useWindowDimensions();
+
   // 핸들 드래그 추적값 — 손가락을 따라 시트가 내려가고, 임계 미만이면 스프링 복귀한다.
   // useRef(...).current는 렌더 중 ref 접근이라 React Compiler 린트에 걸린다 — useMemo로 고정.
   const dragY = useMemo(() => new Animated.Value(0), []);
+  // 등장 오프셋 — 화면 밖(아래)에서 gentle spring으로 올라온다(design.md §20, 이슈 #9 D7).
+  const entranceY = useMemo(() => new Animated.Value(SHEET_HIDDEN_OFFSET), []);
+  // 백드롭 딤 페이드(0→1) — 시트 등장과 함께 배경이 부드럽게 어두워진다.
+  const backdropOpacity = useMemo(() => new Animated.Value(0), []);
 
-  // 닫힐 때(또는 재오픈 전) 드래그 오프셋을 초기화해 다음 열림이 제자리에서 시작되게 한다.
+  // 열림: 시트를 window 높이만큼 아래에 두고 gentle spring으로 0까지 올린다 + 백드롭 페이드인.
+  // 닫힘: 다음 열림이 화면 밖에서 시작되도록 오프셋·드래그·딤을 초기화한다.
   useEffect(() => {
-    if (!isSheetOpen) dragY.setValue(0);
-  }, [isSheetOpen, dragY]);
+    if (isSheetOpen) {
+      entranceY.setValue(windowHeight);
+      Animated.parallel([
+        Animated.spring(entranceY, {
+          toValue: 0,
+          useNativeDriver: true,
+          stiffness: motion.spring.gentle.stiffness,
+          damping: motion.spring.gentle.damping,
+          mass: 1,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: motion.duration.base,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      dragY.setValue(0);
+      entranceY.setValue(SHEET_HIDDEN_OFFSET);
+      backdropOpacity.setValue(0);
+    }
+  }, [isSheetOpen, windowHeight, dragY, entranceY, backdropOpacity]);
 
   // 핸들 밴드 전용 스와이프 다운 제스처(시트 본문 스크롤과 충돌하지 않도록 핸들에만 부착).
   const panResponder = useMemo(
@@ -153,23 +192,28 @@ export function CaptureSheet() {
     <Modal
       visible={isSheetOpen}
       transparent
-      animationType="slide"
+      animationType="none"
       statusBarTranslucent
       onRequestClose={closeSheet}
     >
       <View style={styles.overlay}>
-        {/* 상단 빈 영역 탭 → 닫기(backdrop). */}
-        <Pressable
-          style={[styles.backdrop, { backgroundColor: colors.scrim }]}
-          onPress={closeSheet}
-          accessibilityRole="button"
-          accessibilityLabel={t('capture.action.close')}
-        />
+        {/* 상단 빈 영역 탭 → 닫기(backdrop). 딤은 등장과 함께 페이드인. */}
+        <Animated.View
+          style={[styles.backdrop, { backgroundColor: colors.scrim, opacity: backdropOpacity }]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closeSheet}
+            accessibilityRole="button"
+            accessibilityLabel={t('capture.action.close')}
+          />
+        </Animated.View>
         <Animated.View
           style={[
             styles.sheet,
             { backgroundColor: colors.bgElevated, paddingBottom: insets.bottom + spacing.lg },
-            { transform: [{ translateY: dragY }] },
+            // gentle spring 등장(entranceY) + 드래그(dragY)를 합성해 자연스러운 질감을 만든다.
+            { transform: [{ translateY: Animated.add(entranceY, dragY) }] },
           ]}
           accessibilityLabel={t('capture.sheet.title')}
         >
@@ -250,7 +294,7 @@ function PreviewWithScanLine({
     const loop = Animated.loop(
       Animated.timing(translateY, {
         toValue: previewHeight > 0 ? previewHeight : PREVIEW_HEIGHT,
-        duration: 1200,
+        duration: SCANLINE_CYCLE_MS,
         useNativeDriver: true,
       }),
     );
@@ -323,7 +367,14 @@ function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
         />
       ) : null}
 
-      <ActionRow stage={draft.stage} hasEvent={!!event} onClose={onClose} />
+      <ActionRow
+        stage={draft.stage}
+        hasEvent={!!event}
+        eventConfidence={event?.confidence}
+        captureId={draft.result?.capture_id}
+        event={event}
+        onClose={onClose}
+      />
     </View>
   );
 }
@@ -403,7 +454,7 @@ function ResultBlock({ title, summary, ocrText, captureId, event }: ResultBlockP
       {ocrText ? (
         <View style={styles.ocrBlock}>
           <View style={styles.ocrLabelRow}>
-            <View style={[styles.ocrLabelDot, { backgroundColor: colors.primary }]} />
+            <BrandDot />
             <Text style={[styles.ocrLabel, { color: colors.textSecondary }]}>
               {t('capture.ocr.label')}
             </Text>
@@ -421,6 +472,8 @@ type EventCardProps = {
 
 function EventCard({ event }: EventCardProps) {
   const { colors } = useTheme();
+  // confidence 없는 구버전 캡처는 배지를 숨긴다(크래시 없이 안전 렌더).
+  const confidence = event.confidence;
   return (
     <Card variant="highlight" compact>
       <View style={styles.eventRow}>
@@ -435,6 +488,7 @@ function EventCard({ event }: EventCardProps) {
               {event.location}
             </Text>
           ) : null}
+          {confidence ? <ConfidenceBadge level={confidence} /> : null}
         </View>
       </View>
     </Card>
@@ -444,16 +498,46 @@ function EventCard({ event }: EventCardProps) {
 type ActionRowProps = {
   stage: CaptureStage;
   hasEvent: boolean;
+  /** 이벤트 확신도. 없으면 'low'로 취급(구버전 호환). */
+  eventConfidence?: 'high' | 'low';
+  /** 서버 발급 capture_id. 캘린더 등록 키. */
+  captureId?: string;
+  /** 감지된 이벤트. 캘린더 등록 페이로드. */
+  event?: CaptureEvent | null;
   onClose: () => void;
 };
 
-function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
+function ActionRow({ stage, hasEvent, eventConfidence, captureId, event, onClose }: ActionRowProps) {
   const isDone = stage === 'done';
+  // confidence 없는 구버전은 안전하게 'low'로 취급한다.
+  const isLowConfidence = !eventConfidence || eventConfidence === 'low';
 
-  // 캘린더 추가는 Week 9 예정. 지금은 비활성(이벤트 감지 시에만 노출).
+  const registerCapture = useCalendarStore((state) => state.registerCapture);
+  const calendarStatus = useCalendarStore((state) => state.status);
+  const toast = useToast();
+
+  // 확신 낮은 이벤트는 사용자 확인이 필요하다는 라벨로 표시(원칙5 Always Confirm).
+  const calendarLabel = isLowConfidence
+    ? t('capture.action.confirmAndAdd')
+    : t('capture.action.addToCalendar');
+
   const handleAddToCalendar = useCallback(() => {
-    // Week 9: Google Calendar 연동 시 구현. 현재는 비활성 버튼이라 도달하지 않는다.
-  }, []);
+    if (!captureId || !event) return;
+    void (async () => {
+      if (calendarStatus !== 'connected') {
+        toast.show({ tone: 'warning', title: t('calendar.toast.needConnect') });
+        return;
+      }
+      try {
+        await registerCapture({ captureId, event });
+        toast.show({ tone: 'success', title: t('calendar.toast.registerSuccess') });
+        onClose();
+      } catch (error) {
+        console.error('[CaptureSheet] 캘린더 등록 실패:', error);
+        toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
+      }
+    })();
+  }, [captureId, event, calendarStatus, registerCapture, toast, onClose]);
 
   return (
     <View style={styles.actions}>
@@ -474,12 +558,11 @@ function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
           <Button
             variant="accent"
             size="md"
-            disabled
             onPress={handleAddToCalendar}
-            accessibilityLabel={t('capture.action.addToCalendar')}
+            accessibilityLabel={calendarLabel}
             leftIcon={<Icon name="calendar" size={16} color="textOnAccent" />}
           >
-            {t('capture.action.addToCalendar')}
+            {calendarLabel}
           </Button>
         </View>
       ) : null}
@@ -564,6 +647,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
+    // 과정 자랑 절제 — 은은한 투명도로 "AI가 일하는 중" 과시를 낮춘다(이슈 #9 D9).
+    opacity: SCANLINE_OPACITY,
   },
   progressRow: {
     flexDirection: 'row',
@@ -610,11 +695,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  ocrLabelDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 1,
   },
   ocrLabel: {
     fontSize: typography.caption.size,

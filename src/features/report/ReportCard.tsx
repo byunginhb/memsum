@@ -31,6 +31,10 @@ const REVEAL_DURATION_MS = motion.duration.base; // 200ms
 const REVEAL_STAGGER_MS = motion.stagger + 30; // 80ms
 /** reveal 시작 시 아래에서 올라오는 거리(px). */
 const REVEAL_TRANSLATE_Y = 12;
+/** Hero 코랄 좌측 보더 최종 두께(px) — Card highlight variant과 동일(design.md §15·§27). */
+const HERO_BORDER_WIDTH = 4;
+/** Hero 코랄 보더 그로우 길이(ms) — design.md §27 "coral 좌측 보더 200ms transition". */
+const HERO_BORDER_GROW_MS = motion.duration.base; // 200ms
 
 // ── 표시 상수 ─────────────────────────────────────────────────────────────────
 
@@ -45,6 +49,8 @@ type ReportCardProps = {
   item: WeeklyReportItem;
   /** 리스트 내 위치(0-base). stagger delay 계산에 사용. */
   index: number;
+  /** 전체 카드 수. Hero 코랄 보더가 "마지막 카드 reveal 후" 그로우하도록 타이밍 계산에 쓴다. */
+  revealCount: number;
   /** 원본 캡처 상세로 이동. */
   onPressOriginal: (captureId: string) => void;
   /** up/down 피드백. 같은 값을 다시 누르면 해제(null). */
@@ -55,7 +61,7 @@ type ReportCardProps = {
  * ReportCard — 주간 리포트 한 항목(design.md §27).
  *
  * rank===1: Card variant="highlight" padding="spacious"(코랄 좌측 보더) + display(28pt) 제목.
- * rank 2~5: Card variant="elevated" padding="normal" + title 제목.
+ * rank 2~5: Card variant="outlined" padding="normal" + title 제목(Hero만 강조, 위계화 D1).
  * 공통: rank 숫자 + summary + [원본 보기] ghost + up/down 피드백.
  *
  * Hero 모션: 마운트 시 opacity 0→1 + translateY 12→0, index*stagger 지연으로 순차 등장.
@@ -64,6 +70,7 @@ type ReportCardProps = {
 export function ReportCard({
   item,
   index,
+  revealCount,
   onPressOriginal,
   onFeedback,
 }: ReportCardProps): ReactNode {
@@ -75,6 +82,8 @@ export function ReportCard({
   // reveal SharedValue — reduce-motion이면 즉시 최종값.
   const opacity = useSharedValue(reducedMotion ? 1 : 0);
   const translateY = useSharedValue(reducedMotion ? 0 : REVEAL_TRANSLATE_Y);
+  // Hero 코랄 좌측 보더 그로우(0→1) — width/opacity에 함께 매핑. reduce-motion이면 즉시 표시.
+  const heroBorder = useSharedValue(reducedMotion ? 1 : 0);
 
   // Hero(1위) 카드 reveal 완료 시 햅틱 1회 — design.md §27. 카드 모션과 결합해
   // 타이밍이 어긋나지 않도록 withTiming 완료 콜백에서 발화한다.
@@ -87,6 +96,7 @@ export function ReportCard({
     if (reducedMotion) {
       opacity.value = 1;
       translateY.value = 0;
+      heroBorder.value = 1;
       return;
     }
 
@@ -110,24 +120,40 @@ export function ReportCard({
       withTiming(0, { duration: REVEAL_DURATION_MS, easing: motion.easing.decel }),
     );
 
+    // Hero 코랄 좌측 보더: 모든 카드가 reveal을 마친 뒤(마지막 카드 완료 시점) 그로우한다.
+    // 마지막 카드 완료 = (revealCount-1)*stagger + reveal 길이 → design.md §27.
+    if (isHero) {
+      const growDelay = (revealCount - 1) * REVEAL_STAGGER_MS + REVEAL_DURATION_MS;
+      heroBorder.value = withDelay(
+        growDelay,
+        withTiming(1, { duration: HERO_BORDER_GROW_MS, easing: motion.easing.standard }),
+      );
+    }
+
     return () => {
       cancelAnimation(opacity);
       cancelAnimation(translateY);
+      cancelAnimation(heroBorder);
     };
-  }, [reducedMotion, index, isHero, fireHeroHaptic, opacity, translateY]);
+  }, [reducedMotion, index, revealCount, isHero, fireHeroHaptic, opacity, translateY, heroBorder]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateY: translateY.value }],
   }));
 
-  return (
-    <Animated.View style={animatedStyle}>
-      <Card
-        variant={isHero ? 'highlight' : 'elevated'}
-        padding={isHero ? 'spacious' : 'normal'}
-      >
-        <View style={styles.headerRow}>
+  // 코랄 보더: 폭 0→4px + opacity 0→1 로 좌측에서 자라난다(§27 "grow").
+  const heroBorderStyle = useAnimatedStyle(() => ({
+    width: heroBorder.value * HERO_BORDER_WIDTH,
+    opacity: heroBorder.value,
+  }));
+
+  const card = (
+    <Card
+      variant={isHero ? 'flat' : 'outlined'}
+      padding={isHero ? 'spacious' : 'normal'}
+    >
+      <View style={styles.headerRow}>
           <Text
             style={[styles.rankBadge, { color: colors.accent }]}
             accessibilityElementsHidden
@@ -192,7 +218,24 @@ export function ReportCard({
             />
           </View>
         </View>
-      </Card>
+    </Card>
+  );
+
+  return (
+    <Animated.View style={animatedStyle}>
+      {isHero ? (
+        // Hero: 코랄 좌측 보더를 애니메이션 오버레이로 그린다. 래퍼가 radius를 클립해
+        // Card highlight의 네이티브 좌측 보더와 동일한 곡선으로 잘린다.
+        <View style={styles.heroWrap}>
+          {card}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.heroBorder, heroBorderStyle, { backgroundColor: colors.accent }]}
+          />
+        </View>
+      ) : (
+        card
+      )}
     </Animated.View>
   );
 }
@@ -278,6 +321,19 @@ function FeedbackButton({
 }
 
 const styles = StyleSheet.create({
+  // Hero 래퍼 — radius 클립으로 코랄 보더 오버레이를 카드 곡선에 맞춰 자른다.
+  heroWrap: {
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroBorder: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    // width·opacity는 heroBorderStyle(애니메이션)이 결정한다.
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

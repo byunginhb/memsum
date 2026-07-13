@@ -44,15 +44,17 @@ type CaptureStore = {
   /** 캡처가 'done'(서버 저장 완료)에 도달할 때마다 증가. 리스트 화면이 이 값을 구독해 새로고침한다. */
   savedCount: number;
   /**
-   * 캡처 파이프라인 시작. options.silent=true면 확인 Sheet를 열지 않고 백그라운드로
-   * 처리한다(스크린샷 자동 감지용 — 저장되면 savedCount 증가로 목록이 갱신된다).
+   * 캡처 파이프라인 시작.
+   * - options.silent=true: 확인 Sheet를 열지 않고 백그라운드로 처리(스크린샷 자동 감지용).
+   * - options.openSheet=false: current는 추적하되 Sheet는 열지 않는다(온보딩 인라인 체험용).
+   *   silent=false(기본)일 때만 적용된다. silent=true이면 어차피 Sheet를 열지 않는다.
    *
    * @returns saved — 서버 저장(done)까지 완료됐는지. 호출 측(자동 캡처 토스트 등)이
    * 전역 savedCount 폴링 대신 이 반환값으로 성공을 판별한다(동시 캡처 race 제거).
    */
   startCapture: (
     input: StartCaptureInput,
-    options?: { silent?: boolean },
+    options?: { silent?: boolean; openSheet?: boolean },
   ) => Promise<{ saved: boolean }>;
   closeSheet: () => void;
   reset: () => void;
@@ -130,6 +132,9 @@ async function autoRegisterCalendarIfEnabled(
 ): Promise<boolean> {
   try {
     if (!result.event) return false;
+    // 원칙5 Always Confirm: 확신이 낮은 이벤트는 자동 등록 차단.
+    // confidence 없는 구버전 데이터도 'low'로 취급해 안전하게 차단한다.
+    if (result.event.confidence !== 'high') return false;
     await waitForSettingsHydration();
     if (!useSettingsStore.getState().autoCalendar) return false;
 
@@ -158,7 +163,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
 
   startCapture: async (
     input: StartCaptureInput,
-    options?: { silent?: boolean },
+    options?: { silent?: boolean; openSheet?: boolean },
   ): Promise<{ saved: boolean }> => {
     const silent = options?.silent === true;
     const id = localCaptureId();
@@ -167,6 +172,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     // silent(스크린샷 자동 감지)는 current/Sheet를 일절 건드리지 않는다 —
     // current는 확인 Sheet 1개 전용 슬롯이라, 백그라운드 파이프라인이 공유하면
     // 동시 캡처 시 서로를 중단시키는 race가 생긴다(코드리뷰 HIGH).
+    // openSheet=false: current는 추적하되 Sheet는 열지 않는다(온보딩 인라인 체험).
     const initial: CaptureDraft = {
       id,
       sourcePlatform: input.sourcePlatform,
@@ -174,7 +180,8 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       stage: 'uploading',
     };
     if (!silent) {
-      set({ current: initial, isSheetOpen: true });
+      const shouldOpenSheet = options?.openSheet !== false;
+      set({ current: initial, isSheetOpen: shouldOpenSheet });
     }
 
     // 단계 전이(UI 추적용). silent는 UI가 없으므로 항상 계속 진행한다.

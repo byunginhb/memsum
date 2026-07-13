@@ -1,17 +1,20 @@
 import type { Metadata } from 'next';
 
+import { getLandingCopy } from '@/lib/landing-copy';
 import { GOOGLE_SITE_VERIFICATION, SITE_NAME, SITE_URL } from '@/lib/site';
 
 import './globals.css';
 
+// landing-copy.ts를 SSOT로 삼아 메타데이터를 동기화한다.
+const koMeta = getLandingCopy('ko').meta;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} 멤섬 — 스크린샷 정리·캘린더 자동·주간 요약`,
-    template: `%s | ${SITE_NAME}`,
+    default: koMeta.titleDefault,
+    template: koMeta.titleTemplate,
   },
-  description:
-    '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
+  description: koMeta.description,
   verification: { google: GOOGLE_SITE_VERIFICATION },
   // hreflang — 한/영 페이지를 상호 대안으로 선언. x-default는 한국어(기본 도메인 루트).
   alternates: {
@@ -24,9 +27,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
-    title: '찍기만 하세요. Memsum이 알아서.',
-    description:
-      '쌓인 스크린샷을 자동으로 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄 요약으로. 가입 없이 바로 시작, 광고 없음.',
+    title: koMeta.ogTitle,
+    description: koMeta.ogDescription,
     images: ['/og.png'],
   },
   twitter: {

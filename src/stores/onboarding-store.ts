@@ -7,12 +7,19 @@ type OnboardingState = {
   completed: boolean;
   /** 주간 리포트 첫 진입 코치마크를 본 적이 있는지. 기본 false(1회만 노출). */
   reportCoachmarkSeen: boolean;
+  /**
+   * first-aha(실제 스크린샷 즉석 체험) 스텝을 완료한 적이 있는지.
+   * 재실행 시 aha를 중복 강제하지 않기 위해 사용한다(게이트 로직은 기존 completed 유지).
+   */
+  firstAhaDone: boolean;
   /** AsyncStorage 복원이 끝났는지. 복원 전 라우팅 게이트는 대기한다(깜빡임 방지). */
   hydrated: boolean;
   /** 온보딩 완료 표시(영속). */
   complete: () => void;
   /** 리포트 코치마크 노출 완료 표시(영속). 다시 뜨지 않게 한다. */
   seeReportCoachmark: () => void;
+  /** first-aha 체험 완료 표시(영속). */
+  completeFirstAha: () => void;
   /** 복원 완료 플래그 전환(내부용 — onRehydrateStorage에서 호출). */
   setHydrated: () => void;
 };
@@ -29,10 +36,12 @@ export const useOnboardingStore = create<OnboardingState>()(
     (set) => ({
       completed: false,
       reportCoachmarkSeen: false,
+      firstAhaDone: false,
       hydrated: false,
       // 불변 업데이트: zustand set은 새 부분 상태를 머지한다.
       complete: () => set({ completed: true }),
       seeReportCoachmark: () => set({ reportCoachmarkSeen: true }),
+      completeFirstAha: () => set({ firstAhaDone: true }),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
@@ -42,6 +51,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       partialize: (state) => ({
         completed: state.completed,
         reportCoachmarkSeen: state.reportCoachmarkSeen,
+        firstAhaDone: state.firstAhaDone,
       }),
       // 복원이 끝난(또는 실패한) 시점에 hydrated를 켜 게이트를 깨운다.
       onRehydrateStorage: () => (state) => {

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/design/icons/Icon';
 import type { IconName } from '@/design/icons/Icon';
+import { haptic } from '@/design/theme/platform';
 import { useTheme } from '@/design/theme/useTheme';
 import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
 import { usePhotoImport } from '@/hooks/use-photo-import';
@@ -13,10 +14,8 @@ import type { BottomBarProps, BottomBarTab } from './BottomBar.types';
 
 // 최소 탭 터치 영역 — 디자인시스템.md §10 (44pt).
 const MIN_TOUCH = 44;
-// 중앙 캡처+ 버튼 지름. 탭바 위로 살짝 솟도록 탭바 높이보다 크게.
-const CAPTURE_BUTTON_SIZE = 56;
-// 캡처+ 버튼이 위로 솟는 정도.
-const CAPTURE_BUTTON_LIFT = 8;
+// 중앙 캡처+ pill 높이 — 탭바에 통합(FAB 돌출 없음). 최소 탭 영역(44) 충족.
+const CAPTURE_PILL_HEIGHT = 44;
 // 탭바 본문 높이(safe-area inset 제외).
 const BAR_HEIGHT = 56;
 // 5칸(탭4 + 캡처1) 균등 분할 폭. flex:1 분배가 콘텐츠 차로 어긋나는 것을 막기 위해
@@ -52,6 +51,8 @@ export function BottomBar({ state, navigation }: BottomBarProps): React.ReactNod
 
   const handleNavigate = useCallback(
     (routeName: string): void => {
+      // 탭 전환 햅틱(iOS/Android 양쪽) — 이슈 #9 D6.
+      void haptic('light');
       navigation.navigate(routeName);
     },
     [navigation],
@@ -139,13 +140,26 @@ type CaptureButtonProps = {
   disabled: boolean;
 };
 
-/** 중앙 캡처+ 액션 버튼 — primary 원형, 위로 살짝 솟은 형태. 라우트 아님. */
+/**
+ * 중앙 캡처+ 액션 버튼 — 라벤더 pill(탭바에 통합). 라우트 아님.
+ *
+ * 이슈 #9 D8 / design.md §26 "Bottom Bar (FAB X)": 전형적 "탭바 중앙 돌출 원형"
+ * 클리셰를 탈피하고, 탭바 리듬 안에 앉는 라벤더 라운드 pill(돌출·그림자 없음)로 둔다.
+ * 탭 시 medium 햅틱으로 다른 탭(light)보다 무게감 있는 촉각을 준다(D6).
+ */
 function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
   const { colors } = useTheme();
+
+  const handlePress = (): void => {
+    // 캡처는 핵심 액션 — 탭 전환(light)보다 강한 medium 햅틱으로 구분.
+    void haptic('medium');
+    onPress();
+  };
+
   return (
     <View style={styles.captureSlot}>
       <Pressable
-        onPress={onPress}
+        onPress={handlePress}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityState={{ disabled }}
@@ -154,12 +168,12 @@ function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
         android_ripple={{ borderless: true }}
         style={styles.captureButton}
       >
-        {/* 색 원은 내부 View에 둔다: NativeWind 래핑 Pressable은 inline
-            backgroundColor를 누락시켜(투명 원) 흰 아이콘만 보이게 되므로,
-            배경색이 정상 적용되는 일반 View로 원을 그린다.
+        {/* 배경색은 내부 View에 둔다: NativeWind 래핑 Pressable은 inline
+            backgroundColor를 누락시켜(투명) 흰 아이콘만 보이게 되므로,
+            배경색이 정상 적용되는 일반 View로 pill을 그린다.
             아이콘은 '촬영'으로 오인되는 카메라 대신 사진첩(images)을 써서
             "사진첩에서 골라 정리"라는 실제 동작을 시각적으로 알린다. */}
-        <View style={[styles.captureCircle, { backgroundColor: colors.primary }]}>
+        <View style={[styles.capturePill, { backgroundColor: colors.primary }]}>
           <Icon name="images" size={24} color="onPrimary" />
         </View>
       </Pressable>
@@ -204,13 +218,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captureCircle: {
-    width: CAPTURE_BUTTON_SIZE,
-    height: CAPTURE_BUTTON_SIZE,
+  capturePill: {
+    // 탭바에 통합된 라벤더 pill — 돌출(marginTop)·그림자 없음(FAB 클리셰 탈피).
+    height: CAPTURE_PILL_HEIGHT,
+    minWidth: CAPTURE_PILL_HEIGHT,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    // 탭바 위로 살짝 솟은 형태.
-    marginTop: -CAPTURE_BUTTON_LIFT,
   },
 });

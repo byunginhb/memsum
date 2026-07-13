@@ -13,10 +13,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 
+import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
+import { ConfidenceBadge } from '@/design/components/ConfidenceBadge';
 import { useToast } from '@/design/components/Toast/useToast';
 import { Icon } from '@/design/icons/Icon';
+import type { IconName } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { fontFamily } from '@/design/tokens/typography';
 import { letterSpacingFor, spacing, typography } from '@/design/tokens';
@@ -27,6 +30,22 @@ import { getLocale, t } from '@/i18n';
 import { deleteCapture } from '@/lib/captures';
 import { useCalendarStore } from '@/stores/calendar-store';
 import { useCaptureStore } from '@/stores/capture-store';
+
+// ── 민감정보 마스킹 ───────────────────────────────────────────────────────────
+
+/**
+ * 카드번호 패턴(16자리 연속 또는 4-4-4-4) 마스킹. 표시 레이어 전용 — 원본 데이터 불변.
+ * why 이 패턴만: 계좌번호는 형식이 다양해 오탐률이 높다. 카드번호는 16자리 고정이라
+ * false-positive 없이 안정적으로 감지 가능하다.
+ */
+const CARD_NUMBER_RE = /\b(\d{4})[-\s]?(\d{4})[-\s]?(\d{4})[-\s]?\d{4}\b/g;
+
+function maskSensitiveNumbers(text: string): string {
+  return text.replace(CARD_NUMBER_RE, '$1-****-****-****');
+}
+
+/** OCR 텍스트에 민감정보 마스킹이 필요한 카테고리. */
+const SENSITIVE_CATEGORIES: ReadonlySet<string> = new Set(['receipt', 'shopping']);
 
 /**
  * 캡처 상세 화면 — 기능명세 상세 플로우 (W4-C) + 캘린더 연동(C2).
@@ -169,11 +188,18 @@ function DetailBody({ item, isLoading, error }: DetailBodyProps) {
       ) : null}
 
       <View style={styles.bodySection}>
-        <OcrBlock ocrText={item.ocrText} />
+        <OcrBlock
+          ocrText={item.ocrText}
+          isMasked={SENSITIVE_CATEGORIES.has(item.category)}
+        />
       </View>
 
       <View style={styles.bodySection}>
         <MetaBlock item={item} />
+      </View>
+
+      <View style={styles.bodySection}>
+        <DataFlowBlock />
       </View>
 
       <View style={styles.bodySection}>
@@ -210,9 +236,11 @@ function DetailImage({ item }: { item: CaptureListItem }) {
   );
 }
 
-/** 감지된 이벤트 카드 — highlight 변형. 날짜·장소 표시. */
+/** 감지된 이벤트 카드 — highlight 변형. 날짜·장소·확신도 배지 표시. */
 function EventCard({ event }: { event: CaptureEvent }) {
   const { colors } = useTheme();
+  // confidence 없는 구버전 캡처는 배지를 숨긴다(크래시 없이 안전 렌더).
+  const confidence = event.confidence;
 
   return (
     <Card variant="highlight">
@@ -228,22 +256,25 @@ function EventCard({ event }: { event: CaptureEvent }) {
               {event.location}
             </Text>
           ) : null}
+          {confidence ? <ConfidenceBadge level={confidence} /> : null}
         </View>
       </View>
     </Card>
   );
 }
 
-/** OCR 전체 텍스트 블록. "인식된 텍스트" 라벨 + 본문. */
-function OcrBlock({ ocrText }: { ocrText: string }) {
+/** OCR 전체 텍스트 블록. "인식된 텍스트" 라벨 + 본문. isMasked=true 시 카드번호 등 마스킹. */
+function OcrBlock({ ocrText, isMasked = false }: { ocrText: string; isMasked?: boolean }) {
   const { colors } = useTheme();
   const hasText = ocrText.trim().length > 0;
+  // 원본 불변 — 표시 텍스트만 마스킹한다.
+  const displayText = isMasked && hasText ? maskSensitiveNumbers(ocrText) : ocrText;
 
   return (
     <View style={styles.metaGroup}>
-      {/* 필드 라벨: 라벤더 정사각형 + 소문자 캡션. 한국어라 Pretendard 유지. */}
+      {/* 필드 라벨: 9점 로고 원형 브랜드 점 + 소문자 캡션. 한국어라 Pretendard 유지. */}
       <View style={styles.fieldLabelRow}>
-        <View style={[styles.fieldLabelDot, { backgroundColor: colors.primary }]} />
+        <BrandDot />
         <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
           {t('captures.detail.ocrLabel')}
         </Text>
@@ -252,10 +283,19 @@ function OcrBlock({ ocrText }: { ocrText: string }) {
         {/* 좌측 2px 보더로 "추출된 필드" 인상. 한국어 OCR이므로 폰트는 Pretendard. */}
         <View style={[styles.ocrBodyBorder, { borderLeftColor: colors.border }]}>
           <Text style={[styles.ocrText, { color: colors.textSecondary }]}>
-            {hasText ? ocrText : t('captures.detail.ocrEmpty')}
+            {hasText ? displayText : t('captures.detail.ocrEmpty')}
           </Text>
         </View>
       </Card>
+      {/* 마스킹 적용 시 사용자에게 알린다(투명성). */}
+      {isMasked && hasText ? (
+        <View style={styles.maskHintRow}>
+          <Icon name="shield" size={16} color="textSecondary" />
+          <Text style={[styles.maskHintText, { color: colors.textSecondary }]}>
+            {t('captures.detail.sensitivity.maskHint')}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -266,9 +306,9 @@ function MetaBlock({ item }: { item: CaptureListItem }) {
 
   return (
     <View style={styles.metaGroup}>
-      {/* 필드 라벨: 라벤더 정사각형 + 소문자 캡션. 한국어라 Pretendard 유지. */}
+      {/* 필드 라벨: 9점 로고 원형 브랜드 점 + 소문자 캡션. 한국어라 Pretendard 유지. */}
       <View style={styles.fieldLabelRow}>
-        <View style={[styles.fieldLabelDot, { backgroundColor: colors.primary }]} />
+        <BrandDot />
         <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
           {t('captures.detail.metaLabel')}
         </Text>
@@ -316,6 +356,72 @@ function MetaRow({
       >
         {value}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * 데이터 처리 흐름 가시화 블록 — 이슈 #6 P1.
+ * "무엇이 기기에 남고 무엇이 어디로 가는지"를 정직하게 서술한다(개인정보처리방침 §4와 일치).
+ * 허위 문구 금지: Memsum은 이미지를 비공개 버킷에 업로드하고 텍스트를 서버에서 처리한다.
+ */
+function DataFlowBlock() {
+  const { colors } = useTheme();
+  const router = useRouter();
+
+  return (
+    <View style={styles.metaGroup}>
+      <View style={styles.fieldLabelRow}>
+        <BrandDot />
+        <Text style={[styles.label, styles.fieldLabel, { color: colors.textSecondary }]}>
+          {t('captures.detail.dataFlow.label')}
+        </Text>
+      </View>
+      <Card variant="flat" compact>
+        <DataFlowStep icon="smartphone" text={t('captures.detail.dataFlow.step1')} colors={colors} />
+        <DataFlowStep icon="cloud" text={t('captures.detail.dataFlow.step2')} colors={colors} />
+        <DataFlowStep
+          icon="shield"
+          text={t('captures.detail.dataFlow.step3')}
+          linkLabel={t('captures.detail.dataFlow.deleteLink')}
+          onLinkPress={() => router.push('/(tabs)/settings')}
+          colors={colors}
+          isLast
+        />
+      </Card>
+    </View>
+  );
+}
+
+type DataFlowStepProps = {
+  icon: IconName;
+  text: string;
+  linkLabel?: string;
+  onLinkPress?: () => void;
+  colors: ReturnType<typeof useTheme>['colors'];
+  isLast?: boolean;
+};
+
+function DataFlowStep({ icon, text, linkLabel, onLinkPress, colors, isLast = false }: DataFlowStepProps) {
+  return (
+    <View
+      style={[
+        styles.dataFlowRow,
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+      ]}
+    >
+      <Icon name={icon} size={16} color="textSecondary" />
+      <Text style={[styles.dataFlowText, { color: colors.textSecondary }]}>{text}</Text>
+      {linkLabel && onLinkPress ? (
+        <Pressable
+          onPress={onLinkPress}
+          accessibilityRole="link"
+          accessibilityLabel={linkLabel}
+          hitSlop={spacing.xs}
+        >
+          <Text style={[styles.dataFlowLink, { color: colors.primary }]}>{linkLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -534,12 +640,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
   },
-  /** 5×5pt 라벤더 정사각형(primary 컬러). 모서리 1px 라운드로 픽셀 아트 느낌. */
-  fieldLabelDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 1,
-  },
   /** 캡션에 1.5pt 자간 추가로 스캔·프린트 헤더 느낌. */
   fieldLabel: {
     letterSpacing: 1.5,
@@ -572,5 +672,34 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: spacing.md,
+  },
+  dataFlowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  dataFlowText: {
+    flex: 1,
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodySm.weight,
+  },
+  dataFlowLink: {
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodyMd.weight,
+    textDecorationLine: 'underline',
+  },
+  maskHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  maskHintText: {
+    fontSize: typography.bodySm.size,
+    lineHeight: typography.bodySm.line,
+    fontWeight: typography.bodySm.weight,
   },
 });

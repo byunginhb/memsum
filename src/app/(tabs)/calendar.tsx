@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,12 +11,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { Header } from '@/design/components/Header/Header';
-import { useToast } from '@/design/components/Toast';
+import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
 import { spacing } from '@/design/tokens';
 import { CalendarConnectPrompt } from '@/features/calendar/CalendarConnectPrompt';
 import { EventCaptureList } from '@/features/calendar/EventCaptureList';
-import type { CaptureListItem } from '@/features/captures/types';
+import { useCalendarAction } from '@/hooks/use-calendar-action';
 import { useEventCaptures } from '@/hooks/use-event-captures';
 import { t } from '@/i18n';
 import { useCalendarStore } from '@/stores/calendar-store';
@@ -36,12 +35,10 @@ import { useCalendarStore } from '@/stores/calendar-store';
 export default function CalendarScreen(): ReactNode {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
 
   const status = useCalendarStore((s) => s.status);
   const hydrated = useCalendarStore((s) => s.hydrated);
   const restore = useCalendarStore((s) => s.restore);
-  const registerCapture = useCalendarStore((s) => s.registerCapture);
 
   // 앱 어디선가 restore()가 한 번은 호출돼야 한다. 이 화면 마운트 시 멱등 호출.
   useEffect(() => {
@@ -58,11 +55,7 @@ export default function CalendarScreen(): ReactNode {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : isConnected ? (
-        <ConnectedBody
-          insetsBottom={insets.bottom}
-          toastShow={toast.show}
-          registerCapture={registerCapture}
-        />
+        <ConnectedBody insetsBottom={insets.bottom} />
       ) : (
         <ScrollView
           style={styles.flex}
@@ -81,75 +74,19 @@ export default function CalendarScreen(): ReactNode {
 
 type ConnectedBodyProps = {
   insetsBottom: number;
-  toastShow: ReturnType<typeof useToast>['show'];
-  registerCapture: ReturnType<typeof useCalendarStore.getState>['registerCapture'];
 };
 
 /**
  * 연결된 상태의 본문. 이벤트 캡처 훅을 여기서 호출해, 미연결일 때는 불필요한 데이터
  * 로드가 일어나지 않게 분리한다(훅은 마운트 시 fetch하므로).
+ * 등록·열기 액션은 useCalendarAction 공용 훅 사용(홈과 로직 공유, 중복 금지).
  */
-function ConnectedBody({
-  insetsBottom,
-  toastShow,
-  registerCapture,
-}: ConnectedBodyProps): ReactNode {
+function ConnectedBody({ insetsBottom }: ConnectedBodyProps): ReactNode {
   const { colors } = useTheme();
   const { upcoming, past, isLoading, error, refresh } = useEventCaptures();
-
-  // 현재 등록 진행 중인 캡처 id. 해당 행만 로딩/비활성 처리(중복 탭 방지).
-  const [registeringId, setRegisteringId] = useState<string | null>(null);
+  const { handleRegister, handleOpen, registeringId } = useCalendarAction(refresh);
 
   const isEmpty = upcoming.length === 0 && past.length === 0 && !isLoading;
-
-  const handleRegister = useCallback(
-    (item: CaptureListItem): void => {
-      // event가 없으면 캘린더에 넣을 내용이 없다(타입 가드 + 사용자 보호).
-      if (!item.event) {
-        console.error('[calendar] 등록 시도했으나 event가 없습니다:', item.id);
-        return;
-      }
-      // 이미 다른 항목을 등록 중이면 무시(직렬 처리로 상태 꼬임 방지).
-      if (registeringId !== null) return;
-
-      setRegisteringId(item.id);
-      const event = item.event;
-      void (async () => {
-        try {
-          await registerCapture({ captureId: item.id, event });
-          toastShow({
-            tone: 'success',
-            title: t('calendar.toast.registerSuccess'),
-          });
-          // 등록 결과(calendarEventId·htmlLink)를 반영하려면 목록을 다시 읽는다.
-          await refresh();
-        } catch (err) {
-          const message =
-            err instanceof Error ? err.message : t('calendar.toast.registerError');
-          console.error('[calendar] 일정 등록 실패:', message);
-          toastShow({
-            tone: 'danger',
-            title: t('calendar.toast.registerError'),
-          });
-        } finally {
-          setRegisteringId(null);
-        }
-      })();
-    },
-    [registeringId, registerCapture, refresh, toastShow],
-  );
-
-  const handleOpen = useCallback((htmlLink: string | null): void => {
-    if (!htmlLink) return;
-    void (async () => {
-      try {
-        await Linking.openURL(htmlLink);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : '알 수 없는 오류';
-        console.error('[calendar] 캘린더 링크 열기 실패:', message);
-      }
-    })();
-  }, []);
 
   const contentStyle = useMemo(
     () => ({
@@ -178,7 +115,7 @@ function ConnectedBody({
       {isEmpty ? (
         <View style={styles.emptyWrap}>
           <EmptyState
-            icon="calendar"
+            illustration={<DotsGrid size={96} animated />}
             title={t('calendar.empty.title')}
             body={error ?? t('calendar.empty.body')}
           />

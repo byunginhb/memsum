@@ -2,7 +2,8 @@
 //
 // 알림 정책: 평소에는 완전 무음(저장/정리 결과 알림 없음), 주 1회 리포트만 "짜잔".
 // - 질문 알림("저장할까요?")은 네이티브(ScreenshotAskJobService)가 단일 게시한다.
-// - 이 모듈은 주간 리포트 예약 알림(기본 일요일 저녁)만 담당한다.
+// - 이 모듈은 주간 리포트 예약 알림(기본 일요일 저녁)과
+//   이벤트 전날 리마인드(하루 1건 묶음)를 담당한다.
 // 푸시(APNs/FCM) 자격증명은 필요 없다 — 전부 로컬 알림이다.
 
 import * as Notifications from 'expo-notifications';
@@ -16,8 +17,14 @@ const CHANNEL_WEEKLY = 'weekly-report';
 // 택배 상태 전이 알림 채널(Android). 배송 출발/완료는 즉시 확인 가치가 커 헤드업(HIGH).
 const CHANNEL_PARCEL = 'parcel-status';
 
+// 이벤트 전날 리마인드 채널(Android). 하루 1건 묶음 알림이라 헤드업(HIGH)으로 띄운다.
+const CHANNEL_EVENT_REMINDER = 'event-reminder';
+
 /** 주간 리포트 예약 알림 식별자(같은 id로 재예약하면 교체된다). */
-const WEEKLY_IDENTIFIER = 'weekly-report';
+export const WEEKLY_IDENTIFIER = 'weekly-report';
+
+/** 이벤트 리마인드 식별자 접두사. 날짜 키(YYYYMMDD)를 붙여 하루 1건 고정. */
+const REMINDER_ID_PREFIX = 'reminder-';
 
 /** 기본 발송 시각: 일요일 저녁 7시(기기 로컬 시간 기준). */
 const WEEKLY_WEEKDAY_SUNDAY = 1; // expo/iOS 규약: 1 = 일요일
@@ -55,6 +62,10 @@ async function ensureChannels(): Promise<void> {
     });
     await Notifications.setNotificationChannelAsync(CHANNEL_PARCEL, {
       name: '택배 상태',
+      importance: Notifications.AndroidImportance.HIGH,
+    });
+    await Notifications.setNotificationChannelAsync(CHANNEL_EVENT_REMINDER, {
+      name: '일정 리마인드',
       importance: Notifications.AndroidImportance.HIGH,
     });
     channelReady = true;
@@ -197,4 +208,146 @@ export async function presentParcelDelivered(
     t('push.parcel.delivered.body', { date }),
     input.trackId,
   );
+}
+
+// ── 이벤트 전날 리마인드 ─────────────────────────────────────────────────────
+
+/** 묶음 리마인드 알림 단일 항목. */
+export type EventReminderItem = {
+  title: string;
+  /** ISO8601 KST — 발송 시각 포맷에 사용. */
+  startsAt: string;
+};
+
+/** scheduleEventReminder 입력. */
+export type ScheduleEventReminderInput = {
+  /** 이벤트 날짜 키(YYYYMMDD) — 식별자 생성·전날 계산 기준. */
+  dateKey: string;
+  /** 전날 발송 시각(0-23, 기기 로컬 시간). */
+  hour: number;
+  /** 전날 발송 분. */
+  minute: number;
+  /** 묶음 알림에 표시할 이벤트 목록. */
+  items: EventReminderItem[];
+  /** 탭 시 이동할 딥링크 경로(예: '/calendar'). */
+  deepLinkUrl: string;
+};
+
+/**
+ * 이벤트 날짜 키(YYYYMMDD)와 발송 시각으로 전날 리마인드 절대 시각을 계산한다.
+ * 기기 로컬 시간 기준. 계산된 시각이 현재보다 과거면 null(예약 스킵).
+ */
+export function getReminderDate(dateKey: string, hour: number, minute: number): Date | null {
+  const y = parseInt(dateKey.slice(0, 4), 10);
+  const mo = parseInt(dateKey.slice(4, 6), 10) - 1; // 0-indexed
+  const d = parseInt(dateKey.slice(6, 8), 10);
+  // 이벤트 당일 기준으로 전날(d-1)의 hour:minute 절대 시각.
+  const trigger = new Date(y, mo, d - 1, hour, minute, 0, 0);
+  return trigger.getTime() <= Date.now() ? null : trigger;
+}
+
+/** 시작 시각(ISO8601)을 "HH:MM" 포맷으로 변환. 파싱 실패 시 빈 문자열. */
+function formatEventTime(startsAt: string): string {
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return '';
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+/**
+ * 단건/묶음 알림 제목·본문 생성.
+ * 단건: "{title} · {time}"
+ * 다건: "일정 {count}건 — {title1} {time1}, {title2} …" (최대 3건 요약)
+ */
+function buildReminderContent(items: EventReminderItem[]): { title: string; body: string } {
+  const notifTitle = t('eventReminder.notif.title');
+
+  if (items.length === 1) {
+    const item = items[0];
+    const time = formatEventTime(item.startsAt);
+    const body = time
+      ? t('eventReminder.notif.body', { title: item.title, time })
+      : item.title;
+    return { title: notifTitle, body };
+  }
+
+  const summary = items
+    .slice(0, 3)
+    .map((item) => {
+      const time = formatEventTime(item.startsAt);
+      return time ? `${item.title} ${time}` : item.title;
+    })
+    .join(', ');
+
+  const body = t('eventReminder.notif.bundleBody', {
+    count: String(items.length),
+    summary,
+  });
+  return { title: notifTitle, body };
+}
+
+/**
+ * 특정 이벤트 날짜의 묶음 리마인드 알림을 예약한다.
+ * 식별자=`reminder-{dateKey}`로 고정해 같은 날 재예약은 교체(하루 1건 보장).
+ * 전날 시각이 이미 과거면 false(스킵). 권한 거부도 false.
+ */
+export async function scheduleEventReminder(
+  input: ScheduleEventReminderInput,
+): Promise<boolean> {
+  try {
+    const triggerDate = getReminderDate(input.dateKey, input.hour, input.minute);
+    if (!triggerDate) return false;
+
+    const granted = await ensureNotificationPermission();
+    if (!granted) return false;
+    await ensureChannels();
+
+    const { title, body } = buildReminderContent(input.items);
+    const identifier = `${REMINDER_ID_PREFIX}${input.dateKey}`;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title,
+        body,
+        data: { url: input.deepLinkUrl },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        ...(Platform.OS === 'android' ? { channelId: CHANNEL_EVENT_REMINDER } : null),
+      },
+    });
+    return true;
+  } catch (error) {
+    console.error('[notifications] 이벤트 리마인드 예약 실패:', error);
+    return false;
+  }
+}
+
+/** 특정 이벤트 날짜의 리마인드 예약을 해제한다. */
+export async function cancelEventReminder(dateKey: string): Promise<void> {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`${REMINDER_ID_PREFIX}${dateKey}`);
+  } catch (error) {
+    console.error('[notifications] 이벤트 리마인드 해제 실패:', error);
+  }
+}
+
+/**
+ * `reminder-` 접두사를 가진 이벤트 리마인드 예약을 모두 해제한다.
+ * 이벤트 삭제·설정 OFF·전체 재동기화 직전에 호출한다.
+ */
+export async function cancelAllEventReminders(): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(
+      scheduled
+        .filter((n) => n.identifier.startsWith(REMINDER_ID_PREFIX))
+        .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+    );
+  } catch (error) {
+    console.error('[notifications] 이벤트 리마인드 전체 해제 실패:', error);
+  }
 }

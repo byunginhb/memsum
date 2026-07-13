@@ -107,10 +107,9 @@ export function Button({
 
   const handlePress = async (): Promise<void> => {
     if (isInactive) return;
-    // iOS 탭 피드백. Android는 android_ripple로 시각 피드백 제공.
-    if (Platform.OS === 'ios') {
-      await haptic('light');
-    }
+    // 탭 피드백을 iOS/Android 양쪽에서 발화(이슈 #9 D6: 손에 닿는 질감 일관화).
+    // Android는 android_ripple 시각 피드백에 더해 짧은 진동으로 촉각을 보강한다.
+    await haptic('light');
     onPress();
   };
 

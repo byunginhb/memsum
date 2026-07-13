@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { AppState, PermissionsAndroid, Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
 import { useToast } from '@/design/components/Toast/useToast';
 import { t } from '@/i18n';
 import { ensureNotificationPermission } from '@/lib/notifications';
+import { requestAndroidMediaPermission } from '@/lib/permissions';
 import { useCaptureStore } from '@/stores/capture-store';
+import { useOnboardingStore } from '@/stores/onboarding-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
 import {
@@ -67,6 +69,8 @@ export function useAutoCapture(): void {
   const startCapture = useCaptureStore((state) => state.startCapture);
   const autoCapture = useSettingsStore((state) => state.autoCapture);
   const hydrated = useSettingsStore((state) => state.hydrated);
+  // 온보딩 완료 전에는 권한 팝업을 띄우지 않는다 — 권한 요청은 온보딩 권한 스텝이 담당.
+  const onboardingCompleted = useOnboardingStore((state) => state.completed);
   const toast = useToast();
 
   // 직렬 처리 체인. 새 작업은 이전 처리 완료 후 시작된다.
@@ -74,9 +78,13 @@ export function useAutoCapture(): void {
   // 권한 거부 안내는 세션당 1회만(반복 토스트 방지).
   const warnedPermissionRef = useRef(false);
 
-  // 설정 복원 후 autoCapture가 켜져 있으면 권한을 1회 확보한다.
+  // 설정 복원 후 + 온보딩 완료 후 autoCapture가 켜져 있으면 권한을 확보한다.
+  // 온보딩 완료 전에는 실행하지 않는다 — 권한 요청은 온보딩 권한 스텝(OnboardingPermissionStep)이
+  // 담당하며, 이중 팝업을 방지한다. 온보딩 완료 시 onboardingCompleted가 true로 전환되어
+  // 이 effect가 재실행되고, 이미 허용된 권한은 requestAndroidMediaPermission 내부 체크에서
+  // 즉시 true를 반환해 추가 팝업이 뜨지 않는다.
   useEffect(() => {
-    if (!hydrated || !autoCapture) return;
+    if (!hydrated || !autoCapture || !onboardingCompleted) return;
     void (async () => {
       // 미디어 권한(Android만 — iOS는 네이티브가 처리). 거부 시 자동 정리 불가를 안내.
       if (Platform.OS === 'android') {
@@ -89,7 +97,7 @@ export function useAutoCapture(): void {
       // 질문/결과 알림용 알림 권한(거부돼도 포그라운드 토스트 경로는 동작).
       await ensureNotificationPermission();
     })();
-  }, [hydrated, autoCapture, toast]);
+  }, [hydrated, autoCapture, onboardingCompleted, toast]);
 
   // 스크린샷 이벤트 구독 + 딥링크 → 직렬 큐로 처리.
   useEffect(() => {
@@ -239,19 +247,3 @@ function toCaptureInput(payload: CaptureAskPayload): StartCaptureInput | null {
   };
 }
 
-/**
- * Android READ_MEDIA_IMAGES 런타임 권한을 요청한다.
- * 이미 허용돼 있으면 즉시 true. 거부돼도 앱은 계속 동작(수동 캡처는 가능).
- */
-async function requestAndroidMediaPermission(): Promise<boolean> {
-  try {
-    const permission = PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
-    const already = await PermissionsAndroid.check(permission);
-    if (already) return true;
-    const result = await PermissionsAndroid.request(permission);
-    return result === PermissionsAndroid.RESULTS.GRANTED;
-  } catch (error) {
-    console.error('[auto-capture] 미디어 권한 요청 실패:', error);
-    return false;
-  }
-}
