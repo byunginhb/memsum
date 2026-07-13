@@ -10,6 +10,7 @@ import {
   Clock,
   Copy,
   FileText,
+  HelpCircle,
   Home,
   Images,
   Folder,
@@ -79,6 +80,7 @@ const ICONS = {
   truck: Truck,
   'alert-circle': AlertCircle,
   'check-circle': CheckCircle,
+  'help-circle': HelpCircle,
   copy: Copy,
   clock: Clock,
 } as const;

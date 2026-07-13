@@ -19,6 +19,7 @@ import { Image } from 'expo-image';
 import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
+import { ConfidenceBadge } from '@/design/components/ConfidenceBadge';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { glass, motion, radius, spacing, typography, zIndex } from '@/design/tokens';
@@ -364,7 +365,12 @@ function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
         />
       ) : null}
 
-      <ActionRow stage={draft.stage} hasEvent={!!event} onClose={onClose} />
+      <ActionRow
+        stage={draft.stage}
+        hasEvent={!!event}
+        eventConfidence={event?.confidence}
+        onClose={onClose}
+      />
     </View>
   );
 }
@@ -462,6 +468,8 @@ type EventCardProps = {
 
 function EventCard({ event }: EventCardProps) {
   const { colors } = useTheme();
+  // confidence 없는 구버전 캡처는 배지를 숨긴다(크래시 없이 안전 렌더).
+  const confidence = event.confidence;
   return (
     <Card variant="highlight" compact>
       <View style={styles.eventRow}>
@@ -476,6 +484,7 @@ function EventCard({ event }: EventCardProps) {
               {event.location}
             </Text>
           ) : null}
+          {confidence ? <ConfidenceBadge level={confidence} /> : null}
         </View>
       </View>
     </Card>
@@ -485,16 +494,25 @@ function EventCard({ event }: EventCardProps) {
 type ActionRowProps = {
   stage: CaptureStage;
   hasEvent: boolean;
+  /** 이벤트 확신도. 없으면 'low'로 취급(구버전 호환). */
+  eventConfidence?: 'high' | 'low';
   onClose: () => void;
 };
 
-function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
+function ActionRow({ stage, hasEvent, eventConfidence, onClose }: ActionRowProps) {
   const isDone = stage === 'done';
+  // confidence 없는 구버전은 안전하게 'low'로 취급한다.
+  const isLowConfidence = !eventConfidence || eventConfidence === 'low';
 
   // 캘린더 추가는 Week 9 예정. 지금은 비활성(이벤트 감지 시에만 노출).
   const handleAddToCalendar = useCallback(() => {
     // Week 9: Google Calendar 연동 시 구현. 현재는 비활성 버튼이라 도달하지 않는다.
   }, []);
+
+  // 확신 낮은 이벤트는 사용자 확인이 필요하다는 라벨로 표시(원칙5 Always Confirm).
+  const calendarLabel = isLowConfidence
+    ? t('capture.action.confirmAndAdd')
+    : t('capture.action.addToCalendar');
 
   return (
     <View style={styles.actions}>
@@ -517,10 +535,10 @@ function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
             size="md"
             disabled
             onPress={handleAddToCalendar}
-            accessibilityLabel={t('capture.action.addToCalendar')}
+            accessibilityLabel={calendarLabel}
             leftIcon={<Icon name="calendar" size={16} color="textOnAccent" />}
           >
-            {t('capture.action.addToCalendar')}
+            {calendarLabel}
           </Button>
         </View>
       ) : null}

@@ -283,5 +283,8 @@
   "push.parcel.outForDelivery.bodyWithTime": "오늘 {time} 사이에 도착할 것 같아요. 미리 확인해보세요.",
   "push.parcel.outForDelivery.bodyNoTime": "오늘 중 도착할 것 같아요. 집에 계시면 좋겠어요.",
   "push.parcel.delivered.title": "{carrier} 배송이 완료됐어요",
-  "push.parcel.delivered.body": "{date} 도착했어요."
+  "push.parcel.delivered.body": "{date} 도착했어요.",
+  "confidence.badge.high": "확실",
+  "confidence.badge.low": "확인 요망",
+  "capture.action.confirmAndAdd": "확인 후 추가"
 }

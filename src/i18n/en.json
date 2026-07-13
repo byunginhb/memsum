@@ -283,5 +283,8 @@
   "push.parcel.outForDelivery.bodyWithTime": "Should arrive around {time} today. Take a look!",
   "push.parcel.outForDelivery.bodyNoTime": "Likely arriving today — be home if you can!",
   "push.parcel.delivered.title": "{carrier} — delivered",
-  "push.parcel.delivered.body": "Arrived {date}."
+  "push.parcel.delivered.body": "Arrived {date}.",
+  "confidence.badge.high": "Confident",
+  "confidence.badge.low": "Please check",
+  "capture.action.confirmAndAdd": "Confirm & Add"
 }

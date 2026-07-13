@@ -132,6 +132,9 @@ async function autoRegisterCalendarIfEnabled(
 ): Promise<boolean> {
   try {
     if (!result.event) return false;
+    // 원칙5 Always Confirm: 확신이 낮은 이벤트는 자동 등록 차단.
+    // confidence 없는 구버전 데이터도 'low'로 취급해 안전하게 차단한다.
+    if (result.event.confidence !== 'high') return false;
     await waitForSettingsHydration();
     if (!useSettingsStore.getState().autoCalendar) return false;
 

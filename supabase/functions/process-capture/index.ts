@@ -76,6 +76,8 @@ interface ExtractedEvent {
   readonly starts_at: string;
   readonly ends_at: string | null;
   readonly location: string | null;
+  /** 날짜·시간이 텍스트에 명확히 특정되면 high, 상대적·모호·추론이면 low. */
+  readonly confidence: 'high' | 'low';
 }
 
 interface OpenAiResult {
@@ -159,13 +161,14 @@ function buildSystemPrompt(nowIso: string, locale: Locale): string {
     "한국식 날짜·시간 표현을 해석합니다. 예: '다음 주 화 오후 2시', '6/15 토 14시', '내일 오전 10시 반'.",
     `starts_at·ends_at은 ISO8601 형식이며 KST 오프셋(+09:00)을 포함합니다. 예: '2026-06-15T14:00:00+09:00'.`,
     "종료 시각이 명시되지 않으면 ends_at은 null, 장소가 없으면 location은 null 입니다.",
+    "confidence: 날짜·시간이 텍스트에 명확히 특정되어 있으면 'high', 상대적('다음 주', '곧', '이번 달')·모호하거나 추론이 필요하면 'low'.",
     "",
     "반드시 아래 JSON 스키마로만 응답합니다. 그 외 텍스트를 출력하지 않습니다:",
     '{',
     '  "clean_text": string,',
     '  "title": string,',
     '  "summary": string,',
-    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null },',
+    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null, "confidence": "high" | "low" },',
     '  "category": "marketing" | "event" | "receipt" | "shopping" | "info" | "etc"',
     '}',
   ].join("\n");
@@ -192,13 +195,14 @@ function buildSystemPromptEn(nowIso: string): string {
     "Interpret everyday date/time expressions. Examples: 'next Tue 2pm', '6/15 Sat 14:00', 'tomorrow at 10:30am'.",
     "starts_at and ends_at are ISO8601 with the KST offset (+09:00). Example: '2026-06-15T14:00:00+09:00'.",
     "If no end time is given, ends_at is null; if no location is given, location is null.",
+    "confidence: 'high' if the date and time are explicitly stated in the text; 'low' if they are relative ('next week', 'soon', 'this month'), ambiguous, or require inference.",
     "",
     "Respond ONLY with the JSON schema below. Output no other text:",
     '{',
     '  "clean_text": string,',
     '  "title": string,',
     '  "summary": string,',
-    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null },',
+    '  "event": null | { "title": string, "starts_at": string, "ends_at": string | null, "location": string | null, "confidence": "high" | "low" },',
     '  "category": "marketing" | "event" | "receipt" | "shopping" | "info" | "etc"',
     '}',
   ].join("\n");
@@ -223,11 +227,16 @@ function normalizeOpenAiResult(parsed: unknown, fallbackText: string): OpenAiRes
     typeof (rawEvent as Record<string, unknown>).starts_at === "string"
   ) {
     const e = rawEvent as Record<string, unknown>;
+    // confidence 화이트리스트 검증. 누락/이상값은 'low' 폴백(구버전 응답 호환).
+    const rawConfidence = e.confidence;
+    const confidence: "high" | "low" =
+      rawConfidence === "high" || rawConfidence === "low" ? rawConfidence : "low";
     event = {
       title: e.title as string,
       starts_at: e.starts_at as string,
       ends_at: typeof e.ends_at === "string" ? e.ends_at : null,
       location: typeof e.location === "string" ? e.location : null,
+      confidence,
     };
   }
 

@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { BrandDot } from '@/design/components/BrandDot/BrandDot';
 import { Button } from '@/design/components/Button/Button';
 import { Card } from '@/design/components/Card/Card';
+import { ConfidenceBadge } from '@/design/components/ConfidenceBadge';
 import { useToast } from '@/design/components/Toast/useToast';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
@@ -211,9 +212,11 @@ function DetailImage({ item }: { item: CaptureListItem }) {
   );
 }
 
-/** 감지된 이벤트 카드 — highlight 변형. 날짜·장소 표시. */
+/** 감지된 이벤트 카드 — highlight 변형. 날짜·장소·확신도 배지 표시. */
 function EventCard({ event }: { event: CaptureEvent }) {
   const { colors } = useTheme();
+  // confidence 없는 구버전 캡처는 배지를 숨긴다(크래시 없이 안전 렌더).
+  const confidence = event.confidence;
 
   return (
     <Card variant="highlight">
@@ -229,6 +232,7 @@ function EventCard({ event }: { event: CaptureEvent }) {
               {event.location}
             </Text>
           ) : null}
+          {confidence ? <ConfidenceBadge level={confidence} /> : null}
         </View>
       </View>
     </Card>

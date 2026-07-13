@@ -20,6 +20,7 @@ import { Image } from 'expo-image';
 
 import { Badge } from '@/design/components/Badge/Badge';
 import { Button } from '@/design/components/Button/Button';
+import { ConfidenceBadge } from '@/design/components/ConfidenceBadge';
 import { Icon } from '@/design/icons/Icon';
 import { haptic } from '@/design/theme/platform';
 import { useTheme } from '@/design/theme/useTheme';
@@ -46,6 +47,8 @@ export type NotificationCardProps = {
   event?: NotificationCardEvent;
   /** "이벤트 감지" 배지 라벨. 미지정 시 배지를 그리지 않는다(문구는 props로만). */
   eventLabel?: string;
+  /** 이벤트 확신도. 있으면 ConfidenceBadge를 렌더한다(이슈 #5). */
+  confidenceLevel?: 'high' | 'low';
   /** 1~2개의 액션 버튼. design.md §24. */
   actions: NotificationCardAction[];
   /** 자동·수동 닫기 콜백. */
@@ -133,6 +136,7 @@ export function NotificationCard({
   body,
   event,
   eventLabel,
+  confidenceLevel,
   actions,
   onDismiss,
   autoHideAfter = DEFAULT_AUTO_HIDE_MS,
@@ -192,6 +196,7 @@ export function NotificationCard({
       body={body}
       event={event}
       eventLabel={eventLabel}
+      confidenceLevel={confidenceLevel}
       actions={actions}
     />
   );
@@ -236,6 +241,7 @@ type CardContentProps = {
   body: string;
   event?: NotificationCardEvent;
   eventLabel?: string;
+  confidenceLevel?: 'high' | 'low';
   actions: NotificationCardAction[];
 };
 
@@ -246,6 +252,7 @@ function CardContent({
   body,
   event,
   eventLabel,
+  confidenceLevel,
   actions,
 }: CardContentProps): ReactNode {
   const { colors } = useTheme();
@@ -277,7 +284,7 @@ function CardContent({
           </Text>
 
           {event ? (
-            <EventRow event={event} eventLabel={eventLabel} />
+            <EventRow event={event} eventLabel={eventLabel} confidenceLevel={confidenceLevel} />
           ) : null}
         </View>
       </View>
@@ -305,10 +312,11 @@ function CardContent({
 type EventRowProps = {
   event: NotificationCardEvent;
   eventLabel?: string;
+  confidenceLevel?: 'high' | 'low';
 };
 
-/** 이벤트 감지 시 캘린더 아이콘 + 날짜/장소 한 줄 + (eventLabel 있으면) accent 배지. */
-function EventRow({ event, eventLabel }: EventRowProps): ReactNode {
+/** 이벤트 감지 시 캘린더 아이콘 + 날짜/장소 한 줄 + (eventLabel 있으면) accent 배지 + 확신도 배지. */
+function EventRow({ event, eventLabel, confidenceLevel }: EventRowProps): ReactNode {
   const { colors } = useTheme();
   const whenWhere = [event.date, event.location].filter(Boolean).join(' ');
 
@@ -325,11 +333,14 @@ function EventRow({ event, eventLabel }: EventRowProps): ReactNode {
         </Text>
       </View>
 
-      {eventLabel ? (
-        <Badge tone="accent" variant="subtle">
-          {eventLabel}
-        </Badge>
-      ) : null}
+      <View style={styles.badgeRow}>
+        {eventLabel ? (
+          <Badge tone="accent" variant="subtle">
+            {eventLabel}
+          </Badge>
+        ) : null}
+        {confidenceLevel ? <ConfidenceBadge level={confidenceLevel} /> : null}
+      </View>
     </View>
   );
 }
@@ -379,6 +390,11 @@ const styles = StyleSheet.create({
   eventLine: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.xs,
   },
   eventText: {
