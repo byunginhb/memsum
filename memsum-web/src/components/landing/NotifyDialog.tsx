@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, X } from 'lucide-react';
 
+import { track } from '@/lib/analytics';
 import { SUPPORT_EMAIL } from '@/lib/site';
 import type { LandingCopy } from '@/lib/landing-copy';
 
@@ -132,6 +133,7 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
     setError(null);
     setFallback(false);
     setSubmitting(true);
+    track('notify_click', { locale: copy.isKorean ? 'ko' : 'en' });
     try {
       const res = await fetch('/api/notify', {
         method: 'POST',
@@ -143,6 +145,7 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
         }),
       });
       if (!res.ok) throw new Error('store_failed');
+      track('notify_success', { locale: copy.isKorean ? 'ko' : 'en' });
       setSubmitted(true);
     } catch {
       // 저장 실패 — 에러 + mailto 폴백 안내.

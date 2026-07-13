@@ -116,7 +116,12 @@ export type LandingCopy = {
 
   faq: {
     title: string;
-    items: readonly { q: string; a: string }[];
+    items: readonly {
+      q: string;
+      a: string;
+      /** 있으면 답변 아래 NotifyDialog를 여는 인라인 CTA 버튼을 렌더한다. */
+      ctaLabel?: string;
+    }[];
   };
 
   finalCta: {
@@ -157,6 +162,36 @@ export type LandingCopy = {
     mailtoSubject: string;
     /** {email} 토큰을 신청 주소로 치환. */
     mailtoBody: string;
+  };
+
+  /**
+   * 창작자 스토리 섹션 — 콜드스타트 신뢰 자산.
+   * 파운더 이름은 site.ts OPERATOR_NAME과 일치시킨다.
+   */
+  founder: {
+    name: string;
+    role: string;
+    /** "왜 만들었나" 1~3문장 인용. */
+    quote: string;
+    photoAlt: string;
+    /** 파운더 직접 문의 링크 레이블 — mailto:{SUPPORT_EMAIL}로 연결. */
+    contactCta: string;
+  };
+
+  /**
+   * 미스방지 서사 후기 섹션.
+   * 실제 후기 미확보 구간은 isExample:true로 라벨링(허위 후기 정책 준수).
+   */
+  testimonials: {
+    title: string;
+    /** 각 카드에 표시할 "경험 예시" / "Experience example" 배지 텍스트. */
+    exampleBadge: string;
+    items: readonly {
+      quote: string;
+      context: string;
+      /** true = 실제 후기 미확보 · 경험 예시 라벨 표시. */
+      isExample: boolean;
+    }[];
   };
 
   /**
@@ -363,7 +398,42 @@ const KO: LandingCopy = {
       },
       {
         q: '어떤 기기에서 되나요?',
-        a: 'Android는 지금 Google Play에서 받을 수 있어요. iOS는 준비 중이라, 출시 알림을 신청하면 가장 먼저 알려드려요.',
+        a: 'Android는 지금 Google Play에서 받을 수 있어요. iOS는 준비 중이에요.',
+        ctaLabel: 'iOS 출시 알림 신청',
+      },
+    ],
+  },
+
+  founder: {
+    name: 'Byungin Song',
+    role: '솔로 파운더 · Memsum 만든 사람',
+    quote:
+      '저도 스크린샷 1,800장을 쌓아두고 약속을 놓치던 사람이었어요. 대신 기억해줄 게 필요했고, 그래서 혼자 Memsum을 만들었어요.',
+    photoAlt: 'Memsum을 만든 Byungin Song',
+    contactCta: '만든 사람이 직접 답해드려요',
+  },
+
+  testimonials: {
+    title: '놓칠 뻔한 것들, 이렇게 막았어요',
+    exampleBadge: '경험 예시',
+    items: [
+      {
+        quote:
+          '카톡으로 받은 병원 예약을 캡처만 해뒀는데, 일요일 5줄에 떠서 안 까먹고 갔어요.',
+        context: '병원 예약 · 캘린더 미등록 상황',
+        isExample: true,
+      },
+      {
+        quote:
+          '택배 문자를 캡처했더니 운송장을 읽어서, 따로 확인하러 앱 들어갈 필요가 없었어요.',
+        context: '택배 추적 · 문자 캡처 후',
+        isExample: true,
+      },
+      {
+        quote:
+          '반년 전 찍어둔 할인 코드를 검색 한 번으로 찾았어요. 안 보던 스크린샷이 진짜 쓸모 있어졌어요.',
+        context: '할인 코드 · 검색 기능',
+        isExample: true,
       },
     ],
   },
@@ -393,7 +463,7 @@ const KO: LandingCopy = {
     openCta: '출시되면 가장 먼저 알림 받기',
     formTitle: '가장 먼저 써보세요',
     formDescription:
-      '출시되면 신청하신 분들께 제일 먼저 사용 기회를 드려요. 이메일만 남겨주시면 출시되는 날 바로 알려드릴게요.',
+      '만든 사람이 직접, 출시되는 날 한 통만 보내드려요. 이메일만 남겨주시면 스팸 없이 출시 알림 하나로 바로 알려드릴게요.',
     emailLabel: '이메일 주소',
     validationError: '올바른 이메일 주소를 입력해 주세요.',
     submit: '제일 먼저 써보기',
@@ -623,7 +693,42 @@ const EN: LandingCopy = {
       },
       {
         q: 'Which devices does it work on?',
-        a: 'Android is available now on Google Play. iOS is on the way — sign up for launch alerts and we\'ll let you know first.',
+        a: 'Android is available now on Google Play. iOS is on the way.',
+        ctaLabel: 'Sign up for iOS launch alerts',
+      },
+    ],
+  },
+
+  founder: {
+    name: 'Byungin Song',
+    role: 'Solo founder · built Memsum',
+    quote:
+      "I used to have 1,800 screenshots piled up and still missed appointments. I needed something to remember for me — so I built Memsum myself.",
+    photoAlt: 'Byungin Song, the person who made Memsum',
+    contactCta: 'I reply directly',
+  },
+
+  testimonials: {
+    title: "Things people almost missed — but didn't",
+    exampleBadge: 'Experience example',
+    items: [
+      {
+        quote:
+          "I'd only captured the appointment message, and it showed up in my Sunday 5 — I actually made it to the doctor.",
+        context: 'Doctor appointment · not added to calendar',
+        isExample: true,
+      },
+      {
+        quote:
+          'I screenshotted a delivery text and Memsum read the tracking number. No need to open a separate tracking app.',
+        context: 'Parcel tracking · after capturing SMS',
+        isExample: true,
+      },
+      {
+        quote:
+          "Found a discount code I'd saved six months ago with one search. Screenshots I'd only hoarded were suddenly useful.",
+        context: 'Discount code · search feature',
+        isExample: true,
       },
     ],
   },
@@ -653,7 +758,7 @@ const EN: LandingCopy = {
     openCta: 'Get notified at launch',
     formTitle: 'Be the first to use it',
     formDescription:
-      "When Memsum launches, people on this list get first access. Leave your email and we'll tell you the moment it's out.",
+      "I built Memsum myself, and I'll personally email you the day it launches — just one email, nothing else.",
     emailLabel: 'Email address',
     validationError: 'Please enter a valid email address.',
     submit: 'Get early access',

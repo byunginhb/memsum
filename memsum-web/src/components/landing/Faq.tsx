@@ -2,6 +2,7 @@ import { Minus, Plus } from 'lucide-react';
 
 import type { LandingCopy } from '@/lib/landing-copy';
 
+import { FaqNotifyCta } from './FaqNotifyCta';
 import { Reveal, RevealGroup } from './Reveal';
 
 /**
@@ -46,6 +47,11 @@ export function Faq({ copy }: { copy: LandingCopy }) {
                   <p className={`px-6 pb-5 text-base leading-relaxed ${bk} text-(--color-ink-soft)`}>
                     {item.a}
                   </p>
+                  {item.ctaLabel ? (
+                    <div className="px-6 pb-6">
+                      <FaqNotifyCta label={item.ctaLabel} />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </details>

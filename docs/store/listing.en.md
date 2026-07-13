@@ -85,9 +85,12 @@ PRIVACY
 - No ads.
 
 It's okay to forget. Memsum will remind you.
+
+WHO MADE THIS
+I built Memsum by myself. I used to have 1,800 screenshots piled up and still missed appointments — I needed something to remember for me. If anything feels off, email byunginhb@gmail.com and I'll reply directly.
 ```
 
-- (body length: ~1,250 chars — within 4,000)
+- (body length: ~1,470 chars — within 4,000)
 
 ---
 
