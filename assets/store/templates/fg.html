@@ -27,16 +27,28 @@
  .card .n small{font-size:22px;color:var(--ink);}
  .bar{height:8px;background:#EAE7FB;border-radius:99px;margin-top:14px;overflow:hidden;}
  .bar i{display:block;height:100%;width:60%;background:var(--lav);border-radius:99px;}
+ /* 임박 일정 카드 — 앱 UpcomingSection(coral 좌 4px + D-day)을 피처 그래픽 축소본으로. */
+ .up{margin-top:10px;background:#fff;border:1px solid #E4DFF4;border-left:4px solid var(--coral);
+   border-radius:16px;padding:14px 16px;}
+ .up .dd{font-weight:800;font-size:26px;color:var(--coral);line-height:1;letter-spacing:-.03em;}
+ .up .tt{font-weight:700;font-size:16px;margin-top:8px;letter-spacing:-.01em;}
+ .up .mm{font-family:var(--mono);font-size:11px;color:var(--slate);margin-top:5px;}
 </style></head>
 <body><div class="fg">
   <div class="left">
     <div class="logo"><div class="dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="wm">Memsum</div></div>
-    <div class="eyebrow">스크린샷 정리 · 캘린더 자동 · 주간 요약</div>
-    <h1><span class="b">찍기만 하세요.</span> <span class="t">Memsum이 알아서.<span class="dot"></span></span></h1>
-    <div class="sub">쌓이기만 하던 스크린샷을 읽어 정리하고, 일정은 캘린더에, 한 주는 5줄로.</div>
+    <div class="eyebrow">안 까먹게 · 캘린더로 · 일요일 5줄</div>
+    <h1><span class="b">까먹어도 괜찮아요.</span> <span class="t">Memsum이 기억해요.<span class="dot"></span></span></h1>
+    <div class="sub">스크린샷 속 약속을 대신 기억했다가, 놓치기 전에 캘린더와 일요일 5줄로 꺼내드려요.</div>
   </div>
   <div class="phone"><div class="screen">
     <div class="g">안녕하세요</div>
+    <div class="l">놓치면 안 돼요</div>
+    <div class="up">
+      <div class="dd">내일</div>
+      <div class="tt">정기검진 예약</div>
+      <div class="mm">06.24 WED · 10:30</div>
+    </div>
     <div class="l">THIS WEEK</div>
     <div class="card"><div class="n">24<small>장</small></div><div class="bar"><i></i></div></div>
   </div></div>

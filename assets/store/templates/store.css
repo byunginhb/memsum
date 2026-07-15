@@ -52,6 +52,23 @@ h1 .dot{display:inline-block;width:2vw;height:2vw;border-radius:50%;background:v
   margin-top:3vw;display:flex;align-items:center;gap:.9vw;}
 .s-label b{width:1.1vw;height:1.1vw;background:var(--lav);border-radius:.28vw;display:inline-block;}
 
+/* ── 홈 임박 일정("놓치면 안 돼요") — 앱 UpcomingSection 재현 ──
+   앱과 동일한 위계: 가장 임박 1건은 coral 좌 4px highlight + D-day 강조,
+   나머지는 elevated 간결 행. 홈 최상단(인사 바로 아래)에 온다. */
+.s-label.c b{background:var(--coral);}
+.up{margin-top:1.6vw;background:var(--card);border:.09vw solid var(--line);
+  border-left:.55vw solid var(--coral);border-radius:1.9vw;padding:2.2vw 2.4vw;
+  box-shadow:0 .9vw 2.6vw rgba(28,24,38,.07);}
+.up .dd{font-weight:800;font-size:4.6vw;color:var(--coral);line-height:1;letter-spacing:-.03em;}
+.up .tt{font-weight:700;font-size:2.6vw;margin-top:1.2vw;letter-spacing:-.01em;}
+.up .mm{font-family:var(--mono);font-size:1.8vw;color:var(--slate);margin-top:.8vw;}
+.up2{display:flex;align-items:center;gap:1.8vw;background:var(--card);border:.09vw solid var(--line);
+  border-radius:1.9vw;padding:1.8vw 2.2vw;margin-top:1.3vw;box-shadow:0 .55vw 1.6vw rgba(28,24,38,.05);}
+.up2 .dd{font-family:var(--mono);font-weight:700;font-size:2vw;color:var(--lav);flex-shrink:0;letter-spacing:.04em;}
+.up2 .bd{flex:1;}
+.up2 .tt{font-weight:700;font-size:2.2vw;letter-spacing:-.01em;}
+.up2 .mm{font-family:var(--mono);font-size:1.5vw;color:var(--mist);margin-top:.5vw;}
+
 /* 통계 카드 */
 .stat{margin-top:1.5vw;background:var(--card);border:.09vw solid var(--line);border-radius:2.2vw;
   padding:2.7vw 2.9vw;box-shadow:0 .8vw 2.2vw rgba(28,24,38,.06);}
