@@ -11,8 +11,11 @@
 //
 // 산출: assets/store/screenshots/{play,appstore}/{1..6}.png, assets/store/feature-graphic.png
 //
-// ⚠️ 피처 그래픽의 유일한 소스는 fg.html 이다. 예전 scripts/gen-feature-graphic.mjs(resvg)는
-//    구버전 디자인(단색 라벤더 + 워드마크)을 만들어 이 산출물을 덮어쓰므로 쓰지 말 것.
+// 피처 그래픽의 소스는 fg.html 하나다. 예전엔 gen-feature-graphic.mjs(resvg)가 같은 PNG를
+// 구버전 디자인으로 덮어쓰는 이원화 상태였어서, 그 스크립트를 지우고 여기로 합쳤다.
+//
+// ⚠️ appstore/(1290×2796)는 Play에 올리면 거부된다 — Play는 "긴 변 ≤ 짧은 변 × 2"를 요구하는데
+//    2.17배다. Play엔 play/(1080×1920, 1.78배)만 올릴 것.
 //
 // why 헤드리스 Chrome:
 // - 템플릿 치수가 전부 vw/vh라 뷰포트만 규격에 맞추면 두 해상도에서 비례가 유지된다.

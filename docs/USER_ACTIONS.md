@@ -210,7 +210,9 @@ eas build --profile production --platform all   # 스토어 빌드
 - **스크린샷 5종** `assets/store/screenshots/` (홈 대시보드·주간 리포트·이벤트 상세·캘린더 연결·설정). 시드 데이터로 캡처한 것이라 썸네일은 placeholder입니다.
 - ✅ **(2026-06-12 갱신) release 빌드 + 실제 데이터로 교체 완료** — 그대로 콘솔 업로드 가능.
   기기 프레임/캡션을 입힌 마케팅 버전은 선택 사항(원하시면 추후 제작).
-- 생성 스크립트: `node scripts/gen-icons.mjs`(아이콘), `node scripts/gen-feature-graphic.mjs`(피처 그래픽) — 색·문구 수정 시 재실행.
+- 생성 스크립트: `node scripts/gen-icons.mjs`(아이콘), `node scripts/gen-store-screenshots.mjs`(스크린샷 6종 + 피처 그래픽) — 색·문구 수정 시 재실행.
+  - 스토어 이미지의 소스는 `assets/store/templates/*.html`(`frame1~6` = 스크린샷, `fg.html` = 피처 그래픽). 카피를 고칠 땐 이 HTML을 고치고 스크립트를 다시 돌린다.
+  - `node scripts/gen-store-screenshots.mjs 1` 처럼 프레임만, `... fg` 로 피처 그래픽만 렌더할 수도 있다.
 
 ### ❗ 네이티브 재빌드 1회 필요 (아이콘·스플래시·secure-store 반영)
 브랜드 아이콘·라벤더 스플래시·캘린더 secure-store는 **네이티브 설정**이라 재빌드해야 실제 적용됩니다(JS 화면은 Metro로 즉시 반영).
