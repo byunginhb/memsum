@@ -17,11 +17,20 @@ import Photos
 public class PhotoLibraryWatcherModule: Module {
   private var observer: ScreenshotChangeObserver?
   // 이미 이벤트로 보낸 에셋 id(중복 발화 방지 — 옵저버/checkNow 경로 공용).
+  // sentOrder로 삽입 순서를 기억해 상한(maxSentIds) 초과 시 오래된 것부터 버린다(장기 세션 메모리 증가 방지).
   private var sentIds = Set<String>()
+  private var sentOrder: [String] = []
+  // checkNow는 최근 20건만 보므로 그보다 넉넉하면 재발화 위험이 없다(JS processedIds 300과 동급).
+  private static let maxSentIds = 300
+  // 임시 내보내기 파일 보존 시간. 업로드는 수 초~수십 초 안에 끝나므로 1시간이면 충분하다.
+  private static let tempFileMaxAge: TimeInterval = 60 * 60
   // 모듈 생성 시각. checkNow 캐치업은 이 이후 생성된 에셋만 회수한다
   // (앱 시작 때마다 과거 스크린샷을 재발화하는 것을 방지).
-  private let startDate = Date()
+  // stopWatching 후 다시 켜면 재시작 시각으로 당긴다(꺼져 있던 동안의 스크린샷은 회수하지 않음).
+  private var catchUpSince = Date()
+  private var stoppedByUser = false
   // 사진 권한 결과. startWatching이 권한 확정 전에 불리면 보류했다가 권한 후 시작한다.
+  // (권한 팝업은 JS가 requestPermission을 명시 호출할 때만 — 온보딩 전 자동 팝업 금지.)
   private var authorized = false
   private var startRequested = false
 
@@ -30,14 +39,29 @@ public class PhotoLibraryWatcherModule: Module {
     Events("onScreenshot")
 
     OnCreate {
-      // 권한만 확보한다. 옵저버 등록은 JS가 준비된 뒤 startWatching()에서 —
+      // 현재 권한 상태만 읽는다(팝업 없음). 옵저버 등록은 JS가 준비된 뒤 startWatching()에서 —
       // JS 로딩 중 발화된 이벤트가 sentIds만 채우고 유실되는 것을 막는다(checkNow 회수 보장).
-      self.requestAuthorization { granted in
+      self.authorized = Self.isGranted(PHPhotoLibrary.authorizationStatus(for: .readWrite))
+      // 이전 실행에서 남은 임시 파일 정리(그 실행의 업로드 큐는 이미 사라졌다).
+      DispatchQueue.global(qos: .utility).async {
+        Self.cleanupTempFiles(olderThan: 0)
+      }
+    }
+
+    // 현재 권한 상태(팝업 없음): granted | limited | denied | undetermined.
+    AsyncFunction("getPermissionStatus") { () -> String in
+      return Self.statusString(PHPhotoLibrary.authorizationStatus(for: .readWrite))
+    }
+
+    // 권한 요청(미결정이면 시스템 팝업). 온보딩/설정에서 JS가 명시적으로 호출한다.
+    AsyncFunction("requestPermission") { (promise: Promise) in
+      PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
         DispatchQueue.main.async {
-          self.authorized = granted
-          if granted && self.startRequested {
+          self.authorized = Self.isGranted(status)
+          if self.authorized && self.startRequested {
             self.startObservingIfNeeded()
           }
+          promise.resolve(Self.statusString(status))
         }
       }
     }
@@ -46,31 +70,96 @@ public class PhotoLibraryWatcherModule: Module {
     Function("startWatching") {
       DispatchQueue.main.async {
         self.startRequested = true
+        if self.stoppedByUser {
+          self.catchUpSince = Date()
+          self.stoppedByUser = false
+        }
+        // 설정 앱에서 권한을 바꾸고 돌아온 경우를 반영해 매번 다시 읽는다(팝업 없음).
+        self.authorized = Self.isGranted(PHPhotoLibrary.authorizationStatus(for: .readWrite))
         if self.authorized {
           self.startObservingIfNeeded()
         }
       }
     }
 
+    // 감지 중지(설정 OFF): 옵저버 해제. 다시 켜면 startWatching이 새 기준 fetch로 재등록한다.
+    Function("stopWatching") {
+      DispatchQueue.main.async {
+        self.startRequested = false
+        self.stoppedByUser = true
+        self.stopObserving()
+      }
+    }
+
+    // 딥링크 토큰은 Android 질문 알림 전용 — iOS에는 해당 경로가 없어 항상 거부한다.
+    Function("consumeAskToken") { (_: String) -> Bool in
+      return false
+    }
+
     // 캐치업: JS 리스너 등록 직후·포그라운드 복귀 시 호출해, 리스너가 없던 동안
     // (JS 번들 로딩 중·앱 서스펜드 중) 추가된 스크린샷을 회수한다.
     Function("checkNow") {
-      self.emitRecentAssets()
+      // 메인 큐로 직렬화: 직전 startWatching(메인 비동기)의 상태 갱신 뒤에 실행되게 한다.
+      DispatchQueue.main.async {
+        guard self.startRequested, self.authorized else { return }
+        self.emitRecentAssets()
+      }
     }
 
     OnDestroy {
       // 옵저버 해제 필수 (메모리 누수 방지).
-      if let observer = self.observer {
-        PHPhotoLibrary.shared().unregisterChangeObserver(observer)
-      }
-      self.observer = nil
+      self.stopObserving()
     }
   }
 
-  // 권한 요청은 별도 함수로 분리.
-  private func requestAuthorization(_ completion: @escaping (Bool) -> Void) {
-    PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-      completion(status == .authorized || status == .limited)
+  private static func isGranted(_ status: PHAuthorizationStatus) -> Bool {
+    return status == .authorized || status == .limited
+  }
+
+  private static func statusString(_ status: PHAuthorizationStatus) -> String {
+    switch status {
+    case .authorized: return "granted"
+    case .limited: return "limited"
+    case .notDetermined: return "undetermined"
+    default: return "denied"
+    }
+  }
+
+  private func stopObserving() {
+    if let observer = self.observer {
+      PHPhotoLibrary.shared().unregisterChangeObserver(observer)
+    }
+    self.observer = nil
+  }
+
+  // 발화 기록 + FIFO 상한.
+  private func rememberSent(_ id: String) {
+    sentIds.insert(id)
+    sentOrder.append(id)
+    if sentOrder.count > Self.maxSentIds {
+      let evicted = sentOrder.removeFirst()
+      sentIds.remove(evicted)
+    }
+  }
+
+  private static var tempDirectory: URL {
+    return FileManager.default.temporaryDirectory
+      .appendingPathComponent("memsum-screenshots", isDirectory: true)
+  }
+
+  // 임시 내보내기 파일 중 maxAge보다 오래된 것을 지운다(0이면 전부). 실패는 무시(다음 기회에 재시도).
+  private static func cleanupTempFiles(olderThan maxAge: TimeInterval) {
+    let fm = FileManager.default
+    guard let files = try? fm.contentsOfDirectory(
+      at: tempDirectory, includingPropertiesForKeys: [.contentModificationDateKey]
+    ) else { return }
+    let now = Date()
+    for file in files {
+      let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+        .contentModificationDate ?? .distantPast
+      if now.timeIntervalSince(modified) >= maxAge {
+        try? fm.removeItem(at: file)
+      }
     }
   }
 
@@ -112,10 +201,10 @@ public class PhotoLibraryWatcherModule: Module {
     PHPhotoLibrary.shared().register(observer)
   }
 
-  // startDate 이후 생성된 감지 대상 에셋을 조회해 미발화분만 발화한다(checkNow 경로).
+  // catchUpSince 이후 생성된 감지 대상 에셋을 조회해 미발화분만 발화한다(checkNow 경로).
   private func emitRecentAssets() {
     let options = PHFetchOptions()
-    let datePredicate = NSPredicate(format: "creationDate > %@", startDate as NSDate)
+    let datePredicate = NSPredicate(format: "creationDate > %@", catchUpSince as NSDate)
     if let eligibility = eligibilityPredicate() {
       options.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
         eligibility, datePredicate,
@@ -131,10 +220,7 @@ public class PhotoLibraryWatcherModule: Module {
     let fetch = PHAsset.fetchAssets(with: .image, options: options)
     var assets: [PHAsset] = []
     fetch.enumerateObjects { asset, _, _ in assets.append(asset) }
-
-    DispatchQueue.main.async {
-      self.emitAssets(assets)
-    }
+    emitAssets(assets)
   }
 
   // 미발화 에셋만 임시 파일로 내보낸 뒤 onScreenshot 이벤트를 보낸다. 메인 큐에서 호출.
@@ -142,7 +228,7 @@ public class PhotoLibraryWatcherModule: Module {
     for asset in assets {
       let id = asset.localIdentifier
       guard !sentIds.contains(id) else { continue }
-      sentIds.insert(id)
+      rememberSent(id)
 
       exportToTempFile(asset) { [weak self] uri in
         var payload: [String: Any] = [
@@ -172,9 +258,10 @@ public class PhotoLibraryWatcherModule: Module {
         completion(nil)
         return
       }
+      // 새 파일을 쓰기 전에 오래된 임시 파일을 정리한다(업로드 끝난 파일이 tmp에 쌓이지 않게).
+      Self.cleanupTempFiles(olderThan: Self.tempFileMaxAge)
       do {
-        let dir = FileManager.default.temporaryDirectory
-          .appendingPathComponent("memsum-screenshots", isDirectory: true)
+        let dir = Self.tempDirectory
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let ext = Self.fileExtension(for: dataUTI)
         let fileURL = dir.appendingPathComponent(UUID().uuidString + "." + ext)

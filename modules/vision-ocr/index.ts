@@ -7,7 +7,23 @@ export type OcrResult = {
   text: string;
   /** 0~1 평균 신뢰도. 플랫폼이 제공하지 않으면 생략. */
   confidence?: number;
+  /**
+   * 줄 단위 글자 위치. 좌표는 이미지 대비 0~1 비율, 좌상단 원점.
+   * 구버전 네이티브(필드 없음)를 위해 선택 필드다.
+   */
+  lines?: OcrLine[];
 };
+
+/** 0~1 정규화 사각형(좌상단 원점). */
+export type OcrBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** 인식된 한 줄과 그 위치. */
+export type OcrLine = OcrBox & { text: string };
 
 declare class VisionOcrModule {
   /** iOS: PHAsset localIdentifier 로 이미지 로드 후 OCR. */

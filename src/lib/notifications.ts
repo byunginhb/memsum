@@ -50,11 +50,12 @@ async function ensureChannels(): Promise<void> {
   }
   try {
     await Notifications.setNotificationChannelAsync(CHANNEL_WEEKLY, {
-      name: '주간 리포트',
+      // 채널 이름은 안드로이드 알림 설정 화면에 그대로 보이므로 기기 언어를 따른다.
+      name: t('weeklyNotif.channelName'),
       importance: Notifications.AndroidImportance.HIGH,
     });
     await Notifications.setNotificationChannelAsync(CHANNEL_PARCEL, {
-      name: '택배 상태',
+      name: t('push.parcel.channelName'),
       importance: Notifications.AndroidImportance.HIGH,
     });
     channelReady = true;

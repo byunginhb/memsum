@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { t } from '@/i18n';
 import { getWeeklyReport, submitFeedback } from '@/lib/weekly-report';
 import { useCaptureStore } from '@/stores/capture-store';
 
@@ -49,8 +50,9 @@ export function useWeeklyReport(weekStart?: string): UseWeeklyReportResult {
       setReport(next);
     } catch (err) {
       if (!mountedRef.current) return;
-      const message =
-        err instanceof Error ? err.message : '리포트를 불러오지 못했습니다.';
+      // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+      console.error('[use-weekly-report] 리포트 로드 실패:', err);
+      const message = t('common.error.load');
       setError(message);
     } finally {
       if (mountedRef.current) setIsLoading(false);
@@ -104,8 +106,9 @@ export function useWeeklyReport(weekStart?: string): UseWeeklyReportResult {
             ),
           };
         });
-        const message =
-          err instanceof Error ? err.message : '피드백 저장에 실패했습니다.';
+        // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+        console.error('[use-weekly-report] 피드백 저장 실패:', err);
+        const message = t('common.error.save');
         setError(message);
       } finally {
         feedbackInFlightRef.current.delete(captureId);

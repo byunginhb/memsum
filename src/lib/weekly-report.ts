@@ -12,6 +12,7 @@
 
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
+import { preview } from '@/dev/preview';
 import type {
   ReportFeedback,
   WeeklyReport,
@@ -170,6 +171,7 @@ async function normalizeReport(raw: unknown): Promise<WeeklyReport> {
  * @throws 세션이 없거나, 함수가 오류를 반환하거나, 응답 형식이 어긋날 때.
  */
 export async function getWeeklyReport(weekStart?: string): Promise<WeeklyReport> {
+  if (preview) return preview.report;
   const supabase = getSupabase();
 
   // invoke가 자동 첨부하는 JWT가 이 세션에서 온다. 사전 확인으로 명확한 메시지 제공.
@@ -226,6 +228,7 @@ export async function submitFeedback(
   captureId: string,
   rating: Exclude<ReportFeedback, null>,
 ): Promise<void> {
+  if (preview) return;
   const supabase = getSupabase();
 
   const {

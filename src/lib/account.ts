@@ -6,13 +6,16 @@
 //
 // 삭제 대상(모두 본인 것만 — RLS + 명시 user_id 필터로 이중 보장):
 //   - Storage: captures-raw/{userId}/ 아래 모든 이미지 객체
-//   - DB: report_feedback → weekly_reports → captures (FK on delete cascade가 있으나
-//         순서 의존을 없애기 위해 명시적으로 자식부터 지운다)
+//   - DB: report_feedback → weekly_reports → parcel_tracks → captures → user_profiles
+//         (FK on delete cascade가 있으나 순서 의존을 없애기 위해 명시적으로 자식부터 지운다)
+//   - 로컬: 택배 목록(parcel-store)·닉네임(settings-store) — 서버를 비워도 화면에 남지 않게
 //
 // 익명 인증이라 auth.users 행 자체는 클라이언트에서 지울 수 없다(관리자 권한 필요).
 // 데이터는 모두 비워지고, 세션(빈 익명 계정)은 유지된다.
 
 import { getSupabase } from '@/lib/supabase';
+import { useParcelStore } from '@/stores/parcel-store';
+import { useSettingsStore } from '@/stores/settings-store';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -26,10 +29,18 @@ const STORAGE_LIST_PAGE = 100;
 const STORAGE_REMOVE_BATCH = 100;
 
 /**
- * 삭제 대상 테이블. 자식(피드백) → 부모(리포트·캡처) 순.
- * 모두 user_id 컬럼을 가지며 RLS(auth.uid() = user_id)로 본인 행만 노출된다.
+ * 삭제 대상 테이블과 소유자 컬럼. 자식(피드백) → 부모(리포트·택배·캡처) → 프로필 순.
+ * RLS(auth.uid() = 소유자 컬럼)로 본인 행만 노출된다.
+ * user_profiles만 PK(id)가 곧 auth.users id라 소유자 컬럼이 id다(0001_init.sql).
  */
-const TABLES_TO_CLEAR = ['report_feedback', 'weekly_reports', 'captures'] as const;
+const TABLES_TO_CLEAR = [
+  { table: 'report_feedback', ownerColumn: 'user_id' },
+  { table: 'weekly_reports', ownerColumn: 'user_id' },
+  // capture_id FK가 set null이라 captures보다 먼저 지워 불필요한 갱신을 피한다.
+  { table: 'parcel_tracks', ownerColumn: 'user_id' },
+  { table: 'captures', ownerColumn: 'user_id' },
+  { table: 'user_profiles', ownerColumn: 'id' },
+] as const;
 
 // ── 내부 유틸 ─────────────────────────────────────────────────────────────────
 
@@ -91,7 +102,7 @@ async function removeStorageObjects(paths: string[]): Promise<void> {
 // ── 공개 API ──────────────────────────────────────────────────────────────────
 
 /**
- * 사용자의 모든 캡처 데이터(이미지·캡처·리포트·피드백)를 영구 삭제한다.
+ * 사용자의 모든 데이터(이미지·캡처·리포트·피드백·택배·프로필)를 영구 삭제한다.
  *
  * Storage 객체를 먼저 지워 DB 행이 남아도 고아 이미지를 남기지 않는다.
  * 이어서 DB 행을 자식→부모 순으로 지운다. 각 delete는 user_id로 본인 한정한다
@@ -112,12 +123,16 @@ export async function deleteAllUserData(userId: string): Promise<void> {
     await removeStorageObjects(paths);
 
     // 2) DB 행 삭제(자식 → 부모 순). 모두 본인(user_id) 한정.
-    for (const table of TABLES_TO_CLEAR) {
-      const { error } = await supabase.from(table).delete().eq('user_id', userId);
+    for (const { table, ownerColumn } of TABLES_TO_CLEAR) {
+      const { error } = await supabase.from(table).delete().eq(ownerColumn, userId);
       if (error) {
         throw new Error(`${table} 삭제 실패: ${error.message}`);
       }
     }
+
+    // 3) 로컬 상태 초기화 — 서버가 비었는데 택배 목록·닉네임이 화면에 남지 않게.
+    useParcelStore.setState({ tracks: [] });
+    useSettingsStore.getState().setNickname('');
   } catch (error) {
     const message =
       error instanceof Error

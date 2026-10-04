@@ -9,6 +9,7 @@
 // (supabase/functions/process-capture/index.ts: { ocr_text, source_platform, image_url?, capture_id? }).
 
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import { getCalendars } from 'expo-localization';
 
 import type {
   ProcessCaptureInput,
@@ -23,31 +24,79 @@ import { getSupabase } from '@/lib/supabase';
 /** 호출할 Edge Function 이름. */
 const FUNCTION_NAME = 'process-capture';
 
+// ── 오류 ─────────────────────────────────────────────────────────────────────
+
+/**
+ * process-capture가 돌려주는 일반화된 오류 코드(서버는 원문을 로그에만 남긴다).
+ * network: 응답 자체를 못 받음 / invalid_response: 응답 형식 불일치 / unknown: 미분류.
+ */
+export type ProcessCaptureErrorCode =
+  | 'unauthorized'
+  | 'bad_request'
+  | 'forbidden_image_path'
+  | 'rate_limited'
+  | 'server_misconfigured'
+  | 'processing_failed'
+  | 'network'
+  | 'invalid_response'
+  | 'unknown';
+
+const KNOWN_SERVER_CODES: ReadonlySet<string> = new Set([
+  'unauthorized',
+  'bad_request',
+  'forbidden_image_path',
+  'rate_limited',
+  'server_misconfigured',
+  'processing_failed',
+]);
+
+/** 화면은 code로 문구를 고른다(message는 로그용 — 사용자에게 노출하지 않는다). */
+export class ProcessCaptureError extends Error {
+  readonly code: ProcessCaptureErrorCode;
+
+  constructor(code: ProcessCaptureErrorCode) {
+    super(`process-capture 실패: ${code}`);
+    this.name = 'ProcessCaptureError';
+    this.code = code;
+  }
+}
+
 // ── 내부 유틸 ─────────────────────────────────────────────────────────────────
 
 /**
- * Edge Function이 non-2xx로 반환한 본문에서 { error } 메시지를 추출한다.
- *
- * 왜: invoke는 non-2xx 시 error를 FunctionsHttpError로 주고 실제 메시지는
- * Response(context) 본문에 들어 있다. 이를 풀어 사용자에게 원인을 표면화한다.
+ * invoke 오류 → 오류 코드. non-2xx면 본문 { error: code }를, 그 외(연결 실패 등)는 network.
  */
-async function extractFunctionErrorMessage(error: unknown): Promise<string> {
+async function toProcessCaptureError(error: unknown): Promise<ProcessCaptureError> {
   if (error instanceof FunctionsHttpError) {
     try {
       const body = await error.context.json();
-      if (body && typeof body.error === 'string' && body.error.length > 0) {
-        return body.error;
+      if (body && typeof body.error === 'string' && KNOWN_SERVER_CODES.has(body.error)) {
+        return new ProcessCaptureError(body.error as ProcessCaptureErrorCode);
       }
     } catch {
-      // 본문이 JSON이 아니거나 비어 있으면 아래 기본 메시지로 폴백.
+      // 본문이 JSON이 아니거나 비어 있으면 unknown.
     }
-    return 'process-capture 처리 중 서버 오류가 발생했습니다.';
+    return new ProcessCaptureError('unknown');
   }
+  return new ProcessCaptureError('network');
+}
 
-  if (error instanceof Error) {
-    return error.message;
+/**
+ * 기기 시간대(IANA, 예 "Asia/Seoul"). 서버가 "내일 3시" 같은 상대 일정을 이 기준으로 해석한다.
+ * 얻지 못하면 undefined — 서버 기본값(Asia/Seoul)을 쓴다.
+ */
+function deviceTimeZone(): string | undefined {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (typeof zone === 'string' && zone.length > 0) return zone;
+  } catch {
+    // Intl 시간대 미지원 엔진 — 아래 expo-localization으로 대체.
   }
-  return 'process-capture 호출에 실패했습니다.';
+  try {
+    return getCalendars()[0]?.timeZone ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -56,12 +105,12 @@ async function extractFunctionErrorMessage(error: unknown): Promise<string> {
  */
 function normalizeResult(raw: unknown): ProcessCaptureResult {
   if (typeof raw !== 'object' || raw === null) {
-    throw new Error('process-capture 응답이 비어 있거나 형식이 올바르지 않습니다.');
+    throw new ProcessCaptureError('invalid_response');
   }
   const obj = raw as Record<string, unknown>;
 
   if (typeof obj.capture_id !== 'string' || obj.capture_id.length === 0) {
-    throw new Error('process-capture 응답에 capture_id가 없습니다.');
+    throw new ProcessCaptureError('invalid_response');
   }
 
   let event: CaptureEvent | null = null;
@@ -95,7 +144,7 @@ function normalizeResult(raw: unknown): ProcessCaptureResult {
 /**
  * process-capture Edge Function을 호출해 OCR 텍스트를 후처리한다.
  *
- * @throws 세션이 없거나(미인증), 함수가 오류를 반환하거나, 응답 형식이 어긋날 때.
+ * @throws ProcessCaptureError — 세션 없음(unauthorized)·서버 오류 코드·응답 형식 불일치.
  */
 export async function processCapture(
   input: ProcessCaptureInput,
@@ -109,12 +158,9 @@ export async function processCapture(
     error: sessionError,
   } = await supabase.auth.getSession();
 
-  if (sessionError) {
-    console.error('[api] 세션 조회 실패:', sessionError.message);
-    throw new Error('세션 확인에 실패했습니다. 다시 로그인해 주세요.');
-  }
-  if (!session) {
-    throw new Error('로그인 세션이 없습니다. 먼저 인증이 필요합니다.');
+  if (sessionError || !session) {
+    console.error('[api] 세션 없음/조회 실패:', sessionError?.message);
+    throw new ProcessCaptureError('unauthorized');
   }
 
   try {
@@ -123,28 +169,25 @@ export async function processCapture(
       {
         // snake_case 계약(process-capture/index.ts). invoke가 Record를 JSON 직렬화한다.
         // locale: 앱 언어를 넘겨 title·summary를 사용자 언어로 생성하게 한다(기본 ko).
+        // time_zone: 상대 날짜("내일 3시") 해석 기준. 해외 사용자 일정이 KST로 틀어지던 문제.
         body: {
           ocr_text: input.ocrText,
           source_platform: input.sourcePlatform,
           image_url: input.imageUrl,
           capture_id: input.captureId,
           locale: getLocale(),
+          time_zone: deviceTimeZone(),
         },
       },
     );
 
     if (error) {
-      const message = await extractFunctionErrorMessage(error);
-      throw new Error(message);
+      throw await toProcessCaptureError(error);
     }
 
     return normalizeResult(data);
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'process-capture 호출 중 알 수 없는 오류가 발생했습니다.';
-    console.error('[api] processCapture 실패:', message);
-    throw new Error(message);
+    console.error('[api] processCapture 실패:', error);
+    throw error instanceof ProcessCaptureError ? error : new ProcessCaptureError('unknown');
   }
 }

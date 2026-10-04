@@ -156,3 +156,16 @@ export async function getSignedUrl(
     throw new Error(message);
   }
 }
+
+/**
+ * 업로드한 캡처 이미지를 지운다 — 서버 저장 전에 중단된 캡처(빈 OCR 건너뜀 등)의 고아 객체 정리용.
+ *
+ * @param path uploadCaptureImage가 반환한 버킷 제외 상대 경로({userId}/{captureId}.jpg).
+ */
+export async function removeCaptureImage(path: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.storage.from(BUCKET).remove([path]);
+  if (error) {
+    throw new Error(`Storage 삭제 실패: ${error.message}`);
+  }
+}

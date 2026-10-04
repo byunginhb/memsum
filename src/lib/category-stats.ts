@@ -11,6 +11,7 @@
 // 조회는 익명 세션 + RLS("own captures": auth.uid() = user_id)에 의존한다.
 // 세션이 없으면 RLS가 0을 돌려주므로 빈 배열이 정상 동작(에러 아님)이다.
 
+import { preview } from '@/dev/preview';
 import type { CategoryGroup } from '@/features/home/types';
 import { CATEGORY_KEYS } from '@/lib/categories';
 import { getSupabase } from '@/lib/supabase';
@@ -24,6 +25,7 @@ import { getSupabase } from '@/lib/supabase';
  * - 실패 시 throw(호출 측 훅에서 graceful 처리).
  */
 export async function listCategoryGroups(): Promise<CategoryGroup[]> {
+  if (preview) return [...preview.categoryGroups];
   const supabase = getSupabase();
 
   try {

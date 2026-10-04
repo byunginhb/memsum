@@ -21,20 +21,37 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
+import {
+  localIsoWithOffset,
+  resolveTimeZone,
+  utcOffset,
+} from "../_shared/time-zone.ts";
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = "gpt-4o-mini";
 
-// 지수 백오프: 1s, 2s, 4s, 8s, 16s — 최대 5회 (기능명세 §7.2).
-const BACKOFF_DELAYS_MS = [1000, 2000, 4000, 8000, 16000] as const;
+// 지수 백오프: 1s, 2s, 4s, 8s — 최대 5회 시도 (기능명세 §7.2).
+// 마지막 시도 뒤에는 대기하지 않으므로 대기 간격은 시도 수 - 1개다.
+const MAX_ATTEMPTS = 5;
+const BACKOFF_DELAYS_MS = [1000, 2000, 4000, 8000] as const;
 
 // OpenAI 단일 호출 타임아웃. 백오프 누적 대기와 별개로 무한 대기를 막는다.
-const OPENAI_TIMEOUT_MS = 30000;
+const OPENAI_TIMEOUT_MS = 20000;
 
-// KST. starts_at/ends_at 해석 기준 타임존을 프롬프트에 명시한다.
-const TIMEZONE = "Asia/Seoul";
+// 재시도 포함 OpenAI 처리 총 예산. 앱은 업로드·OCR 포함 90초에 파이프라인을 포기하므로
+// (src/hooks/use-auto-capture.ts PIPELINE_TIMEOUT_MS, 헤드리스 태스크 90s), 서버가 그보다
+// 오래 붙잡으면 앱은 실패로 처리하는데 서버는 뒤늦게 저장하는 불일치가 생긴다.
+const OPENAI_TOTAL_BUDGET_MS = 60000;
+
+// OCR 원문 길이 상한(자). 긴 문서 캡처가 토큰 비용을 폭증시키지 않도록 앞부분만 보낸다.
+const MAX_OCR_TEXT_LENGTH = 8000;
+
+// 사용자별 하루 process-capture 호출 상한(비용 폭탄 방지). 20261004120000_usage_limits 마이그레이션의
+// consume_daily_usage()가 원자적으로 센다. 정상 사용(하루 수십 장)보다 넉넉하게.
+const DAILY_CAPTURE_LIMIT = 200;
+const USAGE_KIND = "process-capture";
 
 // 캡처 카테고리 6종. DB check 제약(0005_category.sql)·src/lib/categories.ts와 동일.
 // 단일 진실은 클라이언트 categories.ts지만, Deno↔RN 경계라 여기 의도적으로 복제한다.
@@ -69,6 +86,8 @@ interface ProcessCaptureBody {
   readonly image_url?: string;
   readonly source_platform: SourcePlatform;
   readonly locale: Locale;
+  /** IANA 시간대(검증 완료). 미지정·이상값이면 Asia/Seoul. */
+  readonly time_zone: string;
 }
 
 interface ExtractedEvent {
@@ -110,6 +129,7 @@ function parseBody(raw: unknown): ProcessCaptureBody {
   const body = raw as Record<string, unknown>;
 
   if (typeof body.ocr_text !== "string" || body.ocr_text.trim().length === 0) {
+    // 클라이언트는 빈 OCR을 보내지 않고 "건너뜀" 처리한다(capture-store). 여기는 방어선.
     throw new Error("ocr_text는 비어 있지 않은 문자열이어야 합니다.");
   }
   if (body.source_platform !== "ios" && body.source_platform !== "android") {
@@ -125,7 +145,9 @@ function parseBody(raw: unknown): ProcessCaptureBody {
   const locale: Locale = body.locale === "en" ? "en" : DEFAULT_LOCALE;
 
   return {
-    ocr_text: body.ocr_text,
+    // 상한 초과분은 잘라낸다(거절하지 않음 — 긴 캡처도 앞부분으로 충분히 정리된다).
+    ocr_text: body.ocr_text.slice(0, MAX_OCR_TEXT_LENGTH),
+    time_zone: resolveTimeZone(body.time_zone),
     source_platform: body.source_platform,
     capture_id: body.capture_id as string | undefined,
     image_url: body.image_url as string | undefined,
@@ -133,16 +155,32 @@ function parseBody(raw: unknown): ProcessCaptureBody {
   };
 }
 
+// image_url(버킷 제외 상대 경로)이 "{userId}/파일" 형태인지. 상위 경로(..)·중첩 폴더 거부.
+function isOwnImagePath(path: string, userId: string): boolean {
+  const prefix = `${userId}/`;
+  if (!path.startsWith(prefix)) return false;
+  const rest = path.slice(prefix.length);
+  return rest.length > 0 && !rest.includes("/") && !rest.includes("..");
+}
+
 // ── OpenAI 후처리 ─────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(nowIso: string, locale: Locale): string {
+// 프롬프트 시간 기준: 사용자 기기 시간대의 현재 시각과 그 UTC 오프셋.
+interface TimeContext {
+  readonly nowIso: string;
+  readonly timeZone: string;
+  readonly offset: string;
+}
+
+function buildSystemPrompt(time: TimeContext, locale: Locale): string {
   // 왜: 모델이 상대 날짜("다음 주 화")를 절대 시각으로 변환하려면 기준 현재 시각이 필요하다.
   if (locale === "en") {
-    return buildSystemPromptEn(nowIso);
+    return buildSystemPromptEn(time);
   }
+  const { nowIso, timeZone, offset } = time;
   return [
     "당신은 한국어 스크린샷 OCR 텍스트를 정제하고 일정 이벤트를 추출하는 어시스턴트입니다.",
-    `현재 시각은 ${nowIso} (${TIMEZONE}, KST) 입니다. 모든 상대 날짜·시간은 이 기준으로 해석합니다.`,
+    `현재 시각은 ${nowIso} (${timeZone}, UTC${offset}) 입니다. 모든 상대 날짜·시간은 이 기준으로 해석합니다.`,
     "",
     "입력으로 거친 OCR 텍스트가 주어집니다. 다음을 수행하세요:",
     "1. 오타·띄어쓰기·줄바꿈을 교정한 정제 텍스트(clean_text)를 만듭니다. 원문에 없는 내용을 추가하지 않습니다.",
@@ -157,7 +195,7 @@ function buildSystemPrompt(nowIso: string, locale: Locale): string {
     "   - etc: 위 어디에도 명확히 속하지 않는 기타",
     "",
     "한국식 날짜·시간 표현을 해석합니다. 예: '다음 주 화 오후 2시', '6/15 토 14시', '내일 오전 10시 반'.",
-    `starts_at·ends_at은 ISO8601 형식이며 KST 오프셋(+09:00)을 포함합니다. 예: '2026-06-15T14:00:00+09:00'.`,
+    `starts_at·ends_at은 ISO8601 형식이며 ${timeZone} 오프셋(${offset})을 포함합니다. 예: '2026-06-15T14:00:00${offset}'.`,
     "종료 시각이 명시되지 않으면 ends_at은 null, 장소가 없으면 location은 null 입니다.",
     "",
     "반드시 아래 JSON 스키마로만 응답합니다. 그 외 텍스트를 출력하지 않습니다:",
@@ -172,10 +210,11 @@ function buildSystemPrompt(nowIso: string, locale: Locale): string {
 }
 
 // 영어 사용자용 프롬프트. clean_text는 원문 언어를 보존하되, title·summary는 자연스러운 영어로.
-function buildSystemPromptEn(nowIso: string): string {
+function buildSystemPromptEn(time: TimeContext): string {
+  const { nowIso, timeZone, offset } = time;
   return [
     "You are an assistant that cleans up OCR text from screenshots and extracts calendar events.",
-    `The current time is ${nowIso} (${TIMEZONE}, KST). Interpret all relative dates and times against this reference.`,
+    `The current time is ${nowIso} (${timeZone}, UTC${offset}). Interpret all relative dates and times against this reference.`,
     "",
     "You are given raw OCR text. Do the following:",
     "1. Produce cleaned text (clean_text) with typos, spacing, and line breaks fixed. Keep clean_text in the SAME language as the source text. Never add anything not in the original.",
@@ -190,7 +229,7 @@ function buildSystemPromptEn(nowIso: string): string {
     "   - etc: anything that doesn't clearly fit the above",
     "",
     "Interpret everyday date/time expressions. Examples: 'next Tue 2pm', '6/15 Sat 14:00', 'tomorrow at 10:30am'.",
-    "starts_at and ends_at are ISO8601 with the KST offset (+09:00). Example: '2026-06-15T14:00:00+09:00'.",
+    `starts_at and ends_at are ISO8601 with the ${timeZone} offset (${offset}). Example: '2026-06-15T14:00:00${offset}'.`,
     "If no end time is given, ends_at is null; if no location is given, location is null.",
     "",
     "Respond ONLY with the JSON schema below. Output no other text:",
@@ -248,11 +287,12 @@ function normalizeOpenAiResult(parsed: unknown, fallbackText: string): OpenAiRes
 async function callOpenAiOnce(
   apiKey: string,
   ocrText: string,
-  nowIso: string,
+  time: TimeContext,
   locale: Locale,
+  timeoutMs: number,
 ): Promise<OpenAiResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(OPENAI_CHAT_URL, {
@@ -266,7 +306,7 @@ async function callOpenAiOnce(
         response_format: { type: "json_object" },
         temperature: 0.2,
         messages: [
-          { role: "system", content: buildSystemPrompt(nowIso, locale) },
+          { role: "system", content: buildSystemPrompt(time, locale) },
           { role: "user", content: ocrText },
         ],
       }),
@@ -307,26 +347,38 @@ async function callOpenAiOnce(
   }
 }
 
-// 지수 백오프(1,2,4,8,16s) 재시도. 마지막 시도 실패 시 마지막 오류를 throw.
+// 지수 백오프(1,2,4,8s) 재시도 — 총 예산(OPENAI_TOTAL_BUDGET_MS) 안에서만.
+// 단일 호출 타임아웃도 남은 예산으로 줄여, 전체가 예산을 넘지 않게 한다.
 async function callOpenAiWithRetry(
   apiKey: string,
   ocrText: string,
-  nowIso: string,
+  time: TimeContext,
   locale: Locale,
 ): Promise<OpenAiResult> {
   let lastError: unknown;
+  const deadline = Date.now() + OPENAI_TOTAL_BUDGET_MS;
 
-  for (let attempt = 0; attempt < BACKOFF_DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const remaining = deadline - Date.now();
     try {
-      return await callOpenAiOnce(apiKey, ocrText, nowIso, locale);
+      return await callOpenAiOnce(
+        apiKey,
+        ocrText,
+        time,
+        locale,
+        Math.min(OPENAI_TIMEOUT_MS, remaining),
+      );
     } catch (error) {
       lastError = error;
       const retryable = (error as Error & { retryable?: boolean }).retryable === true;
-      const isLastAttempt = attempt === BACKOFF_DELAYS_MS.length - 1;
-      if (!retryable || isLastAttempt) {
+      const isLastAttempt = attempt === MAX_ATTEMPTS - 1;
+      const delay = BACKOFF_DELAYS_MS[Math.min(attempt, BACKOFF_DELAYS_MS.length - 1)];
+      // 대기 후 의미 있는 시도(최소 1회 대기 시간만큼)를 할 예산이 없으면 지금 포기한다.
+      const outOfBudget = deadline - Date.now() < delay * 2;
+      if (!retryable || isLastAttempt || outOfBudget) {
         throw error;
       }
-      await sleep(BACKOFF_DELAYS_MS[attempt]);
+      await sleep(delay);
     }
   }
 
@@ -344,13 +396,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response("ok", { headers: corsHeaders });
   }
   if (req.method !== "POST") {
-    return errorResponse("POST 메서드만 지원합니다.", 405);
+    return errorResponse("method_not_allowed", 405);
   }
 
   // 인증: Authorization 헤더를 그대로 Supabase 클라이언트에 전달해 RLS 컨텍스트 유지.
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return errorResponse("인증 토큰이 없습니다.", 401);
+    return errorResponse("unauthorized", 401);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -358,16 +410,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const openAiKey = Deno.env.get("OPENAI_API_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return errorResponse(
-      "서버 설정 오류: SUPABASE_URL/SUPABASE_ANON_KEY가 설정되지 않았습니다.",
-      500,
-    );
+    console.error("[process-capture] SUPABASE_URL/SUPABASE_ANON_KEY 미설정");
+    return errorResponse("server_misconfigured", 500);
   }
   if (!openAiKey) {
-    return errorResponse(
-      "서버 설정 오류: OPENAI_API_KEY 시크릿이 설정되지 않았습니다. `supabase secrets set OPENAI_API_KEY=...` 필요.",
-      500,
+    console.error(
+      "[process-capture] OPENAI_API_KEY 미설정 — `supabase secrets set OPENAI_API_KEY=...` 필요",
     );
+    return errorResponse("server_misconfigured", 500);
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -377,7 +427,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // JWT 유효성 확인 + auth.uid() 확보 (새 insert 시 user_id로 사용).
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData?.user) {
-    return errorResponse("유효하지 않은 인증 토큰입니다.", 401);
+    return errorResponse("unauthorized", 401);
   }
   const userId = userData.user.id;
 
@@ -387,16 +437,40 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const raw = await req.json();
     body = parseBody(raw);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "잘못된 요청 본문입니다.";
-    return errorResponse(message, 400);
+    console.error("[process-capture] 잘못된 요청 본문:", error);
+    return errorResponse("bad_request", 400);
+  }
+
+  // image_url은 본인 폴더({userId}/...)여야 한다. 남의 경로를 내 캡처 행에 넣으면
+  // 서명 URL 생성 등 이후 흐름에서 다른 사용자 객체를 가리키게 되므로 서버에서 막는다.
+  if (body.image_url !== undefined && !isOwnImagePath(body.image_url, userId)) {
+    return errorResponse("forbidden_image_path", 403);
+  }
+
+  // 사용자별 일일 호출 상한 — OpenAI 호출 전에 원자적으로 1 소비한다.
+  // 실패 시 닫힌 쪽(fail-closed): 카운터를 못 세면 비용 보호가 안 되므로 처리하지 않는다.
+  const { data: allowed, error: usageError } = await supabase.rpc("consume_daily_usage", {
+    p_kind: USAGE_KIND,
+    p_limit: DAILY_CAPTURE_LIMIT,
+  });
+  if (usageError) {
+    console.error("[process-capture] 사용량 확인 실패:", usageError.message);
+    return errorResponse("processing_failed", 503);
+  }
+  if (allowed !== true) {
+    return errorResponse("rate_limited", 429);
   }
 
   // OpenAI 후처리 → 결과를 captures에 기록. 실패 시 status='failed' 기록 후 5xx.
   try {
-    const nowIso = new Date().toLocaleString("sv-SE", { timeZone: TIMEZONE })
-      .replace(" ", "T") + "+09:00";
+    const now = new Date();
+    const time: TimeContext = {
+      nowIso: localIsoWithOffset(now, body.time_zone),
+      timeZone: body.time_zone,
+      offset: utcOffset(now, body.time_zone),
+    };
 
-    const result = await callOpenAiWithRetry(openAiKey, body.ocr_text, nowIso, body.locale);
+    const result = await callOpenAiWithRetry(openAiKey, body.ocr_text, time, body.locale);
 
     // captures 스키마(0001)에는 title/summary/embedding 컬럼이 없다.
     // → 전체 추출 JSON을 parsed_event(jsonb)에 저장하고, ocr_text는 정제본으로 갱신한다.
@@ -463,8 +537,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       200,
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "처리 중 오류가 발생했습니다.";
-    console.error("process-capture 실패:", message);
+    // 원문(DB/OpenAI 응답 상세)은 로그에만 — 클라이언트엔 일반 코드만 준다.
+    console.error("process-capture 실패:", error);
 
     // 기존 capture가 지정된 경우, 실패 상태를 best-effort로 기록한다.
     // (이 갱신 자체가 실패해도 원래 오류 응답을 우선한다.)
@@ -480,6 +554,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    return errorResponse(message, 502);
+    return errorResponse("processing_failed", 502);
   }
 });

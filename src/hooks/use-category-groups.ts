@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { t } from '@/i18n';
 import { listCategoryGroups } from '@/lib/category-stats';
 import { useCaptureStore } from '@/stores/capture-store';
 
@@ -46,8 +47,9 @@ export function useCategoryGroups(): UseCategoryGroupsResult {
       setGroups(next);
     } catch (err) {
       if (!mountedRef.current) return;
-      const message =
-        err instanceof Error ? err.message : '주제별 묶음을 불러오지 못했습니다.';
+      // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+      console.error('[use-category-groups] 로드 실패:', err);
+      const message = t('common.error.load');
       setError(message);
     } finally {
       if (mountedRef.current) setIsLoading(false);

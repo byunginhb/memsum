@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 질문 알림 문구(기본 = 영어). 이름에 memsum_ask_ 접두어: 앱/다른 라이브러리 리소스와 충돌 방지. -->
+<resources>
+  <string name="memsum_ask_channel_name">Capture check</string>
+  <string name="memsum_ask_title">Save to Memsum?</string>
+  <string name="memsum_ask_body">We\'ll organize the screen you just captured</string>
+  <string name="memsum_ask_action_save">Save</string>
+  <string name="memsum_ask_action_dismiss">Dismiss</string>
+</resources>

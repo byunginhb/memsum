@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { t } from '@/i18n';
 import { searchCaptures } from '@/lib/captures';
 
 import type { CaptureListItem } from '@/features/captures/types';
@@ -58,8 +59,9 @@ export function useSearchCaptures(): UseSearchCapturesResult {
         setResults(found);
       } catch (err) {
         if (!active || latestQueryRef.current !== trimmed) return;
-        const message =
-          err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.';
+        // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+        console.error('[use-search-captures] 검색 실패:', err);
+        const message = t('common.error.search');
         setError(message);
       } finally {
         if (active && latestQueryRef.current === trimmed) setIsSearching(false);

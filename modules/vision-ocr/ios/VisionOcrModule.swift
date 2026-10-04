@@ -103,7 +103,27 @@ public class VisionOcrModule: Module {
       ? 0
       : candidates.reduce(0) { $0 + Float($1.confidence) } / Float(candidates.count)
 
-    return ["text": text, "confidence": Double(confidence)]
+    return ["text": text, "confidence": Double(confidence), "lines": normalizedLines(observations)]
+  }
+
+  // 줄(관측) 단위 위치를 0~1 정규화 좌표로 반환한다(좌상단 원점 — Android와 같은 계약).
+  // Vision boundingBox는 이미 정규화돼 있지만 원점이 좌하단이라 y를 뒤집는다.
+  private func normalizedLines(_ observations: [VNRecognizedTextObservation]) -> [[String: Any]] {
+    return observations.compactMap { observation -> [String: Any]? in
+      guard let candidate = observation.topCandidates(1).first else { return nil }
+      let box = observation.boundingBox
+      let x = min(max(Double(box.minX), 0), 1)
+      let top = min(max(Double(1 - box.maxY), 0), 1)
+      let bottom = min(max(Double(1 - box.minY), 0), 1)
+      let right = min(max(Double(box.maxX), 0), 1)
+      return [
+        "text": candidate.string,
+        "x": x,
+        "y": top,
+        "width": right - x,
+        "height": bottom - top,
+      ]
+    }
   }
 }
 

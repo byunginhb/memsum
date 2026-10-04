@@ -183,7 +183,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !supabaseAnonKey) {
-    return errorResponse("서버 설정 오류: SUPABASE_URL/SUPABASE_ANON_KEY가 설정되지 않았습니다.", 500);
+    console.error("[track-parcel] SUPABASE_URL/SUPABASE_ANON_KEY 미설정");
+    return errorResponse("server_misconfigured", 500);
   }
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authHeader } },
@@ -203,7 +204,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     body = parseBody(await req.json());
   } catch (error) {
-    return errorResponse(error instanceof Error ? error.message : "잘못된 요청입니다.", 400);
+    console.error("[track-parcel] 잘못된 요청 본문:", error);
+    return errorResponse("bad_request", 400);
   }
 
   try {
@@ -219,8 +221,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
     return jsonResponse(normalizeTracking(payload, body.carrier_code ?? ""), 200);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "택배 조회 중 오류가 발생했습니다.";
-    console.error("track-parcel 실패:", message);
-    return errorResponse(message, 502);
+    // Deno fetch 오류 문구엔 요청 URL(t_key=API 키 포함)이 들어갈 수 있다 —
+    // 클라이언트엔 일반 코드만 주고, 로그에서도 키를 가린다.
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("track-parcel 실패:", message.replace(/t_key=[^&\s)]+/g, "t_key=***"));
+    return errorResponse("processing_failed", 502);
   }
 });

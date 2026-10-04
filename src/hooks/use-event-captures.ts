@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { t } from '@/i18n';
 import { listEventCaptures } from '@/lib/captures';
 import { useCaptureStore } from '@/stores/capture-store';
 
@@ -66,9 +67,9 @@ export function useEventCaptures(): UseEventCapturesResult {
       setBoundaryAt(Date.now());
     } catch (err) {
       if (!mountedRef.current) return;
-      const message =
-        err instanceof Error ? err.message : '일정을 불러오지 못했습니다.';
-      console.error('[use-event-captures] 이벤트 캡처 로드 실패:', message);
+      // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+      const message = t('common.error.load');
+      console.error('[use-event-captures] 이벤트 캡처 로드 실패:', err);
       setError(message);
     } finally {
       if (mountedRef.current) setIsLoading(false);

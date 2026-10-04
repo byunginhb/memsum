@@ -10,6 +10,7 @@
 // 조회는 익명 세션 + RLS("own captures": auth.uid() = user_id)에 의존한다.
 // 세션이 없으면 RLS가 0건을 돌려주므로 count=0이 정상 동작(에러 아님).
 
+import { preview } from '@/dev/preview';
 import { getSupabase } from '@/lib/supabase';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
@@ -87,10 +88,10 @@ function weekBoundsUtc(weekStart: string): { fromUtc: string; toUtc: string } {
  * (전송량·지연 절감). 실패 시 throw(호출 측에서 graceful 처리).
  */
 export async function countCapturesThisWeek(): Promise<WeeklyStats> {
-  const supabase = getSupabase();
-
   const weekStart = mondayOfWeekKst(new Date());
   const weekEnd = addDays(weekStart, DAYS_PER_WEEK - 1); // 일요일
+  if (preview) return { count: preview.weekCount, goal: WEEKLY_GOAL, weekStart, weekEnd };
+  const supabase = getSupabase();
   const { fromUtc, toUtc } = weekBoundsUtc(weekStart);
 
   try {

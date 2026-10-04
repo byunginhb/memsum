@@ -10,18 +10,17 @@ import android.app.job.JobScheduler
 import android.app.job.JobService
 import android.content.BroadcastReceiver
 import android.content.ComponentName
-import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import android.os.Process
 import android.provider.MediaStore
 import android.util.Log
 import com.facebook.react.HeadlessJsTaskService
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
+import java.util.UUID
 
 // 백그라운드 스크린샷 질문 알림 잡.
 //
@@ -33,17 +32,21 @@ import com.facebook.react.jstasks.HeadlessJsTaskConfig
 // 흐름: MediaStore 변경 → onStartJob → (포그라운드면 skip — 인프로세스 옵저버가 처리)
 // → 새 스크린샷이면 헤드업 알림 "Memsum에 저장할까요?" [저장]/[무시] 게시 → 재스케줄.
 // [저장]/본문 탭 → 앱 launch 인텐트(data: memsum://?autoSaveUri=...) → JS Linking 핸들러가
-// 파이프라인 실행. [무시] → AskDismissReceiver가 알림만 제거.
+// 파이프라인 실행. [무시] → AskDismissReceiver가 알림 제거 + "결정된 최대 id" 기록
+// (앱 복귀 시 캐치업·옵저버가 무시한 스크린샷을 다시 보내 업로드하지 않도록).
 class ScreenshotAskJobService : JobService() {
 
   override fun onStartJob(params: JobParameters?): Boolean {
+    // 사용자가 자동 감지를 껐으면(stopWatching) 알림도, 재스케줄도 하지 않는다.
+    // why 여기서도 확인: cancel 전에 이미 OS 큐에 들어간 실행이 올 수 있다.
+    val enabled = isEnabled(applicationContext)
     try {
-      handleTrigger()
+      if (enabled) handleTrigger()
     } catch (e: Exception) {
       Log.e(TAG, "잡 처리 실패", e)
     } finally {
-      // TriggerContentUri 잡은 1회성 — 다음 변경을 위해 항상 재스케줄한다.
-      schedule(applicationContext)
+      // TriggerContentUri 잡은 1회성 — 다음 변경을 위해 재스케줄한다(켜져 있을 때만).
+      if (enabled) schedule(applicationContext)
       jobFinished(params, false)
     }
     return false
@@ -58,11 +61,14 @@ class ScreenshotAskJobService : JobService() {
     val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val lastAskedId = prefs.getLong(KEY_LAST_ASKED, 0L)
 
-    val latest = queryLatestScreenshot(contentResolver) ?: return
+    val latest = MediaStoreQuery.latest(contentResolver, 1).firstOrNull() ?: return
+    if (!latest.isScreenshot) return
     if (latest.id <= lastAskedId) return
 
-    prefs.edit().putLong(KEY_LAST_ASKED, latest.id).apply()
-    postAskNotification(latest)
+    // 딥링크 위조 방지용 1회용 토큰(알림 본문 탭 → JS가 consumeAskToken으로 대조).
+    val token = UUID.randomUUID().toString()
+    prefs.edit().putLong(KEY_LAST_ASKED, latest.id).putString(KEY_ASK_TOKEN, token).apply()
+    postAskNotification(latest, token)
   }
 
   private fun isAppForeground(): Boolean {
@@ -74,58 +80,18 @@ class ScreenshotAskJobService : JobService() {
     } == true
   }
 
-  private data class Latest(val id: Long, val name: String, val contentUri: String)
-
-  // 최신 이미지 1건 조회 — 스크린샷(경로/이름)일 때만 반환.
-  private fun queryLatestScreenshot(resolver: ContentResolver): Latest? {
-    val projection = arrayOf(
-      MediaStore.Images.Media._ID,
-      MediaStore.Images.Media.DISPLAY_NAME,
-      MediaStore.Images.Media.RELATIVE_PATH
-    )
-    val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val args = Bundle().apply {
-        putStringArray(
-          ContentResolver.QUERY_ARG_SORT_COLUMNS,
-          arrayOf(MediaStore.Images.Media.DATE_ADDED)
-        )
-        putInt(
-          ContentResolver.QUERY_ARG_SORT_DIRECTION,
-          ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
-        )
-        putInt(ContentResolver.QUERY_ARG_LIMIT, 1)
-      }
-      resolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, args, null)
-    } else {
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null,
-        "${MediaStore.Images.Media.DATE_ADDED} DESC"
-      )
-    }
-
-    cursor?.use { c ->
-      if (!c.moveToFirst()) return null
-      val id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
-      val name = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: ""
-      val path = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)) ?: ""
-      val isScreenshot = path.contains("Screenshots", true) || name.contains("Screenshot", true)
-      if (!isScreenshot) return null
-      val uri = Uri.withAppendedPath(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString()
-      ).toString()
-      return Latest(id, name, uri)
-    }
-    return null
-  }
-
-  private fun postAskNotification(latest: Latest) {
+  private fun postAskNotification(latest: MediaItem, token: String) {
     val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     // HIGH 채널이어야 상단 헤드업으로 뜬다. expo-notifications가 같은 id로 먼저 만들었어도
     // 동일 설정이라 무해(이미 있으면 시스템이 기존 설정 유지).
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       nm.createNotificationChannel(
-        NotificationChannel(CHANNEL_ASK, "캡처 확인", NotificationManager.IMPORTANCE_HIGH)
+        NotificationChannel(
+          CHANNEL_ASK,
+          getString(R.string.memsum_ask_channel_name),
+          NotificationManager.IMPORTANCE_HIGH
+        )
       )
     }
 
@@ -139,7 +105,8 @@ class ScreenshotAskJobService : JobService() {
     // 본문 탭 = "열어서 보기": 앱을 열며 딥링크로 저장까지 잇는다(보고 싶은 사용자용).
     val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
       data = Uri.parse(
-        "memsum://?autoSaveUri=${Uri.encode(latest.contentUri)}&autoSaveNotifId=$notifId"
+        "memsum://?autoSaveUri=${Uri.encode(latest.contentUri)}" +
+          "&autoSaveToken=${Uri.encode(token)}&autoSaveNotifId=$notifId"
       )
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     } ?: return
@@ -160,25 +127,45 @@ class ScreenshotAskJobService : JobService() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    // [무시]: 앱을 열지 않고 알림만 제거한다.
+    // [무시]: 앱을 열지 않고 알림을 제거하고, 이 항목을 "결정됨"으로 기록한다.
     val dismissIntent = Intent(this, AskDismissReceiver::class.java).apply {
       putExtra(EXTRA_NOTIF_ID, notifId)
+      putExtra(EXTRA_MEDIA_ID, latest.id)
     }
     val dismissPending = PendingIntent.getBroadcast(
       this, notifId * 10 + 2, dismissIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    // 네이티브 알림 문구는 ko 고정(JS i18n 밖에서 떠야 하는 시스템 표면 — 출시 ko 우선,
-    // 추후 strings.xml 다국어화 TODO).
-    val notification = android.app.Notification.Builder(this, CHANNEL_ASK)
-      .setSmallIcon(applicationInfo.icon)
-      .setContentTitle("Memsum에 저장할까요?")
-      .setContentText("방금 캡처한 화면을 정리해 둘게요")
+    // 문구는 strings.xml(values=en, values-ko=ko) — JS i18n 밖에서 뜨는 시스템 표면이라
+    // 기기 언어를 OS 리소스 해석에 맡긴다.
+    // 작은 아이콘은 단색 벡터: 상태바는 알파 채널만 쓰므로 컬러 런처 아이콘은 흰 네모로 뭉개진다.
+    // why 버전 분기: Builder(context, channelId)는 API 26+ 전용이라 minSdk 24 기기에서
+    // NoSuchMethodError로 잡이 죽는다. 26 미만은 채널 대신 우선순위로 헤드업을 요청한다.
+    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      android.app.Notification.Builder(this, CHANNEL_ASK)
+    } else {
+      @Suppress("DEPRECATION")
+      android.app.Notification.Builder(this)
+        .setPriority(android.app.Notification.PRIORITY_HIGH)
+        .setDefaults(android.app.Notification.DEFAULT_ALL)
+    }
+    val notification = builder
+      .setSmallIcon(R.drawable.ic_memsum_notification)
+      .setContentTitle(getString(R.string.memsum_ask_title))
+      .setContentText(getString(R.string.memsum_ask_body))
       .setAutoCancel(true)
       .setContentIntent(openPending)
-      .addAction(android.app.Notification.Action.Builder(null, "저장", savePending).build())
-      .addAction(android.app.Notification.Action.Builder(null, "무시", dismissPending).build())
+      .addAction(
+        android.app.Notification.Action.Builder(
+          null, getString(R.string.memsum_ask_action_save), savePending
+        ).build()
+      )
+      .addAction(
+        android.app.Notification.Action.Builder(
+          null, getString(R.string.memsum_ask_action_dismiss), dismissPending
+        ).build()
+      )
       .build()
 
     nm.notify(notifId, notification)
@@ -191,6 +178,16 @@ class ScreenshotAskJobService : JobService() {
     private const val ASK_NOTIF_ID = 1012
     const val PREFS = "photo_watcher"
     const val KEY_LAST_ASKED = "last_asked_id"
+    /** 자동 감지 사용 여부(stopWatching/startWatching이 기록, 잡이 매 실행마다 확인). */
+    private const val KEY_ENABLED = "enabled"
+    /**
+     * 사용자가 질문 알림에서 결정한([무시]/[저장]) 가장 큰 MediaStore id.
+     * 캐치업·옵저버는 이 값 이하를 건너뛴다. why 최대값: 질문 알림은 최신 1건만 교체 게시하므로
+     * 결정은 "그 시점까지 쌓인 스크린샷 전체"에 대한 응답으로 본다.
+     */
+    private const val KEY_DECIDED_MAX = "decided_max_id"
+    /** 마지막 질문 알림의 1회용 딥링크 토큰. */
+    private const val KEY_ASK_TOKEN = "ask_token"
     const val CHANNEL_ASK = "capture-ask"
     const val EXTRA_NOTIF_ID = "notif_id"
     const val EXTRA_URI = "uri"
@@ -223,18 +220,74 @@ class ScreenshotAskJobService : JobService() {
       }
     }
 
-    // 앱(프로세스) 시작 시 기준점: 현재 최신 id 이전 항목엔 묻지 않는다
-    // (앱이 꺼져 있던 동안의 과거 스크린샷 오발화 방지 — 인프로세스 baseline과 동일 정책).
-    fun resetBaseline(context: Context, latestId: Long) {
-      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        .edit().putLong(KEY_LAST_ASKED, latestId).apply()
+    // 감지 켜기: 플래그 기록 + 잡 등록(startWatching).
+    fun enable(context: Context) {
+      prefs(context).edit().putBoolean(KEY_ENABLED, true).apply()
+      schedule(context)
     }
+
+    // 감지 끄기: 플래그 내림 + 예약 잡 취소 + 떠 있는 질문 알림/토큰 제거(stopWatching).
+    // commit(동기): 직후 도착하는 잡 실행이 반드시 꺼진 값을 읽게 한다.
+    fun disable(context: Context) {
+      prefs(context).edit().putBoolean(KEY_ENABLED, false).remove(KEY_ASK_TOKEN).commit()
+      try {
+        val scheduler =
+          context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+        scheduler.cancel(JOB_ID)
+      } catch (e: Exception) {
+        Log.e(TAG, "잡 취소 실패", e)
+      }
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      nm.cancel(ASK_NOTIF_ID)
+    }
+
+    // 기본 false: 플래그가 없으면(구버전에서 등록된 잡 등) 앱이 다시 켤 때까지 묻지 않는다.
+    fun isEnabled(context: Context): Boolean =
+      prefs(context).getBoolean(KEY_ENABLED, false)
+
+    // 딥링크 토큰 대조 — 일치하면 폐기(1회용)하고 true.
+    fun consumeToken(context: Context, token: String): Boolean {
+      val p = prefs(context)
+      val expected = p.getString(KEY_ASK_TOKEN, null) ?: return false
+      if (token.isEmpty() || token != expected) return false
+      p.edit().remove(KEY_ASK_TOKEN).apply()
+      return true
+    }
+
+    private fun prefs(context: Context) =
+      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    // 질문 기준점 동기화: 이 id 이하 항목엔 묻지 않는다(과거 스크린샷 오발화 방지 —
+    // 인프로세스 baseline과 동일 정책). why max: startWatching은 앱 복귀마다 불리는데,
+    // 동결 중엔 인프로세스 lastSeenId가 갱신되지 않아 잡이 이미 물은 id보다 작을 수 있다 —
+    // 그대로 덮으면 기준점이 내려가 같은 스크린샷을 다시 묻는다. 기준점은 전진만 한다.
+    fun resetBaseline(context: Context, latestId: Long) {
+      val p = prefs(context)
+      val current = p.getLong(KEY_LAST_ASKED, 0L)
+      if (latestId > current) p.edit().putLong(KEY_LAST_ASKED, latestId).apply()
+    }
+
+    // 사용자가 질문 알림에서 결정한 항목 기록(최대값만 유지). commit(동기): 수신기 직후
+    // 앱 복귀 캐치업이 바로 읽으므로 반영이 보장돼야 한다.
+    fun markDecided(context: Context, mediaId: Long) {
+      if (mediaId <= 0L) return
+      val p = prefs(context)
+      if (mediaId > p.getLong(KEY_DECIDED_MAX, 0L)) {
+        p.edit().putLong(KEY_DECIDED_MAX, mediaId).commit()
+      }
+    }
+
+    fun decidedMaxId(context: Context): Long = prefs(context).getLong(KEY_DECIDED_MAX, 0L)
   }
 }
 
-/** [무시] 액션 — 앱을 열지 않고 질문 알림만 제거한다. */
+/** [무시] 액션 — 앱을 열지 않고 질문 알림을 제거하고, 그 항목을 "결정됨"으로 기록한다. */
 class AskDismissReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
+    // 기록이 없으면 앱 복귀 시 캐치업(checkNow)이 무시한 스크린샷을 그대로 업로드한다.
+    ScreenshotAskJobService.markDecided(
+      context, intent.getLongExtra(ScreenshotAskJobService.EXTRA_MEDIA_ID, -1L)
+    )
     val id = intent.getIntExtra(ScreenshotAskJobService.EXTRA_NOTIF_ID, -1)
     if (id >= 0) {
       val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -249,6 +302,11 @@ class AskDismissReceiver : BroadcastReceiver() {
  */
 class SaveCaptureReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
+    // 헤드리스 저장이 맡았으므로 캐치업·옵저버가 같은 항목을 다시 보내지 않게 기록한다
+    // (JS markHandled는 같은 프로세스의 모듈 인스턴스에만 반영되고 재시작 시 사라진다).
+    ScreenshotAskJobService.markDecided(
+      context, intent.getLongExtra(ScreenshotAskJobService.EXTRA_MEDIA_ID, -1L)
+    )
     val notifId = intent.getIntExtra(ScreenshotAskJobService.EXTRA_NOTIF_ID, -1)
     if (notifId >= 0) {
       val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -277,7 +335,6 @@ class SaveCaptureReceiver : BroadcastReceiver() {
 class SaveCaptureService : HeadlessJsTaskService() {
   override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig? {
     val extras = intent?.extras ?: return null
-    Log.i("PhotoLibraryWatcher", "헤드리스 저장 태스크 구성 (uri=${extras.getString(ScreenshotAskJobService.EXTRA_URI)})")
     return HeadlessJsTaskConfig(
       ScreenshotAskJobService.HEADLESS_TASK,
       Arguments.fromBundle(extras),

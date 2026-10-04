@@ -3,8 +3,6 @@ package expo.modules.photolibrarywatcher
 import android.content.ContentResolver
 import android.database.ContentObserver
 import android.net.Uri
-import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -31,6 +29,9 @@ class PhotoLibraryWatcherModule : Module() {
   // 모듈 생성 시각(초). checkNow는 이 이후 추가된 항목만 회수한다(과거 재발화 방지).
   private val startTimeSec: Long = System.currentTimeMillis() / 1000L
 
+  // stopWatching 이후 재시작인지(재시작 시 꺼져 있던 동안의 항목을 캐치업에서 제외).
+  private var stoppedByUser = false
+
   override fun definition() = ModuleDefinition {
     Name("PhotoLibraryWatcher")
     Events("onScreenshot")
@@ -55,6 +56,18 @@ class PhotoLibraryWatcherModule : Module() {
     Function("startWatching") {
       val resolver = appContext.reactContext?.contentResolver
       if (resolver != null && observer == null) {
+        // 기준점 재설정: OnCreate 시점엔 사진 권한이 없었을 수 있어(첫 실행 — 온보딩 후
+        // 권한 허용) 기준점이 0이면 첫 MediaStore 변경에 옛 스크린샷을 발화한다.
+        try {
+          initLastSeen(resolver)
+        } catch (e: Exception) {
+          Log.e("PhotoLibraryWatcher", "initLastSeen 실패", e)
+        }
+        // 사용자가 껐다 켠 경우: 꺼져 있던 동안의 스크린샷은 캐치업으로도 회수하지 않는다.
+        if (stoppedByUser) {
+          lastCheckNowId = maxOf(lastCheckNowId, lastSeenId)
+          stoppedByUser = false
+        }
         val obs = object : ContentObserver(Handler(Looper.getMainLooper())) {
           override fun onChange(selfChange: Boolean, uri: Uri?) {
             super.onChange(selfChange, uri)
@@ -76,9 +89,12 @@ class PhotoLibraryWatcherModule : Module() {
       // 인프로세스 옵저버는 동결 중 콜백을 받지 못하므로(freezer), MediaStore 변경 시
       // OS가 깨워주는 TriggerContentUri 잡이 질문 알림을 담당한다(중복은 잡의
       // 포그라운드-skip과 lastAsked 기준점으로 방지).
+      // 기준점은 전진만 한다(resetBaseline이 max 처리) — 앱 복귀마다 불려도 이미 물은
+      // 항목을 다시 묻지 않는다. 순서: JS는 startWatching → checkNow 순으로 부르며, 이
+      // 기준점은 잡(질문 알림) 전용이라 checkNow 캐치업 마커(lastCheckNowId)와 독립이다.
       appContext.reactContext?.let { ctx ->
         ScreenshotAskJobService.resetBaseline(ctx, lastSeenId)
-        ScreenshotAskJobService.schedule(ctx)
+        ScreenshotAskJobService.enable(ctx)
       }
       null
     }
@@ -108,47 +124,35 @@ class PhotoLibraryWatcherModule : Module() {
       null
     }
 
+    // 감지 중지(설정 OFF·권한 회수): 옵저버 해제 + 백그라운드 잡 취소 + 질문 알림 제거.
+    // why 플래그도 내림: 이미 OS 큐에 들어간 잡 실행이나 다음 프로세스 기동 전 트리거가
+    // 와도 잡이 SharedPreferences를 보고 스스로 멈추게 한다(설정 OFF인데 알림이 뜨던 버그).
+    Function("stopWatching") {
+      unregisterObserver()
+      stoppedByUser = true
+      appContext.reactContext?.let { ScreenshotAskJobService.disable(it) }
+      null
+    }
+
+    // 딥링크(memsum://?autoSaveUri=...&autoSaveToken=...) 검증 — 질문 알림이 만든
+    // 1회용 토큰과 일치할 때만 true(일치하면 즉시 폐기). 외부 앱이 임의 사진 uri로
+    // 딥링크를 쏴 업로드시키는 것을 막는다.
+    Function("consumeAskToken") { token: String ->
+      val ctx = appContext.reactContext
+      ctx != null && ScreenshotAskJobService.consumeToken(ctx, token)
+    }
+
     OnDestroy {
-      // 옵저버 해제 필수 (메모리 누수 방지).
-      observer?.let {
-        appContext.reactContext?.contentResolver?.unregisterContentObserver(it)
-      }
-      observer = null
+      // 옵저버 해제 필수 (메모리 누수 방지). 잡은 남긴다 — 앱 종료 후에도 질문 알림을
+      // 띄우는 것이 잡의 역할이고, 끄는 것은 stopWatching(사용자 설정)만 담당한다.
+      unregisterObserver()
     }
   }
 
   // 모듈 생성 시점의 최신 이미지 _ID를 기준점(lastSeenId)으로 잡는다(발화 없음).
   // 이후 옵저버/checkNow는 이 기준점과 다른 새 항목만 발화한다.
   private fun initLastSeen(resolver: ContentResolver) {
-    val projection = arrayOf(MediaStore.Images.Media._ID)
-    val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val queryArgs = Bundle().apply {
-        putStringArray(
-          ContentResolver.QUERY_ARG_SORT_COLUMNS,
-          arrayOf(MediaStore.Images.Media.DATE_ADDED)
-        )
-        putInt(
-          ContentResolver.QUERY_ARG_SORT_DIRECTION,
-          ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
-        )
-        putInt(ContentResolver.QUERY_ARG_LIMIT, 1)
-      }
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, queryArgs, null
-      )
-    } else {
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        projection, null, null,
-        "${MediaStore.Images.Media.DATE_ADDED} DESC"
-      )
-    }
-
-    cursor?.use { c ->
-      if (c.moveToFirst()) {
-        lastSeenId = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
-      }
-    }
+    MediaStoreQuery.latest(resolver, 1).firstOrNull()?.let { lastSeenId = it.id }
   }
 
   // 캐치업 조회(checkNow 전용): 리스너 부재 동안(JS 로딩·백그라운드 동결·서스펜드)
@@ -161,56 +165,11 @@ class PhotoLibraryWatcherModule : Module() {
   // 최신 catchUpLimit건 안에서 마커(lastCheckNowId)·시작시각 이후 스크린샷을
   // 오래된 순으로 모두 발화한다(상한 초과분은 과거 오발화 방지와의 트레이드오프).
   private fun queryForCatchUp(resolver: ContentResolver) {
-    val projection = arrayOf(
-      MediaStore.Images.Media._ID,
-      MediaStore.Images.Media.DISPLAY_NAME,
-      MediaStore.Images.Media.RELATIVE_PATH,
-      MediaStore.Images.Media.DATE_ADDED
-    )
-
-    val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val queryArgs = Bundle().apply {
-        putStringArray(
-          ContentResolver.QUERY_ARG_SORT_COLUMNS,
-          arrayOf(MediaStore.Images.Media.DATE_ADDED)
-        )
-        putInt(
-          ContentResolver.QUERY_ARG_SORT_DIRECTION,
-          ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
-        )
-        putInt(ContentResolver.QUERY_ARG_LIMIT, catchUpLimit)
-      }
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, queryArgs, null
-      )
-    } else {
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        projection, null, null,
-        "${MediaStore.Images.Media.DATE_ADDED} DESC"
-      )
-    }
-
-    data class CatchUpItem(val id: Long, val name: String, val dateAdded: Long)
-    val items = mutableListOf<CatchUpItem>()
-
-    cursor?.use { c ->
-      var scanned = 0
-      while (c.moveToNext() && scanned < catchUpLimit) {
-        scanned += 1
-        val id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
-        val name = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: ""
-        val path = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)) ?: ""
-        val dateAdded = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
-
-        if (id <= lastCheckNowId) continue
-        if (dateAdded < startTimeSec) continue
-        val isScreenshot = path.contains("Screenshots", true) ||
-          name.contains("Screenshot", true)
-        if (!isScreenshot) continue
-
-        items.add(CatchUpItem(id, name, dateAdded))
-      }
+    // 질문 알림에서 사용자가 이미 결정([무시]/[저장])한 항목 이하는 다시 보내지 않는다.
+    val decidedMax = decidedMaxId()
+    val items = MediaStoreQuery.latest(resolver, catchUpLimit).filter {
+      it.id > lastCheckNowId && it.id > decidedMax &&
+        it.dateAdded >= startTimeSec && it.isScreenshot
     }
     if (items.isEmpty()) return
 
@@ -219,82 +178,40 @@ class PhotoLibraryWatcherModule : Module() {
     for (item in items.sortedBy { it.id }) {
       if (item.id > lastCheckNowId) lastCheckNowId = item.id
       if (item.id > lastSeenId) lastSeenId = item.id
-
-      val contentUri = Uri.withAppendedPath(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, item.id.toString()
-      )
-      sendEvent(
-        "onScreenshot",
-        mapOf(
-          "uri" to contentUri.toString(),
-          "displayName" to item.name,
-          "createdAt" to item.dateAdded
-        )
-      )
+      emit(item)
     }
   }
 
   // 최신 이미지 1건을 조회해 스크린샷이면 onScreenshot 이벤트를 보낸다.
-  //
-  // NOTE: Android 11+(API 30)부터는 sortOrder 문자열에 "LIMIT"를 넣으면 거부되어
-  // 예외가 발생한다(과거 SQLite 꼼수가 막힘). 따라서 API 30+에서는 Bundle 기반
-  // QUERY_ARG_LIMIT를 사용하고, 그 미만에서는 LIMIT 없이 정렬 후 moveToFirst로 처리한다.
   private fun queryLatestScreenshot(resolver: ContentResolver) {
-    val projection = arrayOf(
-      MediaStore.Images.Media._ID,
-      MediaStore.Images.Media.DISPLAY_NAME,
-      MediaStore.Images.Media.RELATIVE_PATH,
-      MediaStore.Images.Media.DATE_ADDED
+    val item = MediaStoreQuery.latest(resolver, 1).firstOrNull() ?: return
+    // 동일 항목 중복 발화 방지.
+    if (item.id == lastSeenId) return
+    if (!item.isScreenshot) return
+    lastSeenId = item.id
+    // 동결 해제 직후 밀린 onChange가 사용자가 [무시]한 항목을 다시 보낼 수 있다.
+    if (item.id <= decidedMaxId()) return
+    emit(item)
+  }
+
+  private fun decidedMaxId(): Long =
+    appContext.reactContext?.let { ScreenshotAskJobService.decidedMaxId(it) } ?: 0L
+
+  private fun emit(item: MediaItem) {
+    sendEvent(
+      "onScreenshot",
+      mapOf(
+        "uri" to item.contentUri,
+        "displayName" to item.name,
+        "createdAt" to item.dateAdded
+      )
     )
+  }
 
-    val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-      val queryArgs = Bundle().apply {
-        putStringArray(
-          ContentResolver.QUERY_ARG_SORT_COLUMNS,
-          arrayOf(MediaStore.Images.Media.DATE_ADDED)
-        )
-        putInt(
-          ContentResolver.QUERY_ARG_SORT_DIRECTION,
-          ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
-        )
-        putInt(ContentResolver.QUERY_ARG_LIMIT, 1)
-      }
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, queryArgs, null
-      )
-    } else {
-      resolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        projection, null, null,
-        "${MediaStore.Images.Media.DATE_ADDED} DESC"
-      )
+  private fun unregisterObserver() {
+    observer?.let {
+      appContext.reactContext?.contentResolver?.unregisterContentObserver(it)
     }
-
-    cursor?.use { c ->
-      if (!c.moveToFirst()) return
-      val id = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
-      val name = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: ""
-      val path = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)) ?: ""
-      val dateAdded = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED))
-
-      // 동일 항목 중복 발화 방지.
-      if (id == lastSeenId) return
-      val isScreenshot = path.contains("Screenshots", true) ||
-        name.contains("Screenshot", true)
-      if (!isScreenshot) return
-      lastSeenId = id
-
-      val contentUri = Uri.withAppendedPath(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString()
-      )
-      sendEvent(
-        "onScreenshot",
-        mapOf(
-          "uri" to contentUri.toString(),
-          "displayName" to name,
-          "createdAt" to dateAdded
-        )
-      )
-    }
+    observer = null
   }
 }

@@ -1,17 +1,22 @@
 import { useEffect, useRef } from 'react';
-import { AppState, PermissionsAndroid, Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 
 import { useToast } from '@/design/components/Toast/useToast';
 import { t } from '@/i18n';
 import { ensureNotificationPermission } from '@/lib/notifications';
 import { useCaptureStore } from '@/stores/capture-store';
+import { useOnboardingStore } from '@/stores/onboarding-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
 import {
   addScreenshotListener,
   checkNow,
+  consumeAskToken,
+  getPermissionStatus,
+  requestPermission,
   startWatching,
+  stopWatching,
 } from '../../modules/photo-library-watcher';
 import type { CaptureAskPayload } from '@/lib/notifications';
 import type { StartCaptureInput } from '@/stores/capture-store';
@@ -25,8 +30,21 @@ const PROCESSED_IDS_MAX = 300;
 /**
  * 단일 캡처 파이프라인 최대 대기(ms). 백그라운드 동결로 네트워크 호출이 영구
  * 행잉되면 직렬 큐 전체가 막히므로, 시간 초과 시 실패로 간주하고 다음으로 넘어간다.
+ * 서버(process-capture)의 OpenAI 재시도 총 예산(60s) + 업로드·OCR 여유로 잡는다.
  */
 const PIPELINE_TIMEOUT_MS = 90 * 1000;
+
+/**
+ * iOS: 앱이 비활성일 때 받은 이벤트를 활성화까지 보관하는 상한(네이티브 캐치업 상한 20과 동급).
+ * 넘치면 가장 오래된 것부터 버린다(장시간 백그라운드 메모리 증가 방지).
+ */
+const INACTIVE_HOLD_MAX = 20;
+
+/**
+ * 딥링크로 받을 수 있는 uri 형태 — MediaStore 이미지 항목만 허용한다
+ * (질문 알림이 만드는 형태와 동일). 외부 파일/임의 스킴 업로드를 막는 2차 방어.
+ */
+const MEDIA_STORE_IMAGE_URI = /^content:\/\/media\/external(_primary)?\/images\/media\/\d+$/;
 
 /**
  * 처리한 스크린샷 id 공유 집합.
@@ -50,56 +68,47 @@ export function markProcessedScreenshot(id: string): void {
  *
  * 앱의 핵심 가치(스크린샷을 알아서 정리). 네이티브 photo-library-watcher가 새 스크린샷을
  * 감지하면, 설정의 autoCapture가 켜져 있을 때:
- * - 앱 사용 중(포그라운드): 토스트와 함께 즉시 백그라운드 파이프라인
- *   (업로드→온디바이스 OCR→GPT→저장)을 돌린다.
- * - 다른 앱 사용 중(백그라운드): 상단 헤드업 알림으로 "Memsum에 저장할까요?"를 묻고,
- *   [저장](또는 본문 탭) 응답 시 파이프라인을 돌린다. [무시]는 폐기.
+ * - 앱 사용 중(포그라운드): 즉시 백그라운드 파이프라인(업로드→온디바이스 OCR→GPT→저장)을 돌린다.
+ * - 다른 앱 사용 중(백그라운드): 네이티브 질문 알림이 묻고, [저장]/본문 탭 시 파이프라인을 돌린다.
  *
+ * - 감지 on/off: 온보딩 완료 + autoCapture ON + 사진 권한이 모두 갖춰져야 startWatching,
+ *   하나라도 빠지면 stopWatching(Android 백그라운드 잡·질문 알림까지 끈다).
+ * - 권한: 온보딩 전에는 절대 묻지 않는다. 온보딩 완료 후에도 미결정이면 그때 1회 묻는다
+ *   (온보딩 화면이 먼저 requestPermission을 불렀다면 이미 결정돼 팝업이 다시 뜨지 않는다).
  * - 직렬 큐: 연속 스크린샷은 한 번에 하나씩 처리한다(동시 업로드 폭주·race 방지).
- * - 결과 판별: startCapture의 반환값(saved)으로 성공을 판별한다(전역 카운터 폴링 race 제거).
- * - 권한: Android 13+ READ_MEDIA_IMAGES 런타임 권한을 요청하고, 거부 시 1회 안내한다.
- *   iOS는 네이티브 모듈이 PHPhotoLibrary 권한을 자동 요청한다.
- * - 캐치업: 구독 직후·포그라운드 복귀 시 checkNow()로 리스너 부재 동안의 항목을 회수한다.
+ * - 캐치업: 감지 시작 직후·포그라운드 복귀 시 checkNow()로 리스너 부재 동안의 항목을 회수한다.
  *
  * 루트 레이아웃에서 1회 마운트한다(AutoCaptureGate).
  */
 export function useAutoCapture(): void {
   const startCapture = useCaptureStore((state) => state.startCapture);
   const autoCapture = useSettingsStore((state) => state.autoCapture);
-  const hydrated = useSettingsStore((state) => state.hydrated);
+  const settingsHydrated = useSettingsStore((state) => state.hydrated);
+  const onboardingCompleted = useOnboardingStore((state) => state.completed);
+  const onboardingHydrated = useOnboardingStore((state) => state.hydrated);
   const toast = useToast();
 
   // 직렬 처리 체인. 새 작업은 이전 처리 완료 후 시작된다.
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   // 권한 거부 안내는 세션당 1회만(반복 토스트 방지).
   const warnedPermissionRef = useRef(false);
-
-  // 설정 복원 후 autoCapture가 켜져 있으면 권한을 1회 확보한다.
-  useEffect(() => {
-    if (!hydrated || !autoCapture) return;
-    void (async () => {
-      // 미디어 권한(Android만 — iOS는 네이티브가 처리). 거부 시 자동 정리 불가를 안내.
-      if (Platform.OS === 'android') {
-        const granted = await requestAndroidMediaPermission();
-        if (!granted && !warnedPermissionRef.current) {
-          warnedPermissionRef.current = true;
-          toast.show({ tone: 'warning', title: t('autoCapture.permissionNeeded') });
-        }
-      }
-      // 질문/결과 알림용 알림 권한(거부돼도 포그라운드 토스트 경로는 동작).
-      await ensureNotificationPermission();
-    })();
-  }, [hydrated, autoCapture, toast]);
+  // 권한 팝업은 세션당 1회만. why: Android는 check로 "거부"와 "미결정"을 구분하지 못하고,
+  // 팝업이 닫히며 생기는 포그라운드 복귀가 sync를 다시 불러 팝업이 연달아 뜰 수 있다.
+  const askedPermissionRef = useRef(false);
+  // sync 중복 실행 방지(설정 변경과 포그라운드 복귀가 겹칠 때).
+  const syncingRef = useRef(false);
 
   // 스크린샷 이벤트 구독 + 딥링크 → 직렬 큐로 처리.
+  // (감지 시작은 아래 effect가 담당 — 리스너가 먼저 등록돼야 이벤트가 유실되지 않는다.)
   useEffect(() => {
+    // iOS 전용: 앱 비활성 중 받은 이벤트 보관함(활성화 시 처리).
+    const heldWhileInactive: CaptureAskPayload[] = [];
     const subscription = addScreenshotListener((payload) => {
       enqueue(() => handleScreenshot(payload));
     });
 
     // 네이티브 질문 알림(JobScheduler 게시)의 본문("열어서 보기") 탭 딥링크 처리.
-    // Android 동결 중 감지는 네이티브 잡이 알림을 띄우고, 저장 선택 시
-    // memsum://?autoSaveUri=... 로 앱을 열어 여기서 파이프라인을 잇는다.
+    // memsum://?autoSaveUri=...&autoSaveToken=... 로 앱을 열어 여기서 파이프라인을 잇는다.
     const handledUrls = new Set<string>();
     const handleDeepLink = (url: string | null): void => {
       if (!url || handledUrls.has(url)) return;
@@ -107,8 +116,12 @@ export function useAutoCapture(): void {
       try {
         const parsed = Linking.parse(url);
         const rawUri = parsed.queryParams?.autoSaveUri;
+        const rawToken = parsed.queryParams?.autoSaveToken;
         const uri = typeof rawUri === 'string' && rawUri.length > 0 ? rawUri : undefined;
         if (!uri) return;
+        // 위조 방지: MediaStore 이미지 uri 형태 + 알림이 만든 1회용 토큰이 모두 맞아야 한다.
+        if (!MEDIA_STORE_IMAGE_URI.test(uri)) return;
+        if (typeof rawToken !== 'string' || !consumeAskToken(rawToken)) return;
         // 같은 항목이 옵저버/캐치업 경로로 이미 처리됐다면 중복 저장하지 않는다.
         if (processedIds.has(uri)) return;
         rememberProcessed(processedIds, uri);
@@ -130,16 +143,11 @@ export function useAutoCapture(): void {
         /* 무시 */
       });
 
-    // 라이브 감지 시작(리스너 등록 후 — 리스너 없는 발화로 인한 유실 방지) +
-    // 캐치업: JS 번들 로딩 중에 찍힌 스크린샷을 1회 회수한다.
-    startWatching();
-    checkNow();
-
-    // 포그라운드 복귀 시 캐치업: 백그라운드 동결(Android cached-app freezer)·
-    // 서스펜드(iOS) 중 찍힌 스크린샷을 복귀 시점에 회수한다.
+    // iOS: 비활성 동안 받아 둔 이벤트를 활성화되면 처리한다(handleScreenshot 참고).
     const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        checkNow();
+      if (state !== 'active') return;
+      for (const held of heldWhileInactive.splice(0)) {
+        enqueue(() => handleScreenshot(held));
       }
     });
 
@@ -168,9 +176,15 @@ export function useAutoCapture(): void {
       if (!input) return; // 지원되지 않는 페이로드(예: uri 없는 iOS 이벤트)는 조용히 무시.
 
       if (AppState.currentState !== 'active') {
-        // 다른 앱 사용 중: 질문 알림은 네이티브 잡(ScreenshotAskJobService)이 단일 게시한다
-        // (동결/비동결 모두 커버 + [저장]=백그라운드 처리). JS는 여기서 관여하지 않고,
-        // 사용자가 응답하지 않은 채 앱으로 돌아오면 캐치업(checkNow)이 자동 처리한다.
+        // Android: 질문 알림은 네이티브 잡(ScreenshotAskJobService)이 단일 게시한다.
+        // 사용자가 응답하지 않은 채 앱으로 돌아오면 캐치업(checkNow)이 자동 처리한다
+        // ([무시]한 항목은 네이티브가 캐치업에서 뺀다).
+        // iOS: 네이티브가 보낸 순간 sentIds로 "보냄" 처리해 checkNow가 다시 보내지 않는다 —
+        // 여기서 버리면 영구 누락되므로 활성화될 때까지 보관했다가 처리한다.
+        if (Platform.OS === 'ios') {
+          heldWhileInactive.push(payload);
+          if (heldWhileInactive.length > INACTIVE_HOLD_MAX) heldWhileInactive.shift();
+        }
         return;
       }
 
@@ -182,28 +196,95 @@ export function useAutoCapture(): void {
     /**
      * 파이프라인 실행 — 무음 정책: 성공해도 알리지 않는다(목록 자동 갱신이 피드백).
      * 실패만 포그라운드 토스트로 알린다(데이터 유실은 사용자가 알아야 함).
+     * 글자 없는 스크린샷(skipped)은 실패가 아니므로 알리지 않는다.
      */
     async function runPipeline(input: StartCaptureInput): Promise<void> {
-      // 성공 판별은 반환값으로(전역 savedCount 폴링은 동시 캡처에서 오판 — 리뷰 HIGH).
-      // 타임아웃 race: 동결 중 끊긴 네트워크가 큐를 영구 차단하지 않게 한다.
       let saved = false;
+      let skipped = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         const result = await Promise.race([
           startCapture(input, { silent: true }),
-          new Promise<{ saved: boolean }>((resolve) => {
-            setTimeout(() => resolve({ saved: false }), PIPELINE_TIMEOUT_MS);
+          new Promise<{ saved: boolean; skipped?: boolean }>((resolve) => {
+            timer = setTimeout(() => resolve({ saved: false }), PIPELINE_TIMEOUT_MS);
           }),
         ]);
         saved = result.saved;
+        skipped = result.skipped === true;
       } catch (error) {
         console.error('[auto-capture] 처리 실패:', error);
+      } finally {
+        // 파이프라인이 먼저 끝나면 경쟁 타이머를 해제한다(큐가 길 때 타이머 누적 방지).
+        if (timer !== undefined) clearTimeout(timer);
       }
 
-      if (!saved && AppState.currentState === 'active') {
+      if (!saved && !skipped && AppState.currentState === 'active') {
         toast.show({ tone: 'danger', title: t('autoCapture.error') });
       }
     }
   }, [startCapture, toast]);
+
+  // 감지 on/off 동기화: 온보딩·설정·권한 상태가 바뀌거나 앱이 포그라운드로 돌아올 때.
+  useEffect(() => {
+    // 웹(개발용 미리보기)에는 사진첩 감지가 없다 — 권한 안내 토스트도 띄우지 않는다.
+    if (Platform.OS === 'web') return;
+    if (!settingsHydrated || !onboardingHydrated) return;
+    const enabled = onboardingCompleted && autoCapture;
+    let cancelled = false;
+
+    const sync = async (): Promise<void> => {
+      if (!enabled) {
+        stopWatching();
+        return;
+      }
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      try {
+        await syncEnabled();
+      } finally {
+        syncingRef.current = false;
+      }
+    };
+
+    const syncEnabled = async (): Promise<void> => {
+      let status = await getPermissionStatus();
+      // 온보딩이 끝난 뒤에만 도달한다 — 아직 안 물어봤으면 지금(세션당 1회) 묻는다.
+      if (status === 'undetermined' && !askedPermissionRef.current) {
+        askedPermissionRef.current = true;
+        status = await requestPermission();
+      }
+      if (cancelled) return;
+      if (status === 'granted' || status === 'limited') {
+        // 리스너 등록 후 시작(위 effect가 먼저 실행됨) → 직후 캐치업으로 부트/부재 구간 회수.
+        startWatching();
+        checkNow();
+      } else {
+        stopWatching();
+        if (!warnedPermissionRef.current) {
+          warnedPermissionRef.current = true;
+          toast.show({ tone: 'warning', title: t('autoCapture.permissionNeeded') });
+        }
+        return;
+      }
+      // 질문 알림(Android)용 알림 권한 — 거부돼도 포그라운드 경로는 동작한다.
+      if (Platform.OS === 'android') {
+        await ensureNotificationPermission();
+      }
+    };
+
+    void sync();
+
+    // 포그라운드 복귀: 설정 앱에서 권한을 바꿨을 수 있어 재동기화 + 캐치업
+    // (백그라운드 동결/서스펜드 중 찍힌 스크린샷 회수).
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void sync();
+    });
+
+    return () => {
+      cancelled = true;
+      appStateSub.remove();
+    };
+  }, [settingsHydrated, onboardingHydrated, onboardingCompleted, autoCapture, toast]);
 }
 
 /** 처리 완료 id 기록 + 상한 초과 시 가장 오래된 항목 제거(FIFO). */
@@ -237,21 +318,4 @@ function toCaptureInput(payload: CaptureAskPayload): StartCaptureInput | null {
     assetId: payload.assetId,
     uri: payload.uri,
   };
-}
-
-/**
- * Android READ_MEDIA_IMAGES 런타임 권한을 요청한다.
- * 이미 허용돼 있으면 즉시 true. 거부돼도 앱은 계속 동작(수동 캡처는 가능).
- */
-async function requestAndroidMediaPermission(): Promise<boolean> {
-  try {
-    const permission = PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES;
-    const already = await PermissionsAndroid.check(permission);
-    if (already) return true;
-    const result = await PermissionsAndroid.request(permission);
-    return result === PermissionsAndroid.RESULTS.GRANTED;
-  } catch (error) {
-    console.error('[auto-capture] 미디어 권한 요청 실패:', error);
-    return false;
-  }
 }

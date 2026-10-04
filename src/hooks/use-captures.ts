@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { t } from '@/i18n';
 import { listCaptures } from '@/lib/captures';
 import { useCaptureStore } from '@/stores/capture-store';
 
@@ -49,8 +50,9 @@ export function useCaptures(): UseCapturesResult {
       cursorRef.current = page.nextCursor;
     } catch (err) {
       if (!mountedRef.current) return;
-      const message =
-        err instanceof Error ? err.message : '목록을 불러오지 못했습니다.';
+      // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+      console.error('[use-captures] 로드 실패:', err);
+      const message = t('common.error.load');
       setError(message);
     } finally {
       if (mountedRef.current) setIsLoading(false);
@@ -73,8 +75,9 @@ export function useCaptures(): UseCapturesResult {
       cursorRef.current = page.nextCursor;
     } catch (err) {
       if (!mountedRef.current) return;
-      const message =
-        err instanceof Error ? err.message : '추가 항목을 불러오지 못했습니다.';
+      // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+      console.error('[use-captures] 로드 실패:', err);
+      const message = t('common.error.load');
       setError(message);
     } finally {
       if (mountedRef.current) setIsLoading(false);

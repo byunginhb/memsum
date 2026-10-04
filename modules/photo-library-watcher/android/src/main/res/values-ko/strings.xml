@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="memsum_ask_channel_name">캡처 확인</string>
+  <string name="memsum_ask_title">Memsum에 저장할까요?</string>
+  <string name="memsum_ask_body">방금 캡처한 화면을 정리해 둘게요</string>
+  <string name="memsum_ask_action_save">저장</string>
+  <string name="memsum_ask_action_dismiss">무시</string>
+</resources>

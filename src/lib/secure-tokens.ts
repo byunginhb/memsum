@@ -9,6 +9,7 @@
 //
 // 보안: 토큰 값 자체는 절대 로그에 남기지 않는다(키 존재 여부·길이 정도만 기록).
 
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 import type { GoogleTokenBundle } from '@/features/calendar/types';
@@ -57,6 +58,8 @@ export async function saveGoogleTokens(
  *   why clear: 손상된 값이 계속 남아 매 복원마다 실패하는 것을 막기 위함.
  */
 export async function loadGoogleTokens(): Promise<GoogleTokenBundle | null> {
+  // 웹(개발용 미리보기)에는 SecureStore가 없다 — 항상 미연결로 본다.
+  if (Platform.OS === 'web') return null;
   let raw: string | null = null;
 
   try {

@@ -4,9 +4,12 @@
 //    (등록은 엔트리에서 해야 HeadlessJsTaskService가 JS 런타임을 헤드리스로 부팅할 때 인식된다.)
 import 'expo-router/entry';
 
-import { AppRegistry } from 'react-native';
+import { AppRegistry, Platform } from 'react-native';
 
 import { saveCaptureTask } from './src/tasks/save-capture-task';
 
 // 이름은 네이티브 ScreenshotAskJobService.HEADLESS_TASK와 일치해야 한다.
-AppRegistry.registerHeadlessTask('MemsumSaveCapture', () => saveCaptureTask);
+// 헤드리스 태스크는 안드로이드 전용 — 웹(react-native-web)에는 이 API가 없어 부팅이 멈춘다.
+if (Platform.OS === 'android') {
+  AppRegistry.registerHeadlessTask('MemsumSaveCapture', () => saveCaptureTask);
+}

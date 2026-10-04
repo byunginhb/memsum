@@ -12,6 +12,8 @@
 
 import { create } from 'zustand';
 
+import { preview } from '@/dev/preview';
+import { t } from '@/i18n';
 import type {
   CalendarRegistration,
   CalendarStoreState,
@@ -126,6 +128,16 @@ export const useCalendarStore = create<InternalCalendarState>()((set, get) => {
       }
 
       restoreInFlight = (async () => {
+        // 웹 미리보기(개발 전용): 토큰 없이 연결된 것처럼 둔다(`?calendar=0`이면 미연결).
+        if (preview) {
+          set({
+            bundle: null,
+            email: preview.calendarEmail,
+            status: preview.calendarEmail ? 'connected' : 'disconnected',
+            hydrated: true,
+          });
+          return;
+        }
         try {
           const bundle = await loadGoogleTokens();
           if (!bundle) {
@@ -194,11 +206,9 @@ export const useCalendarStore = create<InternalCalendarState>()((set, get) => {
         });
       } catch (error) {
         // 실제 오류만 error 상태로 둔다. UI가 await 후 status/error로 토스트를 분기한다.
-        const message =
-          error instanceof Error
-            ? error.message
-            : '구글 캘린더 연결에 실패했어요. 잠시 후 다시 시도해 주세요.';
-        console.error('[calendar-store] connect 실패:', message);
+        // 상태(error)에는 일반 문구만 — OAuth/네트워크 원문은 로그에만 남긴다.
+        console.error('[calendar-store] connect 실패:', error);
+        const message = t('calendar.toast.connectError');
         set({ status: 'error', error: message });
         throw error instanceof Error ? error : new Error(message);
       } finally {
@@ -224,11 +234,8 @@ export const useCalendarStore = create<InternalCalendarState>()((set, get) => {
           error: null,
         });
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : '구글 캘린더 연결 해제에 실패했어요. 잠시 후 다시 시도해 주세요.';
-        console.error('[calendar-store] disconnect 실패:', message);
+        console.error('[calendar-store] disconnect 실패:', error);
+        const message = t('calendar.toast.connectError');
         set({ status: 'error', error: message });
         throw error instanceof Error ? error : new Error(message);
       } finally {
@@ -244,6 +251,9 @@ export const useCalendarStore = create<InternalCalendarState>()((set, get) => {
       // 미연결이면 등록할 수 없다(토큰 갱신 시도 전에 즉시 차단).
       if (get().status !== 'connected') {
         throw new Error('구글 캘린더에 먼저 연결해 주세요.');
+      }
+      if (preview) {
+        return { eventId: `preview-${args.captureId}`, htmlLink: null, syncedAt: new Date().toISOString() };
       }
 
       set({ isBusy: true });

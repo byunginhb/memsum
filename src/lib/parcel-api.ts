@@ -6,6 +6,7 @@
 
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
+import { preview } from '@/dev/preview';
 import type {
   CreateParcelInput,
   ParcelCarrier,
@@ -188,6 +189,7 @@ export async function createParcelTrack(input: CreateParcelInput): Promise<Parce
 
 /** 활성/최근(완료 포함, 중단 제외) 추적 목록. */
 export async function listParcelTracks(): Promise<ParcelTrack[]> {
+  if (preview) return [...preview.parcels];
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from(TABLE)

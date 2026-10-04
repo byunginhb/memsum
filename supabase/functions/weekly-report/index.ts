@@ -6,7 +6,8 @@
 //
 // 동작 요약 (POST body: { week_start?: "YYYY-MM-DD" }):
 //   1) JWT → userId 확보 (RLS 컨텍스트 유지).
-//   2) weekly_reports 캐시 조회. 있으면 즉시 반환 (OpenAI 0회 — 비용·지연 절감).
+//   2) weekly_reports 캐시 조회. 지난 주는 있으면 즉시 반환(OpenAI 0회 — 비용·지연 절감).
+//      진행 중인 주는 캡처 수가 바뀌었거나 생성 이후 새 캡처가 있으면 재생성한다.
 //   3) 없으면 그 주 captures 조회.
 //      - 캡처 < 5건: OpenAI 미호출. items:[] 캐시 후 반환(빈 상태는 화면이 안내).
 //      - 캡처 ≥ 5건: gpt-4o-mini로 5개 선별·랭킹·한줄요약(json_object 강제).
@@ -28,6 +29,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
+import { canReuseCachedReport } from "../_shared/report-cache.ts";
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -51,6 +53,13 @@ const OCR_TRUNCATE_LEN = 300;
 
 // 한 주 범위를 넘겨 후보를 받되, 입력 비용을 막기 위해 상한을 둔다.
 const MAX_CANDIDATES = 50;
+
+// 진행 중인 주 리포트의 OpenAI 재생성 하루 상한(사용자별, 비용 폭탄 방지).
+// why 진행 중 주만: 지난 주는 캐시가 있으면 OpenAI 0회라 반복 호출 비용이 없지만,
+// 이번 주는 캡처가 늘 때마다 재생성되므로 앱 복귀·당겨서 새로고침이 잦으면 호출이 쌓인다.
+// 20261004120000_usage_limits 마이그레이션의 consume_daily_usage()가 원자적으로 센다.
+const DAILY_CURRENT_WEEK_REGEN_LIMIT = 20;
+const USAGE_KIND = "weekly-report";
 
 // OpenAI 샘플링 온도. 0.6: 리마인드 톤에 자연스러운 변주를 주되, json_object 강제 +
 // capture_id 화이트리스트 + 사후 검증(normalizeOpenAiItems)이 형식·구조를 잡으므로
@@ -507,12 +516,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response("ok", { headers: corsHeaders });
   }
   if (req.method !== "POST") {
-    return errorResponse("POST 메서드만 지원합니다.", 405);
+    return errorResponse("method_not_allowed", 405);
   }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return errorResponse("인증 토큰이 없습니다.", 401);
+    return errorResponse("unauthorized", 401);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -520,10 +529,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const openAiKey = Deno.env.get("OPENAI_API_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return errorResponse(
-      "서버 설정 오류: SUPABASE_URL/SUPABASE_ANON_KEY가 설정되지 않았습니다.",
-      500,
-    );
+    console.error("[weekly-report] SUPABASE_URL/SUPABASE_ANON_KEY 미설정");
+    return errorResponse("server_misconfigured", 500);
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -533,7 +540,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // JWT 유효성 + auth.uid() 확보(upsert 시 user_id로 사용).
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData?.user) {
-    return errorResponse("유효하지 않은 인증 토큰입니다.", 401);
+    return errorResponse("unauthorized", 401);
   }
   const userId = userData.user.id;
 
@@ -543,8 +550,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const raw = await req.json().catch(() => ({}));
     body = parseBody(raw);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "잘못된 요청 본문입니다.";
-    return errorResponse(message, 400);
+    console.error("[weekly-report] 잘못된 요청 본문:", error);
+    return errorResponse("bad_request", 400);
   }
 
   // 주 경계 계산(week_start 미지정 시 현재 주 월요일 KST).
@@ -552,12 +559,44 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const weekEnd = addDays(weekStart, DAYS_PER_WEEK - 1); // 일요일
 
   try {
-    // (1) 캐시 조회 — 로케일이 일치하면 OpenAI 0회로 즉시 반환.
+    const { fromUtc, toUtc } = weekBoundsUtc(weekStart);
+    // 진행 중인 주(이번 주·미래): 캡처가 계속 늘 수 있어 캐시를 조건부로만 쓴다.
+    const isCurrentWeek = weekStart >= mondayOfWeekKst(new Date());
+
+    // total_captures는 "그 주 전체 캡처 수"여야 한다(후보는 랭킹 입력용 상한 50).
+    // 홈 통계카드의 "이번 주 N장"과 분모가 일치하도록 head:true·count:exact로 실수를 센다.
+    const countWeekCaptures = async (): Promise<number> => {
+      const { count, error } = await supabase
+        .from("captures")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .gte("created_at", fromUtc)
+        .lt("created_at", toUtc);
+      if (error) {
+        throw new Error(`captures 카운트 실패: ${error.message}`);
+      }
+      return count ?? 0;
+    };
+
+    // 진행 중 주 재생성 1회 소비. 허용이면 true. RPC 실패는 false(로그만).
+    const consumeRegenQuota = async (): Promise<boolean> => {
+      const { data: allowed, error } = await supabase.rpc("consume_daily_usage", {
+        p_kind: USAGE_KIND,
+        p_limit: DAILY_CURRENT_WEEK_REGEN_LIMIT,
+      });
+      if (error) {
+        console.error("[weekly-report] 사용량 확인 실패:", error.message);
+        return false;
+      }
+      return allowed === true;
+    };
+
+    // (1) 캐시 조회 — 재사용 가능하면 OpenAI 0회로 즉시 반환.
     //     로케일이 다르면(사용자가 언어를 바꿈) 같은 주라도 해당 언어로 다시 생성한다.
     //     legacy 행(locale null)은 ko로 간주(마이그레이션 이전 데이터 호환).
     const { data: cached, error: cacheError } = await supabase
       .from("weekly_reports")
-      .select("week_start, week_end, total_captures, items, locale")
+      .select("week_start, week_end, total_captures, items, locale, generated_at")
       .eq("user_id", userId)
       .eq("week_start", weekStart)
       .maybeSingle();
@@ -565,16 +604,50 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (cacheError) {
       throw new Error(`weekly_reports 캐시 조회 실패: ${cacheError.message}`);
     }
+
+    let knownWeekCount: number | null = null;
     if (cached) {
-      const cachedLocale =
-        (cached as { locale?: string | null }).locale === "en" ? "en" : "ko";
-      if (cachedLocale === body.locale) {
+      const meta = cached as {
+        locale?: string | null;
+        total_captures?: number | null;
+        generated_at?: string | null;
+      };
+      let currentState: { weekCount: number; latestCaptureAt: string | null } | null = null;
+      if (isCurrentWeek) {
+        knownWeekCount = await countWeekCaptures();
+        const { data: latestRows, error: latestError } = await supabase
+          .from("captures")
+          .select("created_at")
+          .eq("user_id", userId)
+          .gte("created_at", fromUtc)
+          .lt("created_at", toUtc)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (latestError) {
+          throw new Error(`captures 최신 시각 조회 실패: ${latestError.message}`);
+        }
+        const latest = (latestRows ?? [])[0] as { created_at?: string } | undefined;
+        currentState = {
+          weekCount: knownWeekCount,
+          latestCaptureAt: typeof latest?.created_at === "string" ? latest.created_at : null,
+        };
+      }
+      const reusable = canReuseCachedReport(
+        {
+          locale: meta.locale ?? null,
+          total_captures: meta.total_captures ?? null,
+          generated_at: meta.generated_at ?? null,
+        },
+        body.locale,
+        isCurrentWeek,
+        currentState,
+      );
+      if (reusable) {
         return jsonResponse(toResponse(cached), 200);
       }
     }
 
     // (2) 그 주 캡처 후보 조회(최신순, 상한 MAX_CANDIDATES).
-    const { fromUtc, toUtc } = weekBoundsUtc(weekStart);
     const { data: rows, error: capError } = await supabase
       .from("captures")
       .select("id, ocr_text, parsed_event, image_url, category, created_at")
@@ -590,19 +663,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const candidates = (rows ?? []) as CaptureCandidate[];
-
-    // total_captures는 "그 주 전체 캡처 수"여야 한다(후보는 랭킹 입력용 상한 50).
-    // 홈 통계카드의 "이번 주 N장"과 분모가 일치하도록 head:true·count:exact로 실수를 센다.
-    const { count: weekCount, error: countError } = await supabase
-      .from("captures")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", fromUtc)
-      .lt("created_at", toUtc);
-    if (countError) {
-      throw new Error(`captures 카운트 실패: ${countError.message}`);
-    }
-    const totalCaptures = weekCount ?? candidates.length;
+    const totalCaptures = knownWeekCount ?? await countWeekCaptures();
 
     // (3) 캡처 < 5건: OpenAI 미호출, 빈 items 캐시·반환.
     let items: ReportItemRow[];
@@ -611,6 +672,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     } else if (!openAiKey) {
       // 키 미설정이어도 화면이 빈 화면으로 깨지지 않도록 폴백으로 채운다.
       console.warn("[weekly-report] OPENAI_API_KEY 미설정 — created_at 폴백 사용.");
+      items = buildFallbackItems(candidates);
+    } else if (isCurrentWeek && !(await consumeRegenQuota())) {
+      // 상한 초과(또는 카운터 확인 실패 — 비용 보호를 위해 닫힌 쪽): OpenAI를 부르지 않는다.
+      // 기존 리포트가 있으면 그대로 돌려주고(더 나은 결과를 폴백으로 덮어쓰지 않게), 없으면 폴백.
+      if (cached) {
+        return jsonResponse(toResponse(cached), 200);
+      }
       items = buildFallbackItems(candidates);
     } else {
       // (4) gpt-4o-mini 선별·랭킹. 실패 시 created_at desc 상위 5 폴백.
@@ -652,9 +720,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return jsonResponse(toResponse(upserted), 200);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "처리 중 오류가 발생했습니다.";
-    console.error("weekly-report 실패:", message);
-    return errorResponse(message, 502);
+    // 원문(DB/OpenAI 상세)은 로그에만 — 클라이언트엔 일반 코드만 준다.
+    console.error("weekly-report 실패:", error);
+    return errorResponse("processing_failed", 502);
   }
 });
 

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 
+import { preview } from '@/dev/preview';
 import { AnalyticsEvent, track } from '@/lib/analytics';
-import { processCapture } from '@/lib/api';
-import { uploadCaptureImage } from '@/lib/storage';
+import { ProcessCaptureError, processCapture } from '@/lib/api';
+import { topOcrBoxes } from '@/lib/ocr-boxes';
+import { removeCaptureImage, uploadCaptureImage } from '@/lib/storage';
 import { useAuthStore } from '@/stores/auth-store';
 // 자동 캘린더 등록(설정 ON + 구글 연결 시). calendar-store는 capture-store를
 // import하지 않으므로 순환 의존이 없다.
@@ -13,9 +15,18 @@ import { recognizeText } from '../../modules/vision-ocr';
 
 import type {
   CaptureDraft,
+  CaptureErrorCode,
   CaptureStage,
   ProcessCaptureResult,
 } from '@/features/capture/types';
+import type { OcrBox } from '../../modules/vision-ocr';
+
+/**
+ * 시트용 draft + OCR 글자 위치(0~1, 좌상단 원점, 위에서부터 최대 8개).
+ * 캡처 시트의 스캔 연출(ScanReveal)이 `draft.ocrBoxes`로 읽는다. OCR 전이거나
+ * 구버전 네이티브면 없다.
+ */
+export type CaptureDraftWithBoxes = CaptureDraft & { ocrBoxes?: OcrBox[] };
 
 /**
  * 캡처 파이프라인 오케스트레이션 스토어 (W3-C).
@@ -38,8 +49,10 @@ export type StartCaptureInput = {
   uri?: string;
 };
 
+export type StartCaptureResult = { saved: boolean; skipped?: boolean };
+
 type CaptureStore = {
-  current: CaptureDraft | null;
+  current: CaptureDraftWithBoxes | null;
   isSheetOpen: boolean;
   /** 캡처가 'done'(서버 저장 완료)에 도달할 때마다 증가. 리스트 화면이 이 값을 구독해 새로고침한다. */
   savedCount: number;
@@ -49,11 +62,12 @@ type CaptureStore = {
    *
    * @returns saved — 서버 저장(done)까지 완료됐는지. 호출 측(자동 캡처 토스트 등)이
    * 전역 savedCount 폴링 대신 이 반환값으로 성공을 판별한다(동시 캡처 race 제거).
+   * skipped — 글자를 찾지 못해 저장하지 않음(실패가 아니므로 오류 토스트를 띄우지 않는다).
    */
   startCapture: (
     input: StartCaptureInput,
     options?: { silent?: boolean },
-  ) => Promise<{ saved: boolean }>;
+  ) => Promise<StartCaptureResult>;
   closeSheet: () => void;
   reset: () => void;
   /**
@@ -89,6 +103,26 @@ function ocrSource(input: StartCaptureInput): { assetId?: string; uri?: string }
  */
 function uploadUri(input: StartCaptureInput): string {
   return input.uri ?? input.imageUri;
+}
+
+/**
+ * 화면에 보일 오류 종류. 서버·라이브러리 원문(DB/OpenAI 상세)은 로그에만 남기고
+ * 화면은 이 코드로 i18n 일반 문구를 고른다.
+ */
+function captureErrorCode(error: unknown): CaptureErrorCode {
+  if (error instanceof ProcessCaptureError && error.code === 'rate_limited') {
+    return 'rateLimited';
+  }
+  return 'generic';
+}
+
+/** 업로드 후 서버 호출 전에 중단된 캡처의 이미지를 지운다(고아 객체 방지, 실패는 무시). */
+async function discardUploadedImage(path: string): Promise<void> {
+  try {
+    await removeCaptureImage(path);
+  } catch (error) {
+    console.error('[capture] 업로드 이미지 정리 실패:', error);
+  }
 }
 
 /** 설정 복원 대기 안전망(ms) — 복원 실패로 hydrated가 영영 안 켜져도 진행한다. */
@@ -152,14 +186,15 @@ async function autoRegisterCalendarIfEnabled(
 }
 
 export const useCaptureStore = create<CaptureStore>((set, get) => ({
-  current: null,
-  isSheetOpen: false,
+  // 웹 미리보기(개발 전용) `?sheet=`로 고른 시트 상태. 네이티브에서는 preview가 항상 null.
+  current: preview?.sheetDraft ?? null,
+  isSheetOpen: Boolean(preview?.sheetDraft),
   savedCount: 0,
 
   startCapture: async (
     input: StartCaptureInput,
     options?: { silent?: boolean },
-  ): Promise<{ saved: boolean }> => {
+  ): Promise<StartCaptureResult> => {
     const silent = options?.silent === true;
     const id = localCaptureId();
 
@@ -179,7 +214,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
 
     // 단계 전이(UI 추적용). silent는 UI가 없으므로 항상 계속 진행한다.
     // 비-silent는 그 사이 다른 캡처로 교체됐으면 UI 갱신을 멈춘다(파이프라인 자체는 계속).
-    const advance = (next: CaptureDraft): boolean => {
+    const advance = (next: CaptureDraftWithBoxes): boolean => {
       if (silent) return true;
       if (get().current?.id !== id) return false;
       set({ current: next });
@@ -187,23 +222,25 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     };
 
     const fail = (stage: CaptureStage, error: unknown): void => {
-      const message =
-        error instanceof Error ? error.message : '캡처 처리 중 오류가 발생했습니다.';
       console.error('[capture] 실패:', { id, stage, error });
       if (silent) return; // 백그라운드 캡처는 UI 상태를 건드리지 않는다(호출 측이 반환값으로 처리).
       // 현재 draft가 이 캡처일 때만 error로 전이(불변 업데이트).
       const draft = get().current;
       if (!draft || draft.id !== id) return;
-      set({ current: { ...draft, stage: 'error', error: message } });
+      set({ current: { ...draft, stage: 'error', errorCode: captureErrorCode(error) } });
     };
+
+    // 업로드는 됐지만 서버(process-capture)에 넘기기 전에 끝난 경우 이미지를 정리한다.
+    // 서버 호출 이후의 실패는 지우지 않는다 — 응답만 유실되고 행은 저장됐을 수 있어서.
+    let uploadedPath: string | null = null;
+    let serverCalled = false;
 
     try {
       // ① 세션 보장(익명 로그인). userId 확보.
       await useAuthStore.getState().ensureSession();
       const userId = useAuthStore.getState().userId;
       if (!userId) {
-        const authError = useAuthStore.getState().error;
-        fail('uploading', new Error(authError ?? '로그인 세션을 확보하지 못했습니다.'));
+        fail('uploading', new Error(useAuthStore.getState().error ?? 'no session'));
         return { saved: false };
       }
 
@@ -213,15 +250,34 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         userId,
         captureId: id,
       });
+      uploadedPath = upload.path;
+      // UI가 다른 캡처로 교체돼 중단하는 경우에도 서버 호출 전이므로 이미지를 정리한다.
       if (!advance({ ...initial, stage: 'uploading', storagePath: upload.path })) {
+        await discardUploadedImage(upload.path);
         return { saved: false };
       }
 
       // ③ 온디바이스 OCR(stage: ocr).
       if (!advance({ ...initial, stage: 'ocr', storagePath: upload.path })) {
+        await discardUploadedImage(upload.path);
         return { saved: false };
       }
       const ocr = await recognizeText(ocrSource(input));
+      const ocrBoxes = topOcrBoxes(ocr.lines);
+
+      // 글자가 없는 스크린샷(사진·그래픽 등): 서버(GPT) 호출 없이 "건너뜀"으로 끝낸다.
+      // 서버도 빈 텍스트를 400으로 거절하므로 호출해 봐야 비용·오류 토스트만 생긴다.
+      if (ocr.text.trim().length === 0) {
+        await discardUploadedImage(upload.path);
+        uploadedPath = null;
+        if (!silent) {
+          const draft = get().current;
+          if (draft && draft.id === id) {
+            set({ current: { ...draft, stage: 'error', errorCode: 'noText' } });
+          }
+        }
+        return { saved: false, skipped: true };
+      }
 
       // ④ process-capture 호출(stage: processing). image_url(path)을 함께 넘긴다.
       if (
@@ -230,14 +286,17 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
           stage: 'processing',
           storagePath: upload.path,
           ocrText: ocr.text,
+          ocrBoxes,
         })
       ) {
+        await discardUploadedImage(upload.path);
         return { saved: false };
       }
       // captureId는 넘기지 않는다: 로컬 id(cap_...)는 DB에 없고 uuid도 아니라
       // 함수의 UPDATE-by-id 경로가 실패한다. capture_id 없이 호출해 새 row를
       // INSERT 시키고, 서버가 발급한 capture_id는 result.capture_id로 받는다.
       // (storage 경로의 로컬 id는 파일명일 뿐이며 image_url 컬럼으로 row와 연결된다.)
+      serverCalled = true;
       const result = await processCapture({
         ocrText: ocr.text,
         sourcePlatform: input.sourcePlatform,
@@ -251,6 +310,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         stage: 'done',
         storagePath: upload.path,
         ocrText: ocr.text,
+        ocrBoxes,
         result,
       });
       set({ savedCount: get().savedCount + 1 });
@@ -272,6 +332,9 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     } catch (error) {
       // 단계는 현재 draft에서 추정(가장 최근 전이 stage). silent는 추적 안 하므로 uploading.
       const stage = silent ? 'uploading' : (get().current?.stage ?? 'uploading');
+      if (uploadedPath && !serverCalled) {
+        await discardUploadedImage(uploadedPath);
+      }
       fail(stage, error);
       return { saved: false };
     }

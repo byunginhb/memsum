@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+  <!-- Android 12(API 32) 이하는 READ_MEDIA_IMAGES가 없어 이 권한으로 MediaStore를 읽는다.
+       maxSdkVersion: 13+ 기기에는 선언 자체를 빼 불필요한 권한 노출을 막는다. -->
+  <uses-permission
+    android:name="android.permission.READ_EXTERNAL_STORAGE"
+    android:maxSdkVersion="32" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
   <application>

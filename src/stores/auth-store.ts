@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
+import { preview } from '@/dev/preview';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 import type { AuthState } from '@/features/capture/types';
@@ -79,6 +80,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     if (inFlight) return inFlight;
 
     inFlight = (async () => {
+      // 웹 미리보기(개발 전용): 서버 없이 로그인된 것처럼 둔다.
+      if (preview) {
+        set({ status: 'authenticated', userId: 'preview-user', accessToken: null, error: undefined });
+        return;
+      }
       // Supabase 미설정이면 graceful하게 error 상태로 둔다(앱은 계속 뜸).
       if (!isSupabaseConfigured() || !supabase) {
         set({ status: 'error', error: SUPABASE_UNCONFIGURED_MESSAGE });

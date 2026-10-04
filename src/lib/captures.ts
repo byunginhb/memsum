@@ -11,6 +11,7 @@
 // 비공개 버킷이라 조회 시점에 서명 URL을 생성한다. N개를 개별 생성하면
 // N round-trip이므로 createSignedUrls(복수형 batch API)로 1회에 채운다.
 
+import { preview } from '@/dev/preview';
 import type { CaptureEvent } from '@/features/capture/types';
 import type {
   CaptureListItem,
@@ -210,6 +211,7 @@ export async function listCaptures(
   args: ListCapturesArgs = {},
 ): Promise<CaptureListPage> {
   const { cursor = null, limit = DEFAULT_LIST_LIMIT } = args;
+  if (preview) return { items: [...preview.captures], nextCursor: null };
   const supabase = getSupabase();
 
   try {
@@ -264,6 +266,14 @@ export async function searchCaptures(
 ): Promise<CaptureListItem[]> {
   const { query, limit = DEFAULT_SEARCH_LIMIT, category } = args;
   const trimmed = query.trim();
+  if (preview) {
+    const q = trimmed.toLowerCase();
+    return preview.captures.filter(
+      (c) =>
+        (!category || c.category === category) &&
+        (q.length === 0 || `${c.title} ${c.summary} ${c.ocrText}`.toLowerCase().includes(q)),
+    );
+  }
 
   // query·category 둘 다 없으면 검색 의미가 없다 → 즉시 빈 결과(호출 비용 0).
   if (trimmed.length === 0 && !category) return [];
@@ -309,6 +319,7 @@ export async function searchCaptures(
  * 단건 캡처 조회. 없거나(RLS로 미노출 포함) 행이 0개면 null.
  */
 export async function getCapture(id: string): Promise<CaptureListItem | null> {
+  if (preview) return preview.captures.find((c) => c.id === id) ?? null;
   const supabase = getSupabase();
 
   try {
@@ -347,6 +358,7 @@ export async function getCapture(id: string): Promise<CaptureListItem | null> {
 export async function listEventCaptures(
   limit = DEFAULT_LIST_LIMIT,
 ): Promise<CaptureListItem[]> {
+  if (preview) return preview.captures.filter((c) => c.event !== null).slice(0, limit);
   const supabase = getSupabase();
 
   try {

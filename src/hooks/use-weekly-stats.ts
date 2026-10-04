@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { t } from '@/i18n';
 import { countCapturesThisWeek } from '@/lib/stats';
 import { useCaptureStore } from '@/stores/capture-store';
 
@@ -45,8 +46,9 @@ export function useWeeklyStats(): UseWeeklyStatsResult {
       setStats(next);
     } catch (err) {
       if (!mountedRef.current) return;
-      const message =
-        err instanceof Error ? err.message : '이번 주 통계를 불러오지 못했습니다.';
+      // 원문(서버·DB 상세)은 로그에만 — 화면엔 일반 문구.
+      console.error('[use-weekly-stats] 로드 실패:', err);
+      const message = t('common.error.load');
       setError(message);
     } finally {
       if (mountedRef.current) setIsLoading(false);
