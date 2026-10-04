@@ -10,8 +10,8 @@
 | 패키지 | `app.memsum` (첫 AAB 업로드 순간 영구 고정) |
 | JDK | `~/android-tools/jdk-17.0.20+8/Contents/Home` |
 | Android SDK | `~/android-tools/android_sdk` (build-tools 36.0.0) |
-| 업로드 키스토어 | `~/android-tools/memsum-upload.keystore` (alias `memsum`, RSA 2048, 유효 10000일) |
-| 키 비밀번호 파일 | `~/android-tools/memsum-keystore-password.txt` (권한 600, 스토어·키 비밀번호 동일) |
+| 업로드 키스토어 | `~/android-tools/memsum-eas-upload.jks` — **EAS가 관리하던 기존 업로드 키를 내려받은 것**(2026-10-04, `eas credentials` → Download existing keystore). v1.0.0(versionCode 3~8)을 서명한 바로 그 키 |
+| 키 별칭·비밀번호 파일 | `~/android-tools/memsum-eas-key-alias.txt`, `memsum-eas-keystore-password.txt`, `memsum-eas-key-password.txt` (권한 600, 스토어·키 비밀번호가 다름) |
 | 서명 프로퍼티 이름 | `MEMSUM_STORE_FILE`, `MEMSUM_STORE_PASSWORD`, `MEMSUM_KEY_ALIAS`, `MEMSUM_KEY_PASSWORD` |
 | 서명 주입 플러그인 | 저장소 루트 `withReleaseSigning.js` (`app.json` plugins 마지막) — prebuild 때마다 서명 설정과 R8 축소를 다시 넣는다 |
 | Play API 키 | `~/android-tools/play-service-account.json` (서비스 계정 `play-publisher@maldongmu.iam.gserviceaccount.com`) |
@@ -19,26 +19,20 @@
 | 제출 스크립트 | `scripts/store/play_publish.py` (스토어 폴더 기본값 `docs/store`) |
 | 산출물 위치 | `~/android-tools/memsum-v<버전>.aab`, `-test.apk`, `-mapping.txt` (저장소 밖, 커밋 금지) |
 
-### 업로드 키 지문 (2026-10-04 생성)
+### 업로드 키 지문 (EAS 키)
 ```
-SHA-1:   75:20:50:2B:A6:81:24:A8:ED:91:0C:C3:48:7D:8D:1F:82:50:D3:DD
-SHA-256: 1F:07:68:98:8E:96:04:5B:DF:7E:00:28:DA:FD:AB:42:8F:C3:7E:F7:80:5B:C1:E7:8E:14:AF:2B:AE:EF:10:91
+SHA-1:   6E:1A:63:2F:FF:4C:03:6E:D8:9B:A8:6C:5E:B7:15:2E:A7:1E:49:0F
+SHA-256: 5E:A4:0A:40:7F:3F:68:F1:8D:A4:E0:EB:15:4C:83:CE:E8:36:5F:11:E5:08:A6:10:2A:1E:96:77:77:30:73:81
 ```
-Play 앱 서명을 쓰므로 **사용자 폰에 설치되는 앱은 Google의 앱 서명 키로 다시 서명된다.** 그 키의 지문은 첫 업로드 후
-콘솔 → 테스트 및 출시 → 설정 → 앱 무결성 → 앱 서명에서 확인한다(§6).
+Play 앱 서명을 쓰므로 사용자 폰에 설치되는 앱은 Google의 앱 서명 키로 다시 서명된다(콘솔 → 앱 무결성 → 앱 서명).
 
-키스토어와 비밀번호 파일은 백업하고, 이미 있는 키스토어는 절대 다시 만들지 않는다.
-
-> ⚠️ **(2026-10-04 병합 시 확인) 이 앱은 이미 다른 맥에서 EAS로 Play에 올라가 있다(versionCode 3·7·8).**
-> 그때 쓴 업로드 키는 EAS가 관리하는 키스토어라 위의 로컬 키(`1F:07:68…`)와 **다를 가능성이 높다.**
-> 다르면 로컬 서명 AAB는 콘솔이 "잘못된 키로 서명됨"으로 거부한다. 첫 로컬 제출 전에:
-> 1. 콘솔 → 앱 무결성 → 앱 서명 → "업로드 키 인증서" SHA-256을 위 값과 비교한다.
-> 2. 같으면 그대로 진행. 다르면 ⓐ `eas credentials`로 EAS 키스토어를 내려받아 로컬 서명에 쓰거나,
->    ⓑ 콘솔에서 "업로드 키 재설정"을 요청해 로컬 키(`memsum-upload.keystore`의 인증서 PEM)로 바꾼다(승인까지 며칠).
+- 이 앱은 2026-07 다른 맥에서 EAS 클라우드 빌드로 출시됐다(versionCode 3·7·8, 운영 트랙 8). 같은 업로드 키를 써야 하므로 위 EAS 키로 로컬 서명한다.
+- 2026-10-04 처음 만든 `~/android-tools/memsum-upload.keystore`(SHA-256 `1F:07:68…`)는 **쓰지 않는다**(Play에 등록되지 않은 키).
+- EAS 키는 EAS 서버에도 그대로 있으니, 필요하면 `eas build --profile production -p android`로도 같은 서명의 빌드를 만들 수 있다.
 
 ## 1. 빌드 전 준비
 - **`.env` 필수.** `EXPO_PUBLIC_*` 값은 빌드 시점에 JS 번들에 박힌다. `.env` 없이 빌드하면 Supabase·구글 캘린더가 꺼진 앱이 나온다
-  (2026-10-04 현재 이 맥에 `.env` 없음 → 툴체인 점검 빌드만 함). 항목은 `.env.example` 참고.
+  항목은 `.env.example` 참고. (EAS 빌드 때는 같은 값이 EAS 프로덕션 환경변수로 등록돼 있었다.)
 - `EXPO_PUBLIC_POSTHOG_KEY` 유무에 따라 데이터 보안 답이 달라진다(`console-answers.md` §2-4).
 - `pnpm install` 완료 상태.
 
@@ -49,12 +43,12 @@ export PATH="$JAVA_HOME/bin:$PATH"
 cd ~/Documents/projects/memsum
 pnpm exec expo prebuild --platform android --clean --no-install
 grep -c MEMSUM_STORE_FILE android/app/build.gradle      # 0이면 서명 치환 실패 → withReleaseSigning.js의 치환 문자열 확인
-PW="$(cat ~/android-tools/memsum-keystore-password.txt)"
+T=~/android-tools
 cd android && echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew bundleRelease assembleRelease --no-daemon \
-  -PMEMSUM_STORE_FILE="$HOME/android-tools/memsum-upload.keystore" -PMEMSUM_STORE_PASSWORD="$PW" \
-  -PMEMSUM_KEY_ALIAS=memsum -PMEMSUM_KEY_PASSWORD="$PW"
-V=1.0.0
+  -PMEMSUM_STORE_FILE="$T/memsum-eas-upload.jks" -PMEMSUM_STORE_PASSWORD="$(cat $T/memsum-eas-keystore-password.txt)" \
+  -PMEMSUM_KEY_ALIAS="$(cat $T/memsum-eas-key-alias.txt)" -PMEMSUM_KEY_PASSWORD="$(cat $T/memsum-eas-key-password.txt)"
+V=1.1.0
 cp app/build/outputs/bundle/release/app-release.aab ~/android-tools/memsum-v$V.aab
 cp app/build/outputs/apk/release/app-release.apk   ~/android-tools/memsum-v$V-test.apk
 cp app/build/outputs/mapping/release/mapping.txt   ~/android-tools/memsum-v$V-mapping.txt
@@ -132,7 +126,7 @@ $PY scripts/store/play_publish.py --package app.memsum --aab ~/android-tools/mem
 | prebuild 서명 치환 | `build.gradle`에 `MEMSUM_STORE_FILE` 들어감, `gradle.properties`에 R8·리소스 축소 true |
 | 빌드 | `bundleRelease assembleRelease` 성공 (11분 46초, JS 번들 포함) |
 | 크기 | AAB 95MB, 범용 APK 149MB (모든 CPU 종류 + ML Kit 한국어 인식 모델 내장. Play는 기기별로 쪼개 내려주므로 실제 설치 크기는 훨씬 작다) |
-| 서명 | AAB·APK 모두 업로드 키 SHA-256 `1F:07:68:…:10:91` 일치 |
+| 서명 | AAB·APK 모두 업로드 키 SHA-256 일치 (2026-10-04 점검 빌드는 폐기한 로컬 키 `1F:07:68…`로 서명 — 제출 안 함) |
 | 버전 | `app.memsum` versionCode 1 / versionName 1.0.0 / minSdk 24 / targetSdk 36 |
 | `.env` 값 | Supabase 주소 0개, 구글 클라이언트 ID 0개 → 예상대로 빠짐(그래서 제출 불가) |
 | mapping | `~/android-tools/memsum-v1.0.0-toolcheck-mapping.txt` |

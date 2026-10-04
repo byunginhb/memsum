@@ -11,31 +11,14 @@
 > 빌드·서명·스토어 문구·설문 답안·업로드 스크립트는 Claude가 준비했습니다. 자세한 절차는 `docs/store/mobile-app.md`,
 > 설문 답은 `docs/store/console-answers.md`.
 
-1. **`.env` 파일 복원** (이 맥에 없음 — 빌드 전 필수)
-   - 예전 맥(또는 백업)의 `memsum/.env`를 이 맥의 같은 위치로 옮겨 주세요. 채팅에 내용을 붙여넣지 마세요.
-   - 없으면 키 5개를 다시 채워야 합니다: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
-     `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`, (분석을 켤 거면) `EXPO_PUBLIC_POSTHOG_KEY`.
-   - `.env` 없이 빌드하면 앱은 뜨지만 서버 연결이 꺼진 상태라 제출하면 안 됩니다.
-2. **업로드 키 백업** — `~/android-tools/memsum-upload.keystore`와 `~/android-tools/memsum-keystore-password.txt` 두 파일을
-   비밀번호 관리자나 외장 백업에 복사해 두세요. 잃어버리면 Play 고객센터에 키 재설정을 요청해야 합니다.
-3. **Play Console에서 앱 만들기** — https://play.google.com/console → 앱 만들기
-   - 앱 이름 `Memsum 멤섬 - 스크린샷 정리`, 기본 언어 **한국어**, 앱, 무료, 선언 두 개 체크
-4. **첫 AAB 수동 업로드(내부 테스트)** — `.env` 복원 후 Claude가 만든 `~/android-tools/memsum-v1.0.0.aab`를
-   테스트 및 출시 → **내부 테스트** → 새 버전 만들기 → Play 앱 서명 동의 → AAB 업로드 → 출시명 `1.0.0` → 저장·출시.
-   테스터 목록에 본인 구글 계정을 넣고 링크로 폰에 설치합니다. (첫 번들은 API로 못 올려서 이 한 번만 손으로 합니다)
-   - ⚠️ 패키지 이름 `app.memsum`은 이 순간 영구 고정됩니다.
-   - 콘솔이 "앱 콘텐츠를 먼저 완료하라"며 출시 버튼을 막으면 6번을 먼저 하고 돌아오세요(저장까지는 됩니다).
-5. **서비스 계정에 이 앱 권한 추가** — 콘솔 **홈의 "사용자 및 권한"**(앱 안 아님) → 목록의
-   `play-publisher@maldongmu.iam.gserviceaccount.com` 행 **수정(연필)** → 앱 권한 → 앱 추가 → Memsum →
-   "릴리스 관리"·"스토어 등록정보 관리" 체크 → 저장. ("새 사용자 초대"는 누르지 마세요 — 이미 있는 계정이라 오류가 납니다)
-   이후 버전 업로드·등록정보·이미지는 Claude가 스크립트로 올립니다.
-6. **앱 콘텐츠 설문** (정책 및 프로그램 → 앱 콘텐츠) — `docs/store/console-answers.md` 순서대로:
-   개인정보처리방침 URL, 앱 액세스(로그인 불필요), 광고 없음, **광고 ID 아니요**, 콘텐츠 등급, 타겟층 18세 이상,
-   데이터 보안, **사진 및 동영상 권한 선언**(영문 문구 그대로 붙여넣기).
-7. **앱 서명 키 SHA-1 전달** — 테스트 및 출시 → 설정 → **앱 무결성 → 앱 서명** 화면의 "앱 서명 키 인증서" SHA-1 값을
-   알려 주세요(공개값이라 채팅에 붙여도 됩니다). 내부 테스트 앱에서 구글 캘린더 연결이 실패하면 이 값으로
-   Google Cloud에 Android OAuth 클라이언트를 추가합니다(`mobile-app.md` §6).
-8. 스토어 이미지(아이콘 512·피처 그래픽·스크린샷)는 리디자인 반영 후 Claude가 새로 만들어 올립니다. 그 전까지는 프로덕션 제출 보류.
+(2026-10-04 갱신) 앱은 이미 Play에 출시돼 있고(v1.0.0, versionCode 8), 서비스 계정 권한도 있어 업데이트는 Claude가 API로 올립니다.
+
+1. ~~`.env` 복원~~ ✅ 완료 / ~~EAS 로그인~~ ✅ 완료
+2. **업로드 키 백업** — `~/android-tools/memsum-eas-upload.jks`와 `memsum-eas-*.txt` 3개(별칭·비밀번호)를
+   비밀번호 관리자나 외장 백업에 복사해 두세요. 같은 키가 EAS 서버에도 있어 분실 시 `eas credentials`로 다시 받을 수 있습니다.
+   (`~/android-tools/memsum-upload.keystore`는 Play에 등록되지 않은 키라 쓰지 않습니다 — 지워도 됩니다)
+3. **Supabase CLI 로그인** — 서버 함수 배포용: `! pnpm dlx supabase login`
+4. 업데이트가 내부 테스트에 올라가면 폰에서 확인: 자동 감지 → 알림 [저장], 스캔 형광펜, 캘린더 연결, 전날 밤 리마인드.
 
 ---
 
