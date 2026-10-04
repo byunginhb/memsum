@@ -1,40 +1,49 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { Button } from '@/design/components/Button/Button';
 import { EmptyState } from '@/design/components/EmptyState/EmptyState';
 import { Header } from '@/design/components/Header/Header';
+import { Text } from '@/design/components/Text/Text';
 import { Icon } from '@/design/icons/Icon';
-import { DotsGrid } from '@/design/illustrations/DotsGrid';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
-import type { ReportFeedback, WeeklyReport } from '@/features/report/types';
-import { ReportCard } from '@/features/report/ReportCard';
+import { radius, spacing } from '@/design/tokens';
 import { ReportCoachmark } from '@/features/report/ReportCoachmark';
+import {
+  RANK_COLUMN,
+  REPORT_LINE_COUNT,
+  ReportLine,
+  THUMB_HEIGHT,
+  THUMB_WIDTH,
+} from '@/features/report/ReportLine';
+import type { ReportFeedback, WeeklyReport } from '@/features/report/types';
 import { useWeeklyReport } from '@/hooks/use-weekly-report';
 import { getLocale, t } from '@/i18n';
 import { AnalyticsEvent, track } from '@/lib/analytics';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 
+/** 로딩 자리표시 줄의 문장 막대 너비(%) — 줄마다 길이를 달리해 실제 문장처럼 보이게. */
+const SKELETON_WIDTHS = ['82%', '64%', '74%', '58%', '68%'] as const;
+/** 자리표시 문장 막대 높이 = headline 행간 근처. */
+const SKELETON_BAR_HEIGHT = 18;
+
 type WeeklyReportScreenProps = {
   /** "YYYY-MM-DD"(KST 월요일). 미지정 시 이번 주. */
   weekStart?: string;
-  /**
-   * 사용자 닉네임. 빈 문자열이면 "이름 없음" 카피를 사용한다.
-   * settings store는 다른 작업에서 만드는 중이라, 충돌 회피로 prop 주입한다(추후 통합).
-   */
+  /** 사용자 닉네임. 빈 문자열이면 이름 없는 문구를 쓴다. */
   nickname?: string;
 };
 
 /**
- * WeeklyReportScreen — 주간 5줄 리포트(Hero Moment, design.md §27).
+ * WeeklyReportScreen — 일요일의 5줄 리포트.
  *
- * 구성: Header → 주차 캡션 → 헤딩 → 서브타이틀 → ReportCard 5개 → 자료실 보기(ghost).
- * 상태: 로딩(중앙 스피너) / 에러(StatusBlock + 재시도) / 빈 캡처<5(EmptyState + DotsGrid).
- * Hero(1번) 카드 등장 햅틱은 ReportCard가 reveal 완료 콜백에서 발화한다(모션과 결합).
+ * 머리표(기간) + display 제목 "5줄 리포트" → 한 줄 소개 → 다섯 줄(ReportLine).
+ * 순위 숫자가 1부터 차례로 떨어지는 연출이 이 화면의 단 하나의 연출이고,
+ * 1위 숫자에만 형광펜이 그어지며 약한 햅틱이 함께 온다.
+ * 상태: 로딩(자리표시 다섯 줄) / 오류(왼쪽 정렬 + 다시 시도) / 빈(왼쪽 정렬 + 홈으로).
  */
 export function WeeklyReportScreen({
   weekStart,
@@ -44,8 +53,7 @@ export function WeeklyReportScreen({
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { report, isLoading, error, refresh, setFeedback } =
-    useWeeklyReport(weekStart);
+  const { report, isLoading, error, refresh, setFeedback } = useWeeklyReport(weekStart);
 
   // 분석(비차단): 항목 있는 리포트 열람 = 핵심 가치 모먼트 도달(BM 검증 퍼널).
   useEffect(() => {
@@ -56,15 +64,14 @@ export function WeeklyReportScreen({
     });
   }, [report]);
 
-  const contentStyle = useMemo(
-    () => ({
-      paddingHorizontal: spacing.xl,
-      paddingTop: spacing.xl,
-      paddingBottom: insets.bottom + spacing['4xl'],
-      gap: spacing.lg,
-    }),
-    [insets.bottom],
-  );
+  // 알림 딥링크로 바로 열린 경우엔 돌아갈 화면이 없으므로 홈으로 보낸다.
+  const handleBack = (): void => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
 
   const handlePressOriginal = (captureId: string): void => {
     track(AnalyticsEvent.ReportItemOpened, {});
@@ -76,20 +83,39 @@ export function WeeklyReportScreen({
     void setFeedback(captureId, rating);
   };
 
+  const eyebrow = report
+    ? t('report.weekRange', {
+        start: formatWeekDate(report.weekStart),
+        end: formatWeekDate(report.weekEnd),
+      })
+    : undefined;
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
-      <Header title={t('report.title')} topInset={insets.top} />
-      <Body
-        report={report}
-        isLoading={isLoading}
-        error={error}
-        nickname={nickname}
-        contentStyle={contentStyle}
-        onRetry={refresh}
-        onPressOriginal={handlePressOriginal}
-        onFeedback={handleFeedback}
-        onViewArchive={() => router.push('/search')}
+      <Header
+        large
+        title={t('report.title')}
+        eyebrow={eyebrow}
+        onBack={handleBack}
+        backLabel={t('common.back')}
+        topInset={insets.top}
       />
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing['4xl'] }]}
+      >
+        <Body
+          report={report}
+          isLoading={isLoading}
+          error={error}
+          nickname={nickname}
+          onRetry={() => void refresh()}
+          onPressOriginal={handlePressOriginal}
+          onFeedback={handleFeedback}
+          onViewArchive={() => router.push('/search')}
+          onGoHome={() => router.replace('/')}
+        />
+      </ScrollView>
     </View>
   );
 }
@@ -99,140 +125,140 @@ type BodyProps = {
   isLoading: boolean;
   error: string | null;
   nickname: string;
-  contentStyle: object;
   onRetry: () => void;
   onPressOriginal: (captureId: string) => void;
   onFeedback: (captureId: string, rating: ReportFeedback) => void;
   onViewArchive: () => void;
+  onGoHome: () => void;
 };
 
-/** 상태 분기: 로딩 → 에러 → 빈(캡처<5) → 리포트. */
+/** 상태 분기: 로딩 → 오류 → 빈(캡처 < 5) → 리포트. */
 function Body({
   report,
   isLoading,
   error,
   nickname,
-  contentStyle,
   onRetry,
   onPressOriginal,
   onFeedback,
   onViewArchive,
+  onGoHome,
 }: BodyProps): ReactNode {
-  const { colors } = useTheme();
-  // 코치마크 1회 노출 제어(영속 플래그). 훅은 조기 반환 전에 무조건 호출한다(Rules of Hooks).
+  // 첫 열람 1회 안내. 훅은 조기 반환 전에 무조건 호출한다(Rules of Hooks).
   const coachmarkHydrated = useOnboardingStore((s) => s.hydrated);
   const coachmarkSeen = useOnboardingStore((s) => s.reportCoachmarkSeen);
   const seeReportCoachmark = useOnboardingStore((s) => s.seeReportCoachmark);
 
-  // 최초 로딩(데이터 없음) — 중앙 스피너.
   if (isLoading && !report) {
-    return (
-      <View style={[styles.flex, styles.center]} accessibilityRole="progressbar">
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <ReportSkeleton />;
   }
 
-  // 에러(데이터 없음) — StatusBlock + 재시도.
   if (error && !report) {
     return (
-      <View style={[styles.flex, styles.center]}>
-        <Icon name="x" size={32} color="danger" />
-        <Text style={[styles.statusText, { color: colors.danger }]}>
-          {t('report.error.generic')}
-        </Text>
-        <Button
-          variant="secondary"
-          size="md"
-          onPress={onRetry}
-          accessibilityLabel={t('report.retry')}
-          leftIcon={<Icon name="refresh-cw" size={20} color="primary" />}
-        >
-          {t('report.retry')}
-        </Button>
-      </View>
+      <EmptyState
+        icon="alert-circle"
+        title={t('report.error.generic')}
+        body={t('report.error.body')}
+        action={{ label: t('report.retry'), onPress: onRetry }}
+      />
     );
   }
 
-  // 빈 상태(캡처 < 5 → items 없음) — EmptyState + DotsGrid.
   if (!report || report.items.length === 0) {
     return (
-      <View style={[styles.flex, styles.center]}>
-        <EmptyState
-          illustration={<DotsGrid size={96} animated />}
-          title={t('report.empty.title')}
-          body={t('report.empty.body')}
-        />
-      </View>
+      <EmptyState
+        icon="images"
+        title={t('report.empty.title')}
+        body={t('report.empty.body')}
+        action={{ label: t('report.empty.action'), onPress: onGoHome }}
+      />
     );
   }
 
   const total = report.totalCaptures;
-  const hasName = nickname.trim().length > 0;
-  const subtitle = hasName
-    ? t('report.weeklySubtitle', { name: nickname.trim(), total })
-    : t('report.weeklySubtitleNoName', { total });
+  const name = nickname.trim();
+  const intro =
+    name.length > 0
+      ? t('report.weeklySubtitle', { name, total })
+      : t('report.weeklySubtitleNoName', { total });
 
-  // items가 있는 리포트를 처음 볼 때만 코치마크 1회 노출(복원 완료 후, 미열람 시).
-  const showCoachmark = coachmarkHydrated && !coachmarkSeen;
-
-  // 코치마크 닫기: 영속 플래그 + 분석(교육 도달) 함께 처리.
   const handleDismissCoachmark = (): void => {
     track(AnalyticsEvent.ReportCoachmarkDismissed, {});
     seeReportCoachmark();
   };
 
   return (
-    <>
-      <ScrollView style={styles.flex} contentContainerStyle={contentStyle}>
-      {/* 주차 캡션 */}
-      <Text style={[styles.weekCaption, { color: colors.textSecondary }]}>
-        {t('report.weekRange', {
-          start: formatWeekDate(report.weekStart),
-          end: formatWeekDate(report.weekEnd),
-        })}
+    <View style={styles.report}>
+      <Text variant="body" color="textSecondary">
+        {intro}
       </Text>
 
-      {/* 헤딩 + 서브타이틀 */}
-      <View style={styles.headingBlock}>
-        <Text
-          style={[styles.heading, { color: colors.textPrimary }]}
-          accessibilityRole="header"
-        >
-          {t('report.weekly')}
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {subtitle}
-        </Text>
+      <ReportCoachmark
+        visible={coachmarkHydrated && !coachmarkSeen}
+        onDismiss={handleDismissCoachmark}
+      />
+
+      <View accessibilityRole="list">
+        {report.items.map((item, index) => (
+          <ReportLine
+            key={item.captureId}
+            item={item}
+            index={index}
+            isLast={index === report.items.length - 1}
+            onPressOriginal={onPressOriginal}
+            onFeedback={onFeedback}
+          />
+        ))}
       </View>
 
-      {/* ReportCard 5개 (stagger reveal은 카드 내부에서 index 기반으로 처리) */}
-      {report.items.map((item, index) => (
-        <ReportCard
-          key={item.captureId}
-          item={item}
-          index={index}
-          onPressOriginal={onPressOriginal}
-          onFeedback={onFeedback}
-        />
+      <Button
+        variant="secondary"
+        size="md"
+        onPress={onViewArchive}
+        accessibilityLabel={t('report.viewArchive')}
+        rightIcon={<Icon name="chevron-right" size={20} color="primary" />}
+        style={styles.archive}
+      >
+        {t('report.viewArchive')}
+      </Button>
+    </View>
+  );
+}
+
+/**
+ * 로딩 자리표시 — 스피너 대신 다섯 줄의 골격을 미리 보여 준다.
+ * 순위 숫자는 흐린 글자로, 문장·썸네일은 muted 면으로. 움직임 없음(곧 진짜 연출이 온다).
+ */
+function ReportSkeleton(): ReactNode {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={styles.report}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={t('report.loading')}
+    >
+      {SKELETON_WIDTHS.slice(0, REPORT_LINE_COUNT).map((width, i) => (
+        <View
+          key={width}
+          style={[
+            styles.skeletonLine,
+            i < REPORT_LINE_COUNT - 1
+              ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }
+              : null,
+          ]}
+        >
+          <Text variant="mega" color="textDisabled" style={styles.skeletonRank}>
+            {i + 1}
+          </Text>
+          <View style={styles.skeletonText}>
+            <View style={[styles.skeletonBar, { width, backgroundColor: colors.bgMuted }]} />
+            <View style={[styles.skeletonBarShort, { backgroundColor: colors.bgMuted }]} />
+          </View>
+          <View style={[styles.skeletonThumb, { backgroundColor: colors.bgMuted }]} />
+        </View>
       ))}
-
-      {/* 자료실 보기 */}
-      <View style={styles.archiveSlot}>
-        <Button
-          variant="ghost"
-          size="md"
-          onPress={onViewArchive}
-          accessibilityLabel={t('report.viewArchive')}
-          rightIcon={<Icon name="chevron-right" size={20} color="primary" />}
-        >
-          {t('report.viewArchive')}
-        </Button>
-      </View>
-      </ScrollView>
-
-      <ReportCoachmark visible={showCoachmark} onDismiss={handleDismissCoachmark} />
-    </>
+    </View>
   );
 }
 
@@ -248,40 +274,43 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+  },
+  report: {
+    gap: spacing.lg,
+  },
+  archive: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  skeletonLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: spacing.md,
-    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
   },
-  statusText: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-    textAlign: 'center',
+  skeletonRank: {
+    width: RANK_COLUMN,
   },
-  weekCaption: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
+  skeletonText: {
+    flex: 1,
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
   },
-  headingBlock: {
-    gap: spacing.xs,
+  skeletonBar: {
+    height: SKELETON_BAR_HEIGHT,
+    borderRadius: radius.sm,
   },
-  heading: {
-    fontSize: typography.heading.size,
-    lineHeight: typography.heading.line,
-    fontWeight: typography.heading.weight,
-    letterSpacing: letterSpacingFor('heading'),
+  skeletonBarShort: {
+    width: '40%',
+    height: SKELETON_BAR_HEIGHT,
+    borderRadius: radius.sm,
   },
-  subtitle: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-  },
-  archiveSlot: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
+  skeletonThumb: {
+    width: THUMB_WIDTH,
+    height: THUMB_HEIGHT,
+    borderRadius: radius.md,
   },
 });

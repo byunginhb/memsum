@@ -1,27 +1,34 @@
 import { useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
+import { StyleSheet, View } from 'react-native';
+import Animated, { useReducedMotion } from 'react-native-reanimated';
 
 import { Button } from '@/design/components/Button/Button';
-import { Card } from '@/design/components/Card/Card';
+import { Eyebrow } from '@/design/components/Eyebrow/Eyebrow';
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { Text } from '@/design/components/Text/Text';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
-import { getLocale, t } from '@/i18n';
-
+import { spacing } from '@/design/tokens';
+import {
+  dayParts,
+  formatClock,
+  formatSpokenDateTime,
+} from '@/features/captures/capture-format';
+import { listEntering } from '@/features/captures/list-entering';
 import type { CaptureListItem } from '@/features/captures/types';
+import { t } from '@/i18n';
+
+import { MonoDay } from './MonoDay';
 
 /**
- * 캘린더 탭의 이벤트 캡처 리스트 (C2).
+ * 캘린더 탭 타임라인 — 명세 §6 "날짜를 mono 큰 숫자 왼쪽 열 + 내용 오른쪽의 타임라인 행".
  *
- * upcoming/past 두 섹션을 각각 SectionLabel + 캡처 행으로 쌓는다.
- * 각 행: 썸네일 · 제목 · 일시 · 장소 + 우측 액션.
- * - 이미 등록됨(calendarEventId 존재): "등록됨" 배지 + htmlLink가 있으면 행을 탭해
- *   캘린더에서 열 수 있다(onOpen).
- * - 미등록: "캘린더에 등록" 버튼(small). registeringId가 이 항목이면 "등록하는 중…" + 비활성.
- *
- * 일시 포맷은 타 파일 함수에 의존하지 않도록 이 파일 내 자체 헬퍼로 둔다(요구사항).
+ * 다가오는/지난 두 단을 Eyebrow(`다가오는 일정 · 3`)로 열고, 행은 카드 없이 머리카락 구분선으로 나눈다.
+ * - 왼쪽 열: 월(mono 작은) · 일(mono 큰, 오늘이면 형광펜 바탕) · 요일.
+ * - 오른쪽: 제목·시각/장소(누르면 원본 캡처) + 등록 버튼(44pt) 또는 "등록됨" 줄.
+ * "등록됨" 글씨는 잉크색, 체크 아이콘만 success 색: 라이트 success(#0F8A4A)는 종이 바탕에서
+ * 약 4.0:1이라 작은 글씨 AA(4.5)에 못 미치지만 아이콘(비텍스트 3:1)으로는 충분하다.
  */
 export type EventCaptureListProps = {
   /** 다가오는 일정(오름차순). */
@@ -30,8 +37,10 @@ export type EventCaptureListProps = {
   past: CaptureListItem[];
   /** 미등록 항목의 "등록" 액션. 상위(calendar.tsx)가 store.registerCapture로 처리. */
   onRegister: (item: CaptureListItem) => void;
-  /** 등록된 항목의 htmlLink를 외부 캘린더로 여는 액션. null이면 호출 측이 무시. */
-  onOpen: (htmlLink: string | null) => void;
+  /** 등록된 항목의 htmlLink를 외부 캘린더로 연다. */
+  onOpen: (htmlLink: string) => void;
+  /** 행 내용을 누르면 원본 캡처 상세로. */
+  onOpenCapture: (id: string) => void;
   /** 현재 등록 진행 중인 캡처 id(있으면). 해당 행은 로딩·비활성 처리. */
   registeringId: string | null;
 };
@@ -39,314 +48,207 @@ export type EventCaptureListProps = {
 export function EventCaptureList({
   upcoming,
   past,
-  onRegister,
-  onOpen,
-  registeringId,
+  ...rowProps
 }: EventCaptureListProps): ReactNode {
   return (
     <View style={styles.root}>
       {upcoming.length > 0 ? (
         <Section
-          label={t('calendar.section.upcoming')}
+          label={t('calendar.section.upcoming', { count: upcoming.length })}
           items={upcoming}
-          onRegister={onRegister}
-          onOpen={onOpen}
-          registeringId={registeringId}
+          isPast={false}
+          {...rowProps}
         />
       ) : null}
-
       {past.length > 0 ? (
         <Section
-          label={t('calendar.section.past')}
+          label={t('calendar.section.past', { count: past.length })}
           items={past}
-          onRegister={onRegister}
-          onOpen={onOpen}
-          registeringId={registeringId}
+          isPast
+          // 다가오는 단이 먼저 등장하므로 지난 단은 그 뒤 순번으로 이어서 연출한다.
+          indexOffset={upcoming.length}
+          {...rowProps}
         />
       ) : null}
     </View>
   );
 }
 
-type SectionProps = {
+type RowActions = Omit<EventCaptureListProps, 'upcoming' | 'past'>;
+
+type SectionProps = RowActions & {
   label: string;
   items: CaptureListItem[];
-  onRegister: (item: CaptureListItem) => void;
-  onOpen: (htmlLink: string | null) => void;
+  isPast: boolean;
+  indexOffset?: number;
+};
+
+function Section({ label, items, isPast, indexOffset = 0, ...actions }: SectionProps): ReactNode {
+  const reducedMotion = useReducedMotion();
+  return (
+    <View>
+      <Eyebrow accessibilityRole="header" style={styles.sectionLabel}>
+        {label}
+      </Eyebrow>
+      {items.map((item, i) => (
+        <Animated.View key={item.id} entering={listEntering(indexOffset + i, reducedMotion)}>
+          <EventRow item={item} isPast={isPast} {...actions} />
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
+type EventRowProps = Omit<RowActions, 'registeringId'> & {
+  item: CaptureListItem;
+  isPast: boolean;
   registeringId: string | null;
 };
 
-/** 섹션(라벨 + 행 목록). index.tsx SectionLabel 패턴(caption·textSecondary)을 따른다. */
-function Section({
-  label,
-  items,
-  onRegister,
-  onOpen,
-  registeringId,
-}: SectionProps): ReactNode {
-  const { colors } = useTheme();
-
-  return (
-    <View style={styles.section}>
-      <Text
-        accessibilityRole="header"
-        style={[styles.sectionLabel, { color: colors.textSecondary }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-
-      <View style={styles.rows}>
-        {items.map((item) => (
-          <EventRow
-            key={item.id}
-            item={item}
-            onRegister={onRegister}
-            onOpen={onOpen}
-            isRegistering={registeringId === item.id}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-type EventRowProps = {
-  item: CaptureListItem;
-  onRegister: (item: CaptureListItem) => void;
-  onOpen: (htmlLink: string | null) => void;
-  isRegistering: boolean;
-};
-
-/** 썸네일 한 변 크기(px). 행 높이 안정화를 위해 정사각 고정. */
-const THUMB_SIZE = 48;
-
-/**
- * 단일 이벤트 행.
- * 등록된 항목(calendarEventId)은 htmlLink가 있으면 Card 자체가 탭 가능해져 캘린더에서 연다.
- * 미등록 항목은 우측 등록 버튼만 동작한다(행 탭은 비활성).
- */
 function EventRow({
   item,
+  isPast,
   onRegister,
   onOpen,
-  isRegistering,
+  onOpenCapture,
+  registeringId,
 }: EventRowProps): ReactNode {
   const { colors } = useTheme();
 
+  const isRegistering = registeringId === item.id;
   const isRegistered = item.calendarEventId !== null;
-  const canOpen = isRegistered && item.calendarHtmlLink !== null;
-
+  const htmlLink = item.calendarHtmlLink;
+  const startsAt = item.event?.starts_at ?? '';
+  const parts = startsAt ? dayParts(startsAt) : null;
   const title = item.title.trim().length > 0 ? item.title : t('captures.untitled');
-  // 일시·장소는 감지된 이벤트(event)에서 가져온다. event는 null일 수 있으므로 가드.
-  const whenLabel = item.event ? formatEventDateTime(item.event.starts_at) : '';
   const location = item.event?.location?.trim() ?? '';
+  const clock = startsAt ? formatClock(startsAt) : '';
+  const metaLine = [clock, location].filter((s) => s.length > 0).join(' · ');
+  const dim = isPast ? 'textSecondary' : 'textPrimary';
 
-  const handleRegister = useCallback((): void => {
-    onRegister(item);
-  }, [onRegister, item]);
-
+  const handleRegister = useCallback((): void => onRegister(item), [onRegister, item]);
+  const handleOpenCapture = useCallback((): void => onOpenCapture(item.id), [onOpenCapture, item.id]);
   const handleOpen = useCallback((): void => {
-    onOpen(item.calendarHtmlLink);
-  }, [onOpen, item.calendarHtmlLink]);
+    if (htmlLink) onOpen(htmlLink);
+  }, [onOpen, htmlLink]);
+
+  const spokenWhen = startsAt ? formatSpokenDateTime(startsAt) : '';
 
   return (
-    <Card
-      variant="outlined"
-      padding="compact"
-      // 등록 + 열기 링크가 있을 때만 행을 탭 가능하게 만든다(미등록은 우측 버튼만 동작).
-      onPress={canOpen ? handleOpen : undefined}
-      accessibilityRole={canOpen ? 'link' : undefined}
-    >
-      <View style={styles.row}>
-        <View style={[styles.thumb, { backgroundColor: colors.bgMuted }]}>
-          {item.thumbnailUrl ? (
-            <Image
-              source={{ uri: item.thumbnailUrl }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              transition={150}
-              accessibilityLabel={title}
-            />
-          ) : (
-            <View style={styles.thumbPlaceholder}>
-              <Icon name="images" size={20} color="textSecondary" />
-            </View>
-          )}
-        </View>
+    <View style={[styles.row, { borderTopColor: colors.border }]}>
+      <View
+        style={styles.dateCol}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {parts ? (
+          <>
+            <Eyebrow>{parts.month}</Eyebrow>
+            <MonoDay day={parts.day} color={dim} marked={parts.isToday} />
+            <Eyebrow color={parts.isToday ? 'textPrimary' : 'textSecondary'}>
+              {parts.isToday ? t('calendar.item.today') : parts.weekday}
+            </Eyebrow>
+          </>
+        ) : null}
+      </View>
 
-        <View style={styles.texts}>
-          <Text
-            style={[styles.title, { color: colors.textPrimary }]}
-            numberOfLines={1}
-          >
+      <View style={styles.content}>
+        <PressableScale
+          onPress={handleOpenCapture}
+          accessibilityRole="button"
+          accessibilityLabel={[title, spokenWhen, location].filter((s) => s.length > 0).join(', ')}
+          accessibilityHint={t('calendar.item.openCapture')}
+          style={styles.contentPress}
+        >
+          <Text variant="headline" color={dim} numberOfLines={2}>
             {title}
           </Text>
-          {whenLabel.length > 0 ? (
-            <Text
-              style={[styles.meta, { color: colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {whenLabel}
+          {metaLine.length > 0 ? (
+            <Text variant="mono" color="textSecondary" numberOfLines={1}>
+              {metaLine}
             </Text>
           ) : null}
-          {location.length > 0 ? (
-            <Text
-              style={[styles.meta, { color: colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {location}
-            </Text>
-          ) : null}
-        </View>
+        </PressableScale>
 
-        <View style={styles.action}>
+        <View style={styles.actionRow}>
           {isRegistered ? (
-            <RegisteredBadge canOpen={canOpen} />
+            <>
+              <View style={styles.registered}>
+                <Icon name="check-circle" size={16} color="success" />
+                <Text variant="bodyStrong">{t('calendar.item.registered')}</Text>
+              </View>
+              {htmlLink ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={handleOpen}
+                  accessibilityLabel={t('calendar.item.openInCalendar')}
+                >
+                  {t('calendar.item.openInCalendar')}
+                </Button>
+              ) : null}
+            </>
           ) : (
             <Button
-              variant="primary"
+              variant="secondary"
               size="sm"
               onPress={handleRegister}
               loading={isRegistering}
-              disabled={isRegistering}
+              disabled={registeringId !== null && !isRegistering}
               accessibilityLabel={
-                isRegistering
-                  ? t('calendar.item.registering')
-                  : t('calendar.item.register')
+                isRegistering ? t('calendar.item.registering') : t('calendar.item.register')
               }
+              leftIcon={<Icon name="calendar" size={16} color="primary" />}
             >
-              {isRegistering
-                ? t('calendar.item.registering')
-                : t('calendar.item.register')}
+              {t('calendar.item.register')}
             </Button>
           )}
         </View>
       </View>
-    </Card>
-  );
-}
-
-/** "등록됨" 배지. 열 수 있으면(htmlLink 보유) 캘린더에서 열기 힌트를 함께 보인다. */
-function RegisteredBadge({ canOpen }: { canOpen: boolean }): ReactNode {
-  const { colors } = useTheme();
-
-  return (
-    <View style={styles.badgeCol}>
-      <View style={[styles.badge, { backgroundColor: colors.bgMuted }]}>
-        <Icon name="check" size={16} color="success" />
-        <Text style={[styles.badgeText, { color: colors.success }]} numberOfLines={1}>
-          {t('calendar.item.registered')}
-        </Text>
-      </View>
-      {canOpen ? (
-        <View style={styles.openHint}>
-          <Text
-            style={[styles.openHintText, { color: colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            {t('calendar.item.openInCalendar')}
-          </Text>
-          <Icon name="chevron-right" size={16} color="textSecondary" />
-        </View>
-      ) : null}
     </View>
   );
 }
 
-/**
- * 이벤트 시작 일시 포맷(ISO8601 → 사람이 읽는 일시).
- * 타 파일 함수 import 금지 요구사항에 따라 이 파일 자체 헬퍼로 둔다.
- * 디바이스 로케일이 아니라 앱 로케일(ko/en)을 명시해 KO/EN 표시 일관성을 유지한다.
- * 파싱 실패 시 원문을 그대로 반환해 앱이 깨지지 않게 한다.
- */
-function formatEventDateTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const locale = getLocale() === 'ko' ? 'ko-KR' : 'en-US';
-  return date.toLocaleString(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
+/** 왼쪽 날짜 열 폭 — 두 자리 큰 mono 숫자 + 여유. */
+const DATE_COL_WIDTH = 56;
+/** 등록됨 줄도 옆 버튼(44)과 높이를 맞춘다. */
+const MIN_TOUCH = 44;
 
 const styles = StyleSheet.create({
   root: {
-    gap: spacing.xl,
-  },
-  section: {
-    gap: spacing.md,
+    gap: spacing['3xl'],
   },
   sectionLabel: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
-    letterSpacing: letterSpacingFor('caption'),
-  },
-  rows: {
-    gap: spacing.sm,
+    paddingBottom: spacing.sm,
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.md,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: radius.md,
-    overflow: 'hidden',
+  dateCol: {
+    width: DATE_COL_WIDTH,
+    alignItems: 'flex-start',
+    gap: spacing.xs / 2,
   },
-  thumbPlaceholder: {
+  content: {
     flex: 1,
+    gap: spacing.sm,
+  },
+  contentPress: {
+    gap: spacing.xs,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  texts: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  title: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  meta: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
-  action: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  badgeCol: {
-    alignItems: 'flex-end',
-    gap: spacing.xs,
-  },
-  badge: {
+  registered: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-  },
-  badgeText: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  openHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  openHintText: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
+    minHeight: MIN_TOUCH,
   },
 });

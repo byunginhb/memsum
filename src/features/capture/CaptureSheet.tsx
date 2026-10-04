@@ -1,229 +1,194 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  AccessibilityInfo,
-  ActivityIndicator,
-  Animated,
-  Modal,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Image } from 'expo-image';
 
-import { Button } from '@/design/components/Button/Button';
-import { Card } from '@/design/components/Card/Card';
-import { Icon } from '@/design/icons/Icon';
-import { useTheme } from '@/design/theme/useTheme';
-import { glass, radius, spacing, typography, zIndex } from '@/design/tokens';
+import {
+  Button,
+  CropFrame,
+  Eyebrow,
+  Icon,
+  PressableScale,
+  ScanReveal,
+  Text,
+  useTheme,
+} from '@/design';
+import { elevation, motion, radius, spacing } from '@/design/tokens';
+import { SkeletonBlock } from '@/features/home/Skeleton';
+import { StaggerIn } from '@/features/home/StaggerIn';
 import { ParcelCaptureBlock } from '@/features/parcel/components/ParcelCaptureBlock';
-import { getLocale, t } from '@/i18n';
+import { t } from '@/i18n';
 import { useCaptureStore } from '@/stores/capture-store';
 
-import type { CaptureDraft, CaptureEvent, CaptureStage } from './types';
+import { ExtractedEventRow } from './ExtractedEventRow';
+import type { CaptureDraft, CaptureStage, ProcessCaptureResult } from './types';
+import { useAddToCalendar } from './use-add-to-calendar';
 
-// Sheet 상단 Glass 핸들 밴드 높이. design.md §20 "Sheet 상단 64px Glass".
-const GLASS_HANDLE_HEIGHT = 64;
-
-// 핸들 스와이프 다운 닫기 판정 — 이동 거리(px) 또는 릴리즈 속도(px/ms) 중 하나만 넘으면 닫는다.
+// 끌어내려 닫기 판정 — 거리(px) 또는 놓는 속도(px/s) 중 하나만 넘으면 닫는다.
 const DISMISS_DRAG_DISTANCE = 96;
-const DISMISS_FLING_VELOCITY = 0.8;
-// 수평 스크롤·탭과 구분하기 위한 제스처 시작 임계(아래 방향 px).
-const DRAG_START_THRESHOLD = 6;
+const DISMISS_FLING_VELOCITY = 800;
+// 세로 끌기로 인정하는 최소 이동, 가로로 이만큼 먼저 움직이면 끌기 취소(가로 스크롤 보호).
+const DRAG_ACTIVATE_Y = 6;
+const DRAG_FAIL_X = 16;
+/** 끌기 손잡이 영역 높이 — 터치 44 이상. */
+const HANDLE_AREA = 32;
+const HANDLE_WIDTH = 36;
+const HANDLE_HEIGHT = 4;
+const SHEET_MAX_HEIGHT = '92%';
+/** 스캔 미리보기 폭(시트 대비). 세로 스크린샷이 시트를 다 채우지 않게. */
+const SCAN_WIDTH = '62%';
+/** 결과 머리 썸네일(스캔 이미지가 빨려 들어가는 자리). */
+const THUMB_WIDTH = 56;
+const THUMB_HEIGHT = 74;
+const THUMB_CORNER = 8;
+/** 결과 행은 스캔이 끝나 썸네일 자리가 잡힌 뒤 뜬다. */
+const RESULT_BASE_DELAY = motion.duration.fast;
+/** 결과 행이 떠오르는 거리 — 목록 등장보다 크게(아래에서 "튀어나오는" 느낌). */
+const RESULT_RISE = 16;
+/** "인식된 글자 보기" 행 높이 — 터치 44 이상. */
+const TOGGLE_HEIGHT = 48;
 
-// 진행 중(스피너) 단계 → 라벨 i18n 키.
-const PROGRESS_LABEL_KEY: Record<'uploading' | 'ocr' | 'processing', string> = {
+type Progress = 'uploading' | 'ocr' | 'processing';
+
+const STAGE_LABEL_KEY: Record<Progress, string> = {
   uploading: 'capture.stage.uploading',
   ocr: 'capture.stage.ocr',
   processing: 'capture.stage.processing',
 };
 
-function isProgress(stage: CaptureStage): stage is 'uploading' | 'ocr' | 'processing' {
+function isProgress(stage: CaptureStage): stage is Progress {
   return stage === 'uploading' || stage === 'ocr' || stage === 'processing';
 }
 
-/**
- * 시트 본문 제목을 단계에 맞춘다. 캡처는 무음 자동 저장되므로 "저장할까요?"가 아니라,
- * 진행 중엔 "정리하고 있어요", 완료엔 "이렇게 정리했어요", 오류엔 문제를 알리는 문구를 쓴다.
- */
-function sheetHeadingKey(stage: CaptureStage): string {
-  if (stage === 'done') return 'capture.sheet.titleDone';
-  if (stage === 'error') return 'capture.sheet.titleError';
-  return 'capture.sheet.titleProgress';
-}
 
 /**
- * "투명도 줄이기"(reduce transparency) 접근성 설정 구독 훅 — design.md P1-4.
- * 켜져 있으면 Liquid Glass 대신 불투명 폴백을 써야 가독성이 유지된다.
- * 초기값을 비동기로 읽고, 변경 이벤트를 구독한다. cleanup에서 리스너 해제.
+ * 캡처 시트 — 처리 중엔 ScanReveal 풀 연출, 끝나면 제목 + 뽑힌 항목 행.
+ *
+ * capture-store의 current/isSheetOpen이 단일 진실. 시트 슬라이드·끌어내려 닫기는
+ * reanimated + gesture-handler(UI 스레드)로 처리한다. Modal은 닫힘 모션이 끝난 뒤에 내린다.
+ * Modal은 별도 네이티브 창이라 안쪽을 GestureHandlerRootView로 다시 감싸야 제스처가 동작한다(안드로이드).
  */
-function useReduceTransparency(): boolean {
-  const [reduceTransparency, setReduceTransparency] = useState(false);
+export function CaptureSheet(): ReactNode {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+  const current = useCaptureStore((s) => s.current);
+  const isSheetOpen = useCaptureStore((s) => s.isSheetOpen);
+  const closeSheet = useCaptureStore((s) => s.closeSheet);
+  const startCapture = useCaptureStore((s) => s.startCapture);
+
+  // 열림은 즉시 Modal을 띄우고, 닫힘은 내려가는 모션이 끝난 뒤 Modal을 내린다.
+  const [modalVisible, setModalVisible] = useState(isSheetOpen);
+  const [prevOpen, setPrevOpen] = useState(isSheetOpen);
+  if (prevOpen !== isSheetOpen) {
+    setPrevOpen(isSheetOpen);
+    if (isSheetOpen) setModalVisible(true);
+  }
+
+  const offset = useSharedValue(screenHeight);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function readInitial() {
-      const enabled = await AccessibilityInfo.isReduceTransparencyEnabled();
-      // 비동기 응답 도착 전에 언마운트되면 상태 갱신 금지.
-      if (isMounted) setReduceTransparency(enabled);
+    if (isSheetOpen) {
+      offset.value = screenHeight;
+      offset.value = reducedMotion
+        ? 0
+        : withTiming(0, { duration: motion.duration.slow, easing: motion.easing.emphasized });
+      return;
     }
-    void readInitial();
-
-    const subscription = AccessibilityInfo.addEventListener(
-      'reduceTransparencyChanged',
-      setReduceTransparency,
+    offset.value = withTiming(
+      screenHeight,
+      { duration: reducedMotion ? 0 : motion.duration.base, easing: motion.easing.accel },
+      (finished) => {
+        if (finished) scheduleOnRN(setModalVisible, false);
+      },
     );
+  }, [isSheetOpen, reducedMotion, screenHeight, offset]);
 
-    return () => {
-      isMounted = false;
-      subscription.remove();
-    };
-  }, []);
-
-  return reduceTransparency;
-}
-
-/**
- * 캡처 확인 Sheet — 기능명세 Screen 09 / 디자인시스템 §3.7.
- *
- * capture-store의 current/isSheetOpen만 구독한다(스토어가 단일 진실).
- * NOTE: 디자인시스템 §3.7은 @gorhom/bottom-sheet를 권장하나, 현재 스택
- * (RN0.85 New Arch + reanimated4)에서 @gorhom v5 애니메이션이 silent fail 하여
- * RN 내장 Modal 기반 바텀시트로 구현한다(slide-up, 동일 UX). reanimated 호환
- * 개선 시 @gorhom로 되돌릴 수 있다.
- * 이미지 미리보기 + 단계 표시(스피너) → 완료 시 제목·요약·OCR·이벤트 카드 + 액션.
- */
-export function CaptureSheet() {
-  const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
-  const current = useCaptureStore((state) => state.current);
-  const isSheetOpen = useCaptureStore((state) => state.isSheetOpen);
-  const closeSheet = useCaptureStore((state) => state.closeSheet);
-  const startCapture = useCaptureStore((state) => state.startCapture);
-
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback((): void => {
     if (!current) return;
-    void startCapture({
-      imageUri: current.imageUri,
-      sourcePlatform: current.sourcePlatform,
-    });
+    void startCapture({ imageUri: current.imageUri, sourcePlatform: current.sourcePlatform });
   }, [current, startCapture]);
 
-  // 핸들 드래그 추적값 — 손가락을 따라 시트가 내려가고, 임계 미만이면 스프링 복귀한다.
-  // useRef(...).current는 렌더 중 ref 접근이라 React Compiler 린트에 걸린다 — useMemo로 고정.
-  const dragY = useMemo(() => new Animated.Value(0), []);
+  const pan = Gesture.Pan()
+    .activeOffsetY(DRAG_ACTIVATE_Y)
+    .failOffsetX([-DRAG_FAIL_X, DRAG_FAIL_X])
+    .onUpdate((e) => {
+      offset.set(Math.max(0, e.translationY));
+    })
+    .onEnd((e) => {
+      if (e.translationY > DISMISS_DRAG_DISTANCE || e.velocityY > DISMISS_FLING_VELOCITY) {
+        scheduleOnRN(closeSheet);
+        return;
+      }
+      offset.set(withSpring(0, motion.spring.snappy));
+    });
 
-  // 닫힐 때(또는 재오픈 전) 드래그 오프셋을 초기화해 다음 열림이 제자리에서 시작되게 한다.
-  useEffect(() => {
-    if (!isSheetOpen) dragY.setValue(0);
-  }, [isSheetOpen, dragY]);
-
-  // 핸들 밴드 전용 스와이프 다운 제스처(시트 본문 스크롤과 충돌하지 않도록 핸들에만 부착).
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_event, gesture) =>
-          gesture.dy > DRAG_START_THRESHOLD && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-        onPanResponderMove: (_event, gesture) => {
-          // 위로는 끌리지 않게 0에서 클램프.
-          dragY.setValue(Math.max(0, gesture.dy));
-        },
-        onPanResponderRelease: (_event, gesture) => {
-          const shouldDismiss =
-            gesture.dy > DISMISS_DRAG_DISTANCE || gesture.vy > DISMISS_FLING_VELOCITY;
-          if (shouldDismiss) {
-            closeSheet();
-            return;
-          }
-          Animated.spring(dragY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        },
-      }),
-    [dragY, closeSheet],
-  );
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
+  const scrimStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(offset.value, [0, screenHeight], [1, 0], 'clamp'),
+  }));
 
   return (
     <Modal
-      visible={isSheetOpen}
+      visible={modalVisible}
       transparent
-      animationType="slide"
+      animationType="none"
       statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={closeSheet}
     >
-      <View style={styles.overlay}>
-        {/* 상단 빈 영역 탭 → 닫기(backdrop). */}
-        <Pressable
-          style={[styles.backdrop, { backgroundColor: colors.scrim }]}
-          onPress={closeSheet}
-          accessibilityRole="button"
-          accessibilityLabel={t('capture.action.close')}
-        />
+      <GestureHandlerRootView style={styles.overlay}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }, scrimStyle]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closeSheet}
+            accessibilityRole="button"
+            accessibilityLabel={t('capture.action.close')}
+          />
+        </Animated.View>
+
         <Animated.View
+          accessibilityViewIsModal
           style={[
             styles.sheet,
-            { backgroundColor: colors.bgElevated, paddingBottom: insets.bottom + spacing.lg },
-            { transform: [{ translateY: dragY }] },
+            elevation[4],
+            { backgroundColor: colors.bgSurface, paddingBottom: insets.bottom + spacing.lg },
+            sheetStyle,
           ]}
-          accessibilityLabel={t('capture.sheet.title')}
         >
-          {/* Calm Glass: 상단 핸들 영역만 Liquid Glass — 스와이프 다운(또는 스크린리더 탭)으로 닫는다. */}
-          <View {...panResponder.panHandlers}>
+          <GestureDetector gesture={pan}>
             <Pressable
+              onPress={closeSheet}
               accessibilityRole="button"
               accessibilityLabel={t('capture.action.close')}
               accessibilityHint={t('capture.sheet.dismissHint')}
-              onPress={closeSheet}
+              style={styles.handleArea}
             >
-              <SheetGlassHandle isDark={isDark} />
+              <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
             </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.content}>
+          </GestureDetector>
+
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {current ? (
-              <SheetBody draft={current} onClose={closeSheet} onRetry={handleRetry} />
+              <SheetBody key={current.id} draft={current} onClose={closeSheet} onRetry={handleRetry} />
             ) : null}
           </ScrollView>
         </Animated.View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
-}
-
-/**
- * 캡처 Sheet 상단 핸들 영역 — Calm Glass의 유일한 Liquid Glass 적용부.
- * iOS 26+에서는 GlassView(실제 Liquid Glass), 그 외에는 반투명 tint 폴백.
- * design.md §6.4 glass 토큰 + §20 Sheet 명세.
- */
-function SheetGlassHandle({ isDark }: { isDark: boolean }) {
-  const { colors } = useTheme();
-  const reduceTransparency = useReduceTransparency();
-  const g = isDark ? glass.dark : glass.light;
-  const handleBar = (
-    <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
-  );
-
-  // reduce-transparency가 켜져 있으면 GlassView 대신 불투명 폴백으로 가독성 확보(P1-4).
-  if (isLiquidGlassAvailable() && !reduceTransparency) {
-    return (
-      <GlassView
-        glassEffectStyle="regular"
-        tintColor={g.tint}
-        colorScheme={isDark ? 'dark' : 'light'}
-        style={styles.glassHandle}
-      >
-        {handleBar}
-      </GlassView>
-    );
-  }
-
-  // 폴백: Liquid Glass 미지원(Android·iOS26 미만)은 반투명 tint로 근사.
-  return <View style={[styles.glassHandle, { backgroundColor: g.fallback }]}>{handleBar}</View>;
 }
 
 type SheetBodyProps = {
@@ -232,343 +197,315 @@ type SheetBodyProps = {
   onRetry: () => void;
 };
 
-function SheetBody({ draft, onClose, onRetry }: SheetBodyProps) {
+/**
+ * 단계별 본문. 스캔은 처리 시작과 함께 1회 재생되고, 결과가 먼저 와도 스캔이 끝난 뒤에 결과를 보인다
+ * (연출이 중간에 잘리지 않게). 스캔이 먼저 끝나고 서버가 아직이면 조용한 대기(스켈레톤)로 이어진다.
+ */
+function SheetBody({ draft, onClose, onRetry }: SheetBodyProps): ReactNode {
+  // key={draft.id}로 마운트되므로 처음 본 단계가 진행 중이면 스캔부터 시작한다.
+  const [scanning, setScanning] = useState(() => isProgress(draft.stage));
+  const handleScanDone = useCallback(() => setScanning(false), []);
+
+  if (draft.stage === 'error') {
+    // 글자 없는 이미지는 실패가 아니라 "저장하지 않음" — 조용한 안내로 보인다.
+    if (draft.errorCode === 'noText') {
+      return <NoTextNotice imageUri={draft.imageUri} onClose={onClose} />;
+    }
+    return (
+      <ErrorNotice
+        message={t(`capture.error.${draft.errorCode ?? 'generic'}`)}
+        onRetry={onRetry}
+        onClose={onClose}
+      />
+    );
+  }
+
+  if (scanning) {
+    const stageKey = isProgress(draft.stage) ? STAGE_LABEL_KEY[draft.stage] : 'capture.stage.processing';
+    return (
+      <View style={styles.body}>
+        <View style={styles.headText}>
+          <Eyebrow accessibilityLiveRegion="polite">{t(stageKey)}</Eyebrow>
+          <Text variant="title" accessibilityRole="header">
+            {t('capture.sheet.titleProgress')}
+          </Text>
+        </View>
+        <ScanReveal
+          imageUri={draft.imageUri}
+          // OCR 전이거나 좌표가 없으면 undefined — 형광펜 없이 스캔선만 지나간다.
+          boxes={draft.ocrBoxes}
+          onDone={handleScanDone}
+          style={styles.scan}
+          accessibilityLabel={t('capture.preview.label')}
+        />
+      </View>
+    );
+  }
+
+  if (draft.stage === 'done' && draft.result) {
+    return <ResultView draft={draft} result={draft.result} onClose={onClose} />;
+  }
+
+  // 스캔은 끝났지만 서버 정리가 아직 — 결과 자리만 은은하게 잡아 둔다.
+  const waitingKey = isProgress(draft.stage) ? STAGE_LABEL_KEY[draft.stage] : 'capture.stage.processing';
+  return (
+    <View style={styles.body}>
+      <View style={styles.resultHead}>
+        <Thumb uri={draft.imageUri} />
+        <View style={styles.headTextRow}>
+          <Eyebrow accessibilityLiveRegion="polite">{t(waitingKey)}</Eyebrow>
+          <SkeletonBlock width="80%" height={22} />
+        </View>
+      </View>
+      <View style={styles.waitRows} accessible accessibilityRole="progressbar" accessibilityLabel={t(waitingKey)}>
+        <SkeletonBlock height={16} width="92%" />
+        <SkeletonBlock height={16} width="64%" />
+      </View>
+    </View>
+  );
+}
+
+function Thumb({ uri }: { uri: string }): ReactNode {
   const { colors } = useTheme();
-  const event = draft.result?.event ?? null;
+  return (
+    <CropFrame width={THUMB_WIDTH} height={THUMB_HEIGHT} cornerLength={THUMB_CORNER} outset={3}>
+      <Image
+        source={{ uri }}
+        style={[styles.thumb, { backgroundColor: colors.bgMuted }]}
+        contentFit="cover"
+        contentPosition="top"
+        accessibilityLabel={t('capture.preview.label')}
+      />
+    </CropFrame>
+  );
+}
+
+type ResultViewProps = {
+  draft: CaptureDraft;
+  result: ProcessCaptureResult;
+  onClose: () => void;
+};
+
+function ResultView({ draft, result, onClose }: ResultViewProps): ReactNode {
+  const { colors } = useTheme();
+  const [ocrOpen, setOcrOpen] = useState(false);
+  const event = result.event;
+  const ocrText = result.clean_text || draft.ocrText || '';
+  const calendar = useAddToCalendar({ captureId: result.capture_id, event });
+  const title = result.title.trim().length > 0 ? result.title : t('capture.result.untitled');
+
+  // 행 순서: 0 제목 블록, 1 일정, 2 택배, 3 원문. 없는 행은 건너뛰어도 간격 규칙은 같다.
+  let row = 0;
+  const next = (): number => row++;
 
   return (
     <View style={styles.body}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>
-        {t(sheetHeadingKey(draft.stage))}
-      </Text>
+      <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
+        <View style={styles.resultHead}>
+          <Thumb uri={draft.imageUri} />
+          <View style={styles.headTextRow}>
+            <Eyebrow>{t('capture.sheet.titleDone')}</Eyebrow>
+            <Text variant="title" accessibilityRole="header" numberOfLines={3}>
+              {title}
+            </Text>
+          </View>
+        </View>
+        {result.summary ? (
+          <Text variant="body" color="textSecondary" style={styles.summary}>
+            {result.summary}
+          </Text>
+        ) : null}
+      </StaggerIn>
 
-      <Image
-        source={{ uri: draft.imageUri }}
-        style={styles.preview}
-        contentFit="cover"
-        accessibilityLabel={t('capture.preview.label')}
-        accessibilityRole="image"
-      />
+      <View>
+        {event ? (
+          <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
+            <View style={[styles.rule, { backgroundColor: colors.border }]} />
+            <ExtractedEventRow event={event} markDelay={RESULT_BASE_DELAY + motion.stagger * 2} />
+          </StaggerIn>
+        ) : null}
 
-      {isProgress(draft.stage) ? <ProgressRow stage={draft.stage} /> : null}
+        {/* 택배 문자면 추적 시작 블록(ko + 설정 ON일 때만 — 컴포넌트가 스스로 가린다). */}
+        <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
+          <ParcelCaptureBlock ocrText={ocrText} captureId={result.capture_id} />
+        </StaggerIn>
 
-      {draft.stage === 'error' ? (
-        <ErrorBlock message={draft.error} onRetry={onRetry} />
-      ) : null}
+        {ocrText ? (
+          <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
+            <View style={[styles.rule, { backgroundColor: colors.border }]} />
+            <PressableScale
+              onPress={() => setOcrOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: ocrOpen }}
+              accessibilityLabel={t('capture.ocr.toggle')}
+              style={styles.ocrToggle}
+            >
+              <Text variant="bodyStrong">{t('capture.ocr.toggle')}</Text>
+              <View style={ocrOpen ? styles.chevronOpen : undefined}>
+                <Icon name="chevron-right" size={16} color="textSecondary" />
+              </View>
+            </PressableScale>
+            {ocrOpen ? (
+              <Text variant="caption" color="textSecondary" selectable style={styles.ocrText}>
+                {ocrText}
+              </Text>
+            ) : null}
+          </StaggerIn>
+        ) : null}
+      </View>
 
-      {draft.stage === 'done' && draft.result ? (
-        <ResultBlock
-          title={draft.result.title}
-          summary={draft.result.summary}
-          ocrText={draft.result.clean_text || draft.ocrText || ''}
-          captureId={draft.result.capture_id}
-          event={event}
-        />
-      ) : null}
-
-      <ActionRow stage={draft.stage} hasEvent={!!event} onClose={onClose} />
+      <View style={styles.actions}>
+        {event ? (
+          <>
+            <Button variant="secondary" onPress={onClose} style={styles.flex}>
+              {t('capture.action.done')}
+            </Button>
+            <Button
+              loading={calendar.busy}
+              onPress={() => void (calendar.added ? calendar.open() : calendar.add())}
+              leftIcon={<Icon name="calendar" size={16} color="onPrimary" />}
+              style={styles.flex}
+            >
+              {calendar.added ? t('capture.action.openInCalendar') : t('capture.action.addToCalendar')}
+            </Button>
+          </>
+        ) : (
+          <Button onPress={onClose} fullWidth style={styles.flex}>
+            {t('capture.action.done')}
+          </Button>
+        )}
+      </View>
     </View>
   );
 }
 
-type ProgressRowProps = {
-  stage: 'uploading' | 'ocr' | 'processing';
-};
-
-function ProgressRow({ stage }: ProgressRowProps) {
-  const { colors } = useTheme();
-  const label = t(PROGRESS_LABEL_KEY[stage]);
+function NoTextNotice({ imageUri, onClose }: { imageUri: string; onClose: () => void }): ReactNode {
   return (
-    <View
-      style={styles.progressRow}
-      accessibilityRole="progressbar"
-      accessibilityLabel={label}
-    >
-      <ActivityIndicator size="small" color={colors.primary} />
-      <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>{label}</Text>
+    <View style={styles.body}>
+      <View style={styles.resultHead}>
+        <Thumb uri={imageUri} />
+        <View style={styles.headTextRow}>
+          <Text variant="title" accessibilityRole="header">
+            {t('capture.empty.title')}
+          </Text>
+          <Text variant="body" color="textSecondary">
+            {t('capture.empty.body')}
+          </Text>
+        </View>
+      </View>
+      <Button variant="secondary" onPress={onClose} fullWidth>
+        {t('capture.action.done')}
+      </Button>
     </View>
   );
 }
 
-type ErrorBlockProps = {
-  message?: string;
+type ErrorNoticeProps = {
+  message: string;
   onRetry: () => void;
+  onClose: () => void;
 };
 
-function ErrorBlock({ message, onRetry }: ErrorBlockProps) {
-  const { colors } = useTheme();
+function ErrorNotice({ message, onRetry, onClose }: ErrorNoticeProps): ReactNode {
   return (
-    <Card variant="outlined">
-      <View style={styles.errorRow}>
-        <Icon name="x" size={20} color="danger" />
-        <Text style={[styles.errorText, { color: colors.danger }]}>
-          {message ?? t('capture.error.generic')}
+    <View style={styles.body}>
+      <View style={styles.headText}>
+        <Text variant="title" accessibilityRole="header">
+          {t('capture.sheet.titleError')}
+        </Text>
+        <Text variant="body" color="textSecondary" accessibilityLiveRegion="polite">
+          {message}
         </Text>
       </View>
-      <View style={styles.retryButton}>
+      <View style={styles.actions}>
+        <Button variant="ghost" onPress={onClose} style={styles.flex}>
+          {t('capture.action.close')}
+        </Button>
         <Button
-          variant="secondary"
-          size="md"
           onPress={onRetry}
-          accessibilityLabel={t('capture.action.retry')}
-          leftIcon={<Icon name="refresh-cw" size={16} color="primary" />}
+          leftIcon={<Icon name="refresh-cw" size={16} color="onPrimary" />}
+          style={styles.flex}
         >
           {t('capture.action.retry')}
         </Button>
       </View>
-    </Card>
-  );
-}
-
-type ResultBlockProps = {
-  title: string;
-  summary: string;
-  ocrText: string;
-  /** 서버 발급 capture_id(택배 추적 등록 시 연결용). */
-  captureId: string;
-  event: CaptureEvent | null;
-};
-
-function ResultBlock({ title, summary, ocrText, captureId, event }: ResultBlockProps) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.resultBlock}>
-      <Text style={[styles.resultTitle, { color: colors.textPrimary }]}>{title}</Text>
-      {summary ? (
-        <Text style={[styles.resultSummary, { color: colors.textSecondary }]}>{summary}</Text>
-      ) : null}
-
-      {event ? <EventCard event={event} /> : null}
-
-      {/* 택배 SMS 감지 시 추적 시작 블록(ko + 토글 ON일 때만, 컴포넌트 자체 게이트). */}
-      <ParcelCaptureBlock ocrText={ocrText} captureId={captureId} />
-
-      {ocrText ? (
-        <View style={styles.ocrBlock}>
-          <Text style={[styles.ocrLabel, { color: colors.textSecondary }]}>
-            {t('capture.ocr.label')}
-          </Text>
-          <Text style={[styles.ocrText, { color: colors.textSecondary }]}>{ocrText}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
-
-type EventCardProps = {
-  event: CaptureEvent;
-};
-
-function EventCard({ event }: EventCardProps) {
-  const { colors } = useTheme();
-  return (
-    <Card variant="highlight" compact>
-      <View style={styles.eventRow}>
-        <Icon name="calendar" size={20} color="accent" />
-        <View style={styles.eventText}>
-          <Text style={[styles.eventTitle, { color: colors.textPrimary }]}>{event.title}</Text>
-          <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>
-            {formatEventWhen(event.starts_at)}
-          </Text>
-          {event.location ? (
-            <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>
-              {event.location}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-    </Card>
-  );
-}
-
-type ActionRowProps = {
-  stage: CaptureStage;
-  hasEvent: boolean;
-  onClose: () => void;
-};
-
-function ActionRow({ stage, hasEvent, onClose }: ActionRowProps) {
-  const isDone = stage === 'done';
-
-  // 캘린더 추가는 Week 9 예정. 지금은 비활성(이벤트 감지 시에만 노출).
-  const handleAddToCalendar = useCallback(() => {
-    // Week 9: Google Calendar 연동 시 구현. 현재는 비활성 버튼이라 도달하지 않는다.
-  }, []);
-
-  return (
-    <View style={styles.actions}>
-      <View style={styles.flexItem}>
-        <Button
-          variant={isDone ? 'primary' : 'secondary'}
-          size="md"
-          onPress={onClose}
-          accessibilityLabel={isDone ? t('capture.action.done') : t('capture.action.close')}
-          leftIcon={<Icon name="check" size={16} color={isDone ? 'onPrimary' : 'primary'} />}
-        >
-          {isDone ? t('capture.action.done') : t('capture.action.close')}
-        </Button>
-      </View>
-
-      {isDone && hasEvent ? (
-        <View style={styles.flexItem}>
-          <Button
-            variant="accent"
-            size="md"
-            disabled
-            onPress={handleAddToCalendar}
-            accessibilityLabel={t('capture.action.addToCalendar')}
-            leftIcon={<Icon name="calendar" size={16} color="textOnAccent" />}
-          >
-            {t('capture.action.addToCalendar')}
-          </Button>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * 이벤트 시작 시각 표시. starts_at은 ISO8601(KST). 파싱 실패 시 원문 노출.
- */
-function formatEventWhen(startsAt: string): string {
-  const date = new Date(startsAt);
-  if (Number.isNaN(date.getTime())) return startsAt;
-  // 기기 로케일이 아닌 앱 i18n 로케일을 명시(LOW): ko → ko-KR, 그 외 → en-US.
-  return date.toLocaleString(getLocale() === 'ko' ? 'ko-KR' : 'en-US');
-}
-
-const PREVIEW_HEIGHT = 200;
-
-const SHEET_MAX_HEIGHT = '90%';
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // 딤 색은 렌더에서 colors.scrim 토큰을 인라인 적용(라이트/다크 대응).
-    zIndex: zIndex.overlay,
+  flex: {
+    flex: 1,
   },
   sheet: {
     maxHeight: SHEET_MAX_HEIGHT,
-    borderTopLeftRadius: radius['2xl'],
-    borderTopRightRadius: radius['2xl'],
-    // 상단 Liquid Glass 밴드가 둥근 모서리 밖으로 새지 않도록 클립.
-    overflow: 'hidden',
-    zIndex: zIndex.modal,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
   },
-  // Calm Glass: Sheet 상단 글래스 밴드(드래그 핸들 포함). design.md §20 (64px Glass)
-  glassHandle: {
-    minHeight: GLASS_HANDLE_HEIGHT,
+  handleArea: {
+    height: HANDLE_AREA + spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
   },
   handle: {
-    width: 36,
-    height: 4,
-    borderRadius: radius.full,
+    width: HANDLE_WIDTH,
+    height: HANDLE_HEIGHT,
+    borderRadius: radius.pill,
   },
   content: {
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing.lg,
   },
   body: {
-    gap: spacing.lg,
+    gap: spacing.xl,
   },
-  title: {
-    fontSize: typography.title.size,
-    lineHeight: typography.title.line,
-    fontWeight: typography.title.weight,
-  },
-  preview: {
-    width: '100%',
-    height: PREVIEW_HEIGHT,
-    borderRadius: radius.xl,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  progressLabel: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  errorText: {
-    flex: 1,
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
-  retryButton: {
-    marginTop: spacing.md,
-  },
-  resultBlock: {
-    gap: spacing.md,
-  },
-  resultTitle: {
-    fontSize: typography.title.size,
-    lineHeight: typography.title.line,
-    fontWeight: typography.title.weight,
-  },
-  resultSummary: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-  },
-  ocrBlock: {
+  headText: {
     gap: spacing.xs,
   },
-  ocrLabel: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.bodyMd.weight,
+  headTextRow: {
+    flex: 1,
+    gap: spacing.xs,
   },
-  ocrText: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
+  chevronOpen: {
+    transform: [{ rotate: '90deg' }],
   },
-  eventRow: {
+  scan: {
+    width: SCAN_WIDTH,
+    alignSelf: 'center',
+  },
+  resultHead: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
+    gap: spacing.lg,
   },
-  eventText: {
+  thumb: {
     flex: 1,
-    gap: spacing.xs,
+    borderRadius: radius.sm,
   },
-  eventTitle: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.title.weight,
+  summary: {
+    marginTop: spacing.md,
   },
-  eventMeta: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
+  waitRows: {
+    gap: spacing.sm,
+  },
+  rule: {
+    height: StyleSheet.hairlineWidth,
+  },
+  ocrToggle: {
+    minHeight: TOGGLE_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ocrText: {
+    paddingBottom: spacing.md,
   },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  flexItem: {
-    flex: 1,
   },
 });

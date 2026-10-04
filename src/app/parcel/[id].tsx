@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
+import { Header } from '@/design/components/Header/Header';
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import { spacing, typography } from '@/design/tokens';
+import { spacing } from '@/design/tokens';
 import { ParcelDetailScreen } from '@/features/parcel/ParcelDetailScreen';
 import { getLocale, t } from '@/i18n';
 
@@ -25,13 +28,30 @@ export default function ParcelDetailRoute(): ReactNode {
   return <ParcelDetailScreen trackId={id} />;
 }
 
-/** ko 외 진입 시 빈 안내 화면(딥링크 직접 진입 방어). */
+/** ko 외 진입 시 안내 화면(딥링크 직접 진입 방어). */
 function LocaleGuard(): ReactNode {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const handleBack = (): void => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
+
   return (
-    <View style={[styles.guard, { backgroundColor: colors.bgBase }]}>
-      <Stack.Screen options={{ headerShown: true, title: t('parcel.detailTitle') }} />
-      <Text style={[styles.guardText, { color: colors.textSecondary }]}>
+    <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header
+        title={t('parcel.detailTitle')}
+        onBack={handleBack}
+        backLabel={t('common.back')}
+        topInset={insets.top}
+      />
+      <Text variant="body" color="textSecondary" style={styles.guardText}>
         {t('parcel.notConfigured')}
       </Text>
     </View>
@@ -39,16 +59,11 @@ function LocaleGuard(): ReactNode {
 }
 
 const styles = StyleSheet.create({
-  guard: {
+  flex: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
   },
   guardText: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
   },
 });

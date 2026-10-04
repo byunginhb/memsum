@@ -1,87 +1,100 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
-import { formatParcelTime } from '@/features/parcel/eta-text';
+import { radius, spacing } from '@/design/tokens';
+import { formatParcelStamp, formatParcelTime } from '@/features/parcel/eta-text';
 import type { ParcelEvent, ParcelLevel } from '@/features/parcel/types';
+import { t } from '@/i18n';
 
 type ParcelTimelineProps = {
-  /** 배송 이벤트(API 정규화 형태). 최신순으로 정렬되어 들어온다고 가정한다. */
+  /** 배송 이벤트(API 정규화 형태). 순서는 여기서 최신순으로 다시 정렬한다. */
   events: ParcelEvent[];
-  /** 현재 진행 단계(현재 이벤트 강조용). */
+  /** 현재 진행 단계(완료 표시용). */
   currentLevel: ParcelLevel;
 };
 
-/** dot 직경 — 현재(최신) 이벤트는 크게. */
-const DOT_SIZE = 8;
-const CURRENT_DOT_SIZE = 12;
+/** 왼쪽 시각 열 너비 — mono "10.04"/"14:32"가 들어가는 고정 폭. */
+const STAMP_COLUMN = 56;
+/** 최신 이벤트 표시 점. */
+const LATEST_DOT = 8;
+/** 한 칸 안 두 줄(날짜·시각, 상태·위치) 사이의 좁은 간격. */
+const LINE_GAP = 2;
 
 /**
- * ParcelTimeline — 배송 이벤트 세로 타임라인(design.md §5.3).
- * 최신 이벤트가 위에 오고, dot+연결선으로 흐름을 표현한다.
- * 첫 항목(최신·현재 단계)은 primary dot으로 강조, 나머지는 약하게(textSecondary).
+ * ParcelTimeline — 배송 기록을 구분선 행으로 나열한다.
+ *
+ * 왼쪽 열은 mono 날짜·시각, 오른쪽은 상태(종류)와 위치. 행 사이는 머리카락 구분선.
+ * 맨 위(최신) 행만 글자를 진하게 하고 코발트 점(완료면 success)을 붙인다.
  */
 export function ParcelTimeline({ events, currentLevel }: ParcelTimelineProps): ReactNode {
   const { colors } = useTheme();
 
   if (events.length === 0) {
     return (
-      <Text style={[styles.empty, { color: colors.textSecondary }]}>—</Text>
+      <Text variant="caption" color="textSecondary">
+        {t('parcel.timelineEmpty')}
+      </Text>
     );
   }
 
-  // SweetTracker는 이벤트를 과거→최신 순으로 준다. 타임라인은 최신을 맨 위(현재)에 강조해 보여주므로
-  // timeString 기준 내림차순 정렬한다(형식 "YYYY-MM-DD HH:mm:ss"는 사전식 정렬=시간순).
-  const ordered = [...events].sort((a, b) =>
-    (b.timeString ?? '').localeCompare(a.timeString ?? ''),
-  );
+  // SweetTracker는 과거→최신 순으로 준다. 최신을 맨 위에 두려고 timeString 내림차순 정렬
+  // (형식 "YYYY-MM-DD HH:mm:ss"는 사전식 정렬 = 시간순).
+  const ordered = [...events].sort((a, b) => (b.timeString ?? '').localeCompare(a.timeString ?? ''));
 
   return (
     <View accessibilityRole="list">
       {ordered.map((event, index) => {
-        const isFirst = index === 0;
+        const isLatest = index === 0;
         const isLast = index === ordered.length - 1;
-        const delivered = currentLevel >= 6 && isFirst;
-        const dotColor = delivered
-          ? colors.accent
-          : isFirst
-            ? colors.primary
-            : colors.borderStrong;
-        const dotSize = isFirst ? CURRENT_DOT_SIZE : DOT_SIZE;
-        const label = [event.where, formatParcelTime(event.timeString)]
+        const stamp = formatParcelStamp(event.timeString);
+        const kind = event.kind.length > 0 ? event.kind : '—';
+        const dotColor = currentLevel >= 6 ? colors.success : colors.primary;
+        const a11y = [kind, event.where, formatParcelTime(event.timeString)]
           .filter((s) => s.length > 0)
-          .join(' · ');
+          .join(', ');
+
         return (
-          <View key={`${event.timeString}-${index}`} style={styles.row} accessibilityRole="text">
-            <View style={styles.markerColumn}>
-              <View
-                style={[
-                  styles.dot,
-                  {
-                    width: dotSize,
-                    height: dotSize,
-                    borderRadius: radius.full,
-                    backgroundColor: dotColor,
-                  },
-                ]}
-              />
-              {/* 마지막 항목 아래에는 연결선 생략. */}
-              {!isLast ? (
-                <View style={[styles.connector, { backgroundColor: colors.border }]} />
+          <View
+            key={`${event.timeString}-${index}`}
+            accessible
+            accessibilityLabel={a11y}
+            style={[
+              styles.row,
+              !isLast
+                ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }
+                : null,
+            ]}
+          >
+            <View style={styles.stamp}>
+              {stamp ? (
+                <>
+                  <Text variant="mono" color="textSecondary">
+                    {stamp.date}
+                  </Text>
+                  <Text variant="monoLg" color={isLatest ? 'textPrimary' : 'textSecondary'}>
+                    {stamp.time}
+                  </Text>
+                </>
               ) : null}
             </View>
-            <View style={styles.content}>
-              <Text
-                style={[
-                  styles.kind,
-                  { color: isFirst ? colors.textPrimary : colors.textSecondary },
-                ]}
-              >
-                {event.kind.length > 0 ? event.kind : '—'}
-              </Text>
-              {label.length > 0 ? (
-                <Text style={[styles.meta, { color: colors.textSecondary }]}>{label}</Text>
+
+            <View style={styles.body}>
+              <View style={styles.kindRow}>
+                {isLatest ? <View style={[styles.dot, { backgroundColor: dotColor }]} /> : null}
+                <Text
+                  variant={isLatest ? 'bodyStrong' : 'body'}
+                  color={isLatest ? 'textPrimary' : 'textSecondary'}
+                  style={styles.kind}
+                >
+                  {kind}
+                </Text>
+              </View>
+              {event.where.length > 0 ? (
+                <Text variant="caption" color="textSecondary">
+                  {event.where}
+                </Text>
               ) : null}
             </View>
           </View>
@@ -92,41 +105,31 @@ export function ParcelTimeline({ events, currentLevel }: ParcelTimelineProps): R
 }
 
 const styles = StyleSheet.create({
-  empty: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
   row: {
     flexDirection: 'row',
-    gap: spacing.md,
+    alignItems: 'flex-start',
+    gap: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  markerColumn: {
+  stamp: {
+    width: STAMP_COLUMN,
+    gap: LINE_GAP,
+  },
+  body: {
+    flex: 1,
+    gap: LINE_GAP,
+  },
+  kindRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: CURRENT_DOT_SIZE,
-  },
-  dot: {
-    marginTop: spacing.xs,
-  },
-  connector: {
-    flex: 1,
-    width: 2,
-    marginVertical: spacing.xs,
-    borderRadius: radius.full,
-  },
-  content: {
-    flex: 1,
-    paddingBottom: spacing.lg,
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   kind: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
+    flexShrink: 1,
   },
-  meta: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
+  dot: {
+    width: LATEST_DOT,
+    height: LATEST_DOT,
+    borderRadius: radius.pill,
   },
 });

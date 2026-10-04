@@ -3,6 +3,7 @@
 // 추적 시작·갱신 오케스트레이션(create → track → apply + 전이 알림).
 // 캡처 감지 블록·수동 입력·폴링이 공유하는 단일 흐름(중복 제거).
 
+import { preview } from '@/dev/preview';
 import type {
   CreateParcelInput,
   ParcelTrack,
@@ -76,6 +77,7 @@ export async function startParcelTracking(input: CreateParcelInput): Promise<Par
  * @returns 갱신된 ParcelTrack(실패 시 null — 호출측은 기존 행 유지).
  */
 export async function refreshParcelTracking(track: ParcelTrack): Promise<ParcelTrack | null> {
+  if (preview) return track;
   const result = await trackParcel(track.carrierCode, track.invoiceNo);
   const patch = await notifyOnTransition(track, result);
   return applyTrackResult(track.id, result, patch);

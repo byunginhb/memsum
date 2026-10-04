@@ -1,12 +1,11 @@
 import { useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Alert, StyleSheet, Text } from 'react-native';
+import { Alert } from 'react-native';
 
 import { ListItem } from '@/design/components/ListItem/ListItem';
+import { Text } from '@/design/components/Text/Text';
 import { useToast } from '@/design/components/Toast';
 import { Icon } from '@/design/icons/Icon';
-import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, typography } from '@/design/tokens';
 import { t } from '@/i18n';
 import { useCalendarStore } from '@/stores/calendar-store';
 
@@ -19,7 +18,6 @@ import { useCalendarStore } from '@/stores/calendar-store';
  * 진행 중(isBusy)에는 중복 탭을 무시한다.
  */
 export function GoogleCalendarRow(): ReactNode {
-  const { colors } = useTheme();
   const toast = useToast();
 
   const status = useCalendarStore((state) => state.status);
@@ -99,10 +97,7 @@ export function GoogleCalendarRow(): ReactNode {
 
   // 연결됨이면 "연결 해제" 텍스트(secondary), 미연결이면 chevron.
   const trailing = isConnected ? (
-    <Text
-      style={[styles.disconnectLabel, { color: colors.textSecondary }]}
-      numberOfLines={1}
-    >
+    <Text variant="caption" color="textSecondary" numberOfLines={1}>
       {t('settings.googleCalendar.disconnect')}
     </Text>
   ) : (
@@ -111,20 +106,12 @@ export function GoogleCalendarRow(): ReactNode {
 
   return (
     <ListItem
-      leading={<Icon name="calendar" size={24} color="textPrimary" />}
       title={t('settings.googleCalendar.title')}
       subtitle={subtitle}
       trailing={trailing}
       onPress={handlePress}
+      // 연결 상태(부제)가 스크린리더에도 함께 읽히도록 라벨에 합친다.
+      accessibilityLabel={`${t('settings.googleCalendar.title')}, ${subtitle}`}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  disconnectLabel: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-    letterSpacing: letterSpacingFor('bodySm'),
-  },
-});

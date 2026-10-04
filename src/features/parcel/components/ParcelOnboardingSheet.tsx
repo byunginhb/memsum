@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/design/components/Button/Button';
-import { Icon } from '@/design/icons/Icon';
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import { spacing, typography } from '@/design/tokens';
+import { spacing } from '@/design/tokens';
 import { ParcelSheet } from '@/features/parcel/components/ParcelSheet';
 import { t } from '@/i18n';
 
@@ -16,7 +16,7 @@ type ParcelOnboardingSheetProps = {
   onConfirm: () => void;
 };
 
-/** 정직한 한계 고지 3종(design.md §9.2). i18n 키로 고정. */
+/** 정직한 한계 고지 3종. i18n 키로 고정. */
 const DISCLAIMER_KEYS = [
   'settings.parcel.disclaimer1',
   'settings.parcel.disclaimer2',
@@ -24,8 +24,8 @@ const DISCLAIMER_KEYS = [
 ] as const;
 
 /**
- * ParcelOnboardingSheet — 최초 토글 ON 시 한계를 정직하게 고지한다(design.md §2.1).
- * "도착 예정일은 알기 어렵다"는 기대치 설정이 핵심. 단정형 카피 금지.
+ * ParcelOnboardingSheet — 택배 추적을 처음 켤 때 무엇을 하고 무엇을 못 하는지 먼저 알린다.
+ * "도착 예정일은 알기 어렵다"는 기대치 설정이 핵심. 한계 3줄은 구분선 목록으로.
  */
 export function ParcelOnboardingSheet({
   visible,
@@ -35,70 +35,63 @@ export function ParcelOnboardingSheet({
   const { colors } = useTheme();
 
   return (
-    <ParcelSheet visible={visible} onClose={onCancel} title={t('settings.parcel.onboardingTitle')}>
-      <Text style={[styles.body, { color: colors.textPrimary }]}>
-        {t('settings.parcel.onboardingBody')}
-      </Text>
+    <ParcelSheet
+      visible={visible}
+      onClose={onCancel}
+      eyebrow={t('parcel.sheetEyebrow')}
+      title={t('settings.parcel.onboardingTitle')}
+    >
+      <Text variant="body">{t('settings.parcel.onboardingBody')}</Text>
 
-      <View style={styles.disclaimers}>
-        {DISCLAIMER_KEYS.map((key) => (
-          <View key={key} style={styles.disclaimerRow}>
-            <Icon name="alert-circle" size={16} color="textSecondary" />
-            <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>{t(key)}</Text>
-          </View>
+      <View accessibilityRole="list">
+        {DISCLAIMER_KEYS.map((key, index) => (
+          <Text
+            key={key}
+            variant="caption"
+            color="textSecondary"
+            style={[
+              styles.disclaimer,
+              index > 0
+                ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }
+                : null,
+            ]}
+          >
+            {t(key)}
+          </Text>
         ))}
       </View>
 
       <View style={styles.actions}>
-        <View style={styles.flexItem}>
-          <Button
-            variant="secondary"
-            size="md"
-            onPress={onCancel}
-            accessibilityLabel={t('settings.parcel.ctaLater')}
-          >
-            {t('settings.parcel.ctaLater')}
-          </Button>
-        </View>
-        <View style={styles.flexItem}>
-          <Button
-            variant="primary"
-            size="md"
-            onPress={onConfirm}
-            accessibilityLabel={t('settings.parcel.ctaStart')}
-          >
-            {t('settings.parcel.ctaStart')}
-          </Button>
-        </View>
+        <Button
+          variant="secondary"
+          size="lg"
+          onPress={onCancel}
+          accessibilityLabel={t('settings.parcel.ctaLater')}
+          style={styles.flexItem}
+        >
+          {t('settings.parcel.ctaLater')}
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          onPress={onConfirm}
+          accessibilityLabel={t('settings.parcel.ctaStart')}
+          style={styles.flexItem}
+        >
+          {t('settings.parcel.ctaStart')}
+        </Button>
       </View>
     </ParcelSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  body: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-  },
-  disclaimers: {
-    gap: spacing.md,
-  },
-  disclaimerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
   disclaimer: {
-    flex: 1,
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
+    paddingVertical: spacing.md,
   },
   actions: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   flexItem: {
     flex: 1,

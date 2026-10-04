@@ -37,3 +37,25 @@ export function formatParcelTime(value: string | null | undefined): string {
     minute: '2-digit',
   });
 }
+
+/** 두 자리 0 채움. */
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+/**
+ * 타임라인 mono 열용 짧은 시각. 예: { date: "10.04", time: "14:32" }.
+ * 숫자만 쓰므로 JetBrains Mono로 그대로 그릴 수 있다(한글 없음). 파싱 실패 시 null.
+ */
+export function formatParcelStamp(
+  value: string | null | undefined,
+): { date: string; time: string } | null {
+  if (!value) return null;
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    date: `${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`,
+    time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`,
+  };
+}

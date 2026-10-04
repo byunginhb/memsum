@@ -1,15 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { Badge } from '@/design/components/Badge/Badge';
 import { Button } from '@/design/components/Button/Button';
-import { Card } from '@/design/components/Card/Card';
+import { Eyebrow } from '@/design/components/Eyebrow/Eyebrow';
+import { Text } from '@/design/components/Text/Text';
 import { useToast } from '@/design/components/Toast';
-import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { spacing, typography } from '@/design/tokens';
+import { spacing } from '@/design/tokens';
 import { ParcelCarrierSelectSheet } from '@/features/parcel/components/ParcelCarrierSelectSheet';
 import { ParcelManualInputSheet } from '@/features/parcel/components/ParcelManualInputSheet';
 import { startParcelTracking } from '@/features/parcel/start-tracking';
@@ -31,7 +30,7 @@ type ParcelCaptureBlockProps = {
 type Phase = 'idle' | 'tracking';
 
 /**
- * ParcelCaptureBlock — 캡처 확인 시트 내 택배 감지 블록(design.md §3).
+ * ParcelCaptureBlock — 캡처 확인 시트 안의 택배 감지 블록. 카드 대신 위아래 구분선으로 나눈다.
  *
  * 노출 조건: ko + parcelTracking ON + isLikelyParcelSms(text). 미충족 시 null.
  * "택배 추적 시작" → recommendCarrier → resolveCarrier(힌트) →
@@ -124,39 +123,32 @@ export function ParcelCaptureBlock({ ocrText, captureId }: ParcelCaptureBlockPro
 
   return (
     <>
-      <Card variant="outlined">
-        <View style={styles.row}>
-          <Icon name="package" size={20} color="primary" />
-          <View style={styles.texts}>
-            <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
-              {carrierLabel}
-            </Text>
-            <Text style={[styles.invoice, { color: colors.textSecondary }]}>
-              {t('capture.parcel.invoiceMasked', { masked: maskInvoice(extraction.invoiceNo) })}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.badgeRow}>
-          <Badge tone="primary" variant="subtle" leftIcon={<Icon name="truck" size={16} color="primary" />}>
-            {t('parcel.sectionTitle')}
-          </Badge>
-        </View>
-
-        <View style={styles.actions}>
-          <View style={styles.flexItem}>
-            <Button
-              variant="primary"
-              size="md"
-              loading={phase === 'tracking'}
-              onPress={() => void handleStart()}
-              accessibilityLabel={t('capture.parcel.ctaTrack')}
-            >
-              {t('capture.parcel.ctaTrack')}
-            </Button>
-          </View>
-        </View>
-      </Card>
+      <View style={[styles.block, { borderColor: colors.border }]}>
+        <Eyebrow>{t('parcel.sheetEyebrow')}</Eyebrow>
+        <Text variant="headline" numberOfLines={1}>
+          {carrierLabel}
+        </Text>
+        <Text
+          variant="monoLg"
+          color="textSecondary"
+          accessibilityLabel={t('capture.parcel.invoiceMasked', {
+            masked: maskInvoice(extraction.invoiceNo),
+          })}
+        >
+          {maskInvoice(extraction.invoiceNo)}
+        </Text>
+        <Button
+          variant="primary"
+          size="md"
+          fullWidth
+          loading={phase === 'tracking'}
+          onPress={() => void handleStart()}
+          accessibilityLabel={t('capture.parcel.ctaTrack')}
+          style={styles.action}
+        >
+          {t('capture.parcel.ctaTrack')}
+        </Button>
+      </View>
 
       <ParcelCarrierSelectSheet
         visible={isSelectOpen}
@@ -178,35 +170,13 @@ export function ParcelCaptureBlock({ ocrText, captureId }: ParcelCaptureBlockPro
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-  },
-  texts: {
-    flex: 1,
+  block: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: spacing.lg,
     gap: spacing.xs,
   },
-  title: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  invoice: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
-  badgeRow: {
-    flexDirection: 'row',
+  action: {
     marginTop: spacing.md,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-  },
-  flexItem: {
-    flex: 1,
   },
 });

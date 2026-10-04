@@ -1,33 +1,35 @@
 import { useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
-import { Card } from '@/design/components/Card/Card';
+import { CropFrame } from '@/design/components/CropFrame/CropFrame';
+import { Eyebrow } from '@/design/components/Eyebrow/Eyebrow';
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { Text } from '@/design/components/Text/Text';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
+import { motion, radius, spacing } from '@/design/tokens';
 import { t } from '@/i18n';
 
+import { formatShortDate } from './capture-format';
 import type { CaptureCardProps } from './types';
 
-// 썸네일 비율(가로:세로). 스크린샷이 세로형이 많아 4:5로 약간 세로를 길게.
-const THUMB_ASPECT_RATIO = 4 / 5;
-// 카드 제목 최대 줄 수(2열 그리드에서 높이 안정화).
+/** 썸네일 비율(가로:세로). 스크린샷은 세로형이라 3:4로 위쪽을 넉넉히 보인다. */
+export const CAPTURE_THUMB_ASPECT = 3 / 4;
+/** 3열에서도 높이가 흔들리지 않게 제목은 두 줄까지. */
 const TITLE_MAX_LINES = 2;
-
-/** ISO8601 → "6월 6일" 류 짧은 날짜 라벨. 파싱 실패 시 빈 문자열. */
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
+/** 크롭 모서리 — 그리드 간격(12) 안에 들어가도록 짧고 얇게, 썸네일 밖으로 살짝. */
+const CROP_CORNER = 10;
+const CROP_STROKE = 1.5;
+const CROP_OUTSET = 3;
 
 /**
- * 캡처 카드 — 홈 2열 그리드 / 검색 결과 공용(기능명세 Screen 01).
+ * 캡처 카드 — 홈 최근 캡처·자료실 3열 그리드 공용(명세 §6).
  *
- * 썸네일(없으면 images placeholder) + 제목(빈문자면 untitled 폴백) + 날짜,
- * 이벤트 감지 시 캘린더 배지. 탭하면 onPress(item.id)로 상세 라우팅을 상위에 위임한다.
+ * 카드 면 없이 썸네일 + 크롭 모서리 + 제목 두 줄 + mono 날짜만 둔다(카드 남발 금지).
+ * 일정이 뽑힌 캡처는 썸네일 왼쪽 아래에 형광펜 바탕·잉크 글씨 날짜표(대비 17:1)를 붙인다.
+ * 눌림은 PressableScale(scale 0.97). 스크린리더에는 제목·날짜·일정 여부를 한 문장으로 읽힌다.
  */
 export function CaptureCard({ item, onPress }: CaptureCardProps): ReactNode {
   const { colors } = useTheme();
@@ -37,68 +39,76 @@ export function CaptureCard({ item, onPress }: CaptureCardProps): ReactNode {
   }, [onPress, item.id]);
 
   const title = item.title.trim().length > 0 ? item.title : t('captures.untitled');
-  const dateLabel = formatDate(item.createdAt);
+  const dateLabel = formatShortDate(item.createdAt);
+  const eventDate = item.hasEvent && item.event ? formatShortDate(item.event.starts_at) : '';
+  const a11yLabel = [title, dateLabel, item.hasEvent ? t('captures.card.eventBadge') : '']
+    .filter((s) => s.length > 0)
+    .join(', ');
 
   return (
-    <Pressable
+    <PressableScale
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={t('captures.card.open')}
-      accessibilityHint={title}
-      style={({ pressed }) => (pressed ? styles.pressed : null)}
+      accessibilityLabel={a11yLabel}
+      accessibilityHint={t('captures.card.open')}
     >
-      <Card variant="elevated" compact>
+      <CropFrame
+        cornerLength={CROP_CORNER}
+        strokeWidth={CROP_STROKE}
+        outset={CROP_OUTSET}
+        color="borderStrong"
+      >
         <View style={[styles.thumb, { backgroundColor: colors.bgMuted }]}>
           {item.thumbnailUrl ? (
             <Image
               source={{ uri: item.thumbnailUrl }}
               style={StyleSheet.absoluteFill}
               contentFit="cover"
-              transition={150}
-              accessibilityLabel={t('captures.card.thumbnail')}
+              contentPosition="top"
+              transition={motion.duration.fast}
+              accessible={false}
             />
           ) : (
-            <View style={styles.placeholder} accessible accessibilityLabel={t('captures.card.noImage')}>
-              <Icon name="images" size={32} color="textSecondary" />
+            <View style={styles.placeholder}>
+              <Icon name="images" size={24} color="textSecondary" />
             </View>
           )}
-          {item.hasEvent ? (
-            <View
-              style={[styles.badge, { backgroundColor: colors.accent }]}
-              accessibilityLabel={t('captures.card.eventBadge')}
-            >
-              <Icon name="calendar" size={16} color="textOnAccent" />
-              <Text style={[styles.badgeText, { color: colors.textOnAccent }]} numberOfLines={1}>
-                {t('captures.card.event')}
-              </Text>
-            </View>
-          ) : null}
         </View>
 
-        <Text
-          style={[styles.title, { color: colors.textPrimary }]}
-          numberOfLines={TITLE_MAX_LINES}
-        >
-          {title}
-        </Text>
-        {dateLabel.length > 0 ? (
-          <Text style={[styles.date, { color: colors.textSecondary }]} numberOfLines={1}>
-            {dateLabel}
-          </Text>
+        {/* 일정 배지는 잉크 알약 — 형광펜은 화면당 1곳(홈 헤드라인·캘린더 오늘)만 쓰므로 썸네일마다 칠하지 않는다. */}
+        {item.hasEvent ? (
+          <View
+            style={[styles.badge, { backgroundColor: colors.barBg }]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Icon name="calendar" size={16} color="barFg" />
+            {eventDate.length > 0 ? (
+              <Text variant="mono" color="barFg">
+                {eventDate}
+              </Text>
+            ) : (
+              <Text variant="caption" color="barFg">
+                {t('captures.card.event')}
+              </Text>
+            )}
+          </View>
         ) : null}
-      </Card>
-    </Pressable>
+      </CropFrame>
+
+      <Text variant="caption" numberOfLines={TITLE_MAX_LINES} style={styles.title}>
+        {title}
+      </Text>
+      {dateLabel.length > 0 ? <Eyebrow style={styles.date}>{dateLabel}</Eyebrow> : null}
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  pressed: {
-    opacity: 0.7,
-  },
   thumb: {
     width: '100%',
-    aspectRatio: THUMB_ASPECT_RATIO,
-    borderRadius: radius.lg,
+    aspectRatio: CAPTURE_THUMB_ASPECT,
+    borderRadius: radius.md,
     overflow: 'hidden',
   },
   placeholder: {
@@ -108,30 +118,19 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: spacing.sm,
-    left: spacing.sm,
+    left: spacing.xs,
+    bottom: spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
-  },
-  badgeText: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.bodyMd.weight,
+    gap: spacing.xs / 2,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: radius.sm,
   },
   title: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   date: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
-    marginTop: spacing.xs,
+    marginTop: spacing.xs / 2,
   },
 });

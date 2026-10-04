@@ -1,53 +1,88 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { Button } from '@/design/components/Button/Button';
-import { Card } from '@/design/components/Card/Card';
-import { useToast } from '@/design/components/Toast/useToast';
+import {
+  Button,
+  CropFrame,
+  EmptyState,
+  Eyebrow,
+  Header,
+  Marked,
+  PressableScale,
+  Text,
+  useToast,
+} from '@/design';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { motion, radius, spacing } from '@/design/tokens';
+import { ExtractedEventRow } from '@/features/capture/ExtractedEventRow';
 import type { CaptureEvent } from '@/features/capture/types';
+import { useAddToCalendar } from '@/features/capture/use-add-to-calendar';
+import { formatSpokenDateTime, formatStamp } from '@/features/captures/capture-format';
+import { SkeletonBlock } from '@/features/captures/CaptureSkeleton';
 import type { CaptureListItem } from '@/features/captures/types';
 import { useCapture } from '@/hooks/use-capture';
 import { getLocale, t } from '@/i18n';
 import { deleteCapture } from '@/lib/captures';
-import { useCalendarStore } from '@/stores/calendar-store';
+import { extractParcel, isLikelyParcelSms, maskInvoice } from '@/lib/parcel';
 import { useCaptureStore } from '@/stores/capture-store';
 
+/** 상세 이미지 비율 — 세로형 스크린샷의 윗부분(제목·날짜가 몰리는 곳)이 보이게 3:4. */
+const IMAGE_ASPECT = 3 / 4;
+/** 이미지 진입 시작 배율(공유 요소 전환 대체). */
+const IMAGE_ENTER_SCALE = 0.96;
+/** 상세 이미지 크롭 모서리 바깥 돌출(px). */
+const IMAGE_CROP_OUTSET = 4;
+/** 등록 체크 아이콘이 튀어나오는 시작 배율. */
+const CHECK_ENTER_SCALE = 0.4;
+/** 최소 터치 영역. */
+const MIN_TOUCH = 44;
+
 /**
- * 캡처 상세 화면 — 기능명세 상세 플로우 (W4-C) + 캘린더 연동(C2).
- * 큰 이미지 + 제목/요약 + 이벤트 카드(있으면) + OCR 전체 텍스트 + 메타 + 하단 액션.
- * 캘린더 액션은 calendar-store와 연결돼 동작한다. 공유는 아직 준비 중(비활성).
+ * 캡처 상세 — 명세 §6 "상세: 시스템 헤더 대신 공용 Header. 이미지 → 제목 → 뽑힌 일정/택배 →
+ * OCR 원문은 접힘".
+ *
+ * 카드로 감싸지 않고 머리카락 구분선으로 단을 나눈다. 메타(캡처 일시·상태)는 제목 위 mono 머리표 한 줄.
+ * 이 화면의 연출은 "캘린더 등록 성공" 한 곳뿐(체크 + 형광펜). 이미지 진입은 조용한 페이드+스케일.
+ *
+ * 공유 요소 전환(sharedTransitionTag)은 쓰지 않는다: reanimated 4.3에서는 정적 기능 플래그
+ * ENABLE_SHARED_ELEMENT_TRANSITIONS(기본 false, 실험 단계)를 켜고 네이티브를 다시 빌드해야 하며
+ * expo-router 네이티브 스택과의 조합이 검증되지 않았다.
  */
-export default function CaptureDetailScreen() {
+export default function CaptureDetailScreen(): ReactNode {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : '';
   const { item, isLoading, error } = useCapture(id);
   const router = useRouter();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const notifyDataChanged = useCaptureStore((s) => s.notifyDataChanged);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // why here: 캘린더 연결 상태는 SecureStore 복원 후에 확정된다. 이 화면이 캘린더
-  // 액션을 노출하므로 마운트 시 1회 복원을 보장한다(restore는 멱등이라 중복 호출 무해).
-  const hydrated = useCalendarStore((s) => s.hydrated);
-  const restore = useCalendarStore((s) => s.restore);
-  useEffect(() => {
-    if (!hydrated) void restore();
-  }, [hydrated, restore]);
+  // 딥링크로 바로 들어오면 돌아갈 화면이 없으므로 홈으로 보낸다.
+  const handleBack = useCallback((): void => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, [router]);
 
   // 이 캡처 1건을 영구 삭제. 파괴적이라 확인 다이얼로그 후 진행하고, 성공 시 목록 갱신 + 뒤로.
   const handleDelete = useCallback((): void => {
@@ -67,7 +102,7 @@ export default function CaptureDetailScreen() {
                 await deleteCapture(item.id, item.imagePath);
                 notifyDataChanged();
                 toast.show({ tone: 'success', title: t('captures.detail.delete.success') });
-                router.back();
+                handleBack();
               } catch (deleteError) {
                 console.error('[captures/detail] 삭제 실패:', deleteError);
                 toast.show({ tone: 'danger', title: t('captures.detail.delete.error') });
@@ -78,445 +113,457 @@ export default function CaptureDetailScreen() {
         },
       ],
     );
-  }, [isDeleting, item, notifyDataChanged, toast, router]);
+  }, [isDeleting, item, notifyDataChanged, toast, handleBack]);
 
-  return (
-    <View style={styles.flex}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: t('captures.detail.title'),
-          // 항목 로드 후에만 삭제 버튼 노출. 삭제 중엔 스피너로 진행 표시.
-          headerRight: () =>
-            item ? (
-              <Pressable
-                onPress={handleDelete}
-                disabled={isDeleting}
-                accessibilityRole="button"
-                accessibilityLabel={t('captures.detail.delete.action')}
-                hitSlop={spacing.sm}
-                style={styles.headerButton}
-              >
-                {isDeleting ? (
-                  <ActivityIndicator size="small" />
-                ) : (
-                  <Icon name="trash-2" size={24} color="danger" />
-                )}
-              </Pressable>
-            ) : null,
-        }}
-      />
-      <DetailBody item={item} isLoading={isLoading} error={error} />
-    </View>
-  );
-}
-
-type DetailBodyProps = {
-  item: CaptureListItem | null;
-  isLoading: boolean;
-  error: string | null;
-};
-
-function DetailBody({ item, isLoading, error }: DetailBodyProps) {
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-
-  const contentStyle = useMemo(
-    () => ({
-      paddingBottom: insets.bottom + spacing['4xl'],
-      gap: spacing.xl,
-    }),
-    [insets.bottom],
-  );
-
-  if (isLoading) {
-    return (
-      <View style={[styles.flex, styles.center, { backgroundColor: colors.bgBase }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (error || !item) {
-    return (
-      <View style={[styles.flex, styles.center, { backgroundColor: colors.bgBase }]}>
-        <Icon name="x" size={32} color="textSecondary" />
-        <Text style={[styles.notFoundText, { color: colors.textSecondary }]}>
-          {error ?? t('captures.detail.notFound')}
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView
-      style={[styles.flex, { backgroundColor: colors.bgBase }]}
-      contentContainerStyle={contentStyle}
+  const deleteButton = item ? (
+    <PressableScale
+      onPress={handleDelete}
+      disabled={isDeleting}
+      accessibilityRole="button"
+      accessibilityLabel={t('captures.detail.delete.action')}
+      accessibilityState={{ disabled: isDeleting, busy: isDeleting }}
+      hitSlop={spacing.sm}
+      style={styles.headerButton}
     >
-      <DetailImage item={item} />
-      <View style={styles.bodySection}>
-        <Text style={[styles.itemTitle, { color: colors.textPrimary }]}>{item.title}</Text>
-        {item.summary.trim().length > 0 ? (
-          <Text style={[styles.summary, { color: colors.textSecondary }]}>{item.summary}</Text>
-        ) : null}
-      </View>
-
-      {item.hasEvent && item.event ? (
-        <View style={styles.bodySection}>
-          <EventCard event={item.event} />
-        </View>
-      ) : null}
-
-      <View style={styles.bodySection}>
-        <OcrBlock ocrText={item.ocrText} />
-      </View>
-
-      <View style={styles.bodySection}>
-        <MetaBlock item={item} />
-      </View>
-
-      <View style={styles.bodySection}>
-        <DetailActions item={item} />
-      </View>
-    </ScrollView>
-  );
-}
-
-/** 큰 썸네일. thumbnailUrl이 null이면 placeholder 표시. */
-function DetailImage({ item }: { item: CaptureListItem }) {
-  const { colors } = useTheme();
-
-  if (!item.thumbnailUrl) {
-    return (
-      <View
-        style={[styles.imagePlaceholder, { backgroundColor: colors.bgMuted }]}
-        accessibilityRole="image"
-        accessibilityLabel={t('captures.detail.imagePlaceholder')}
-      >
-        <Icon name="images" size={32} color="textSecondary" />
-      </View>
-    );
-  }
-
-  return (
-    <Image
-      style={styles.image}
-      source={{ uri: item.thumbnailUrl }}
-      contentFit="cover"
-      transition={150}
-      accessibilityLabel={item.title}
-    />
-  );
-}
-
-/** 감지된 이벤트 카드 — highlight 변형. 날짜·장소 표시. */
-function EventCard({ event }: { event: CaptureEvent }) {
-  const { colors } = useTheme();
-
-  return (
-    <Card variant="highlight">
-      <View style={styles.eventRow}>
-        <Icon name="calendar" size={20} color="accent" />
-        <View style={styles.eventTexts}>
-          <Text style={[styles.eventTitle, { color: colors.textPrimary }]}>{event.title}</Text>
-          <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>
-            {formatDateTime(event.starts_at)}
-          </Text>
-          {event.location ? (
-            <Text style={[styles.eventMeta, { color: colors.textSecondary }]}>
-              {event.location}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-    </Card>
-  );
-}
-
-/** OCR 전체 텍스트 블록. "인식된 텍스트" 라벨 + 본문. */
-function OcrBlock({ ocrText }: { ocrText: string }) {
-  const { colors } = useTheme();
-  const hasText = ocrText.trim().length > 0;
-
-  return (
-    <View style={styles.metaGroup}>
-      <Text style={[styles.label, { color: colors.textSecondary }]}>
-        {t('captures.detail.ocrLabel')}
-      </Text>
-      <Card variant="outlined">
-        <Text
-          style={[styles.ocrText, { color: hasText ? colors.textPrimary : colors.textSecondary }]}
-        >
-          {hasText ? ocrText : t('captures.detail.ocrEmpty')}
-        </Text>
-      </Card>
-    </View>
-  );
-}
-
-/** 메타 정보(캡처 일시·상태). */
-function MetaBlock({ item }: { item: CaptureListItem }) {
-  const { colors } = useTheme();
-
-  return (
-    <View style={styles.metaGroup}>
-      <Text style={[styles.label, { color: colors.textSecondary }]}>
-        {t('captures.detail.metaLabel')}
-      </Text>
-      <Card variant="flat" compact>
-        <MetaRow
-          label={t('captures.detail.meta.capturedAt')}
-          value={formatDateTime(item.createdAt)}
-        />
-        <MetaRow
-          label={t('captures.detail.meta.status')}
-          value={t(`captures.detail.status.${item.status}`)}
-        />
-      </Card>
-    </View>
-  );
-}
-
-function MetaRow({ label, value }: { label: string; value: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.metaRow}>
-      <Text style={[styles.metaRowLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.metaRowValue, { color: colors.textPrimary }]}>{value}</Text>
-    </View>
-  );
-}
-
-/**
- * 하단 액션. 이벤트가 있으면 "캘린더에 추가"(연결 필요 시 자동 연결 시도)를 노출하고,
- * 이미 등록된 캡처면 "캘린더에서 열기"로 전환한다. 공유는 아직 준비 중(비활성).
- *
- * why 로컬 낙관적 갱신: useCapture 훅에는 refetch가 없으므로, 등록 성공 시 item을 다시
- * 불러오는 대신 이 컴포넌트의 로컬 state(justRegistered + htmlLink)로 즉시 "열기"로 바꾼다.
- */
-function DetailActions({ item }: { item: CaptureListItem }) {
-  const toast = useToast();
-
-  // 스토어에서 진행 상태·액션을 구독한다(필요한 슬라이스만 선택해 리렌더 최소화).
-  // 연결 상태(status)는 핸들러에서 getState()로 최신값을 직접 읽으므로 구독하지 않는다.
-  const isBusy = useCalendarStore((s) => s.isBusy);
-  const connect = useCalendarStore((s) => s.connect);
-  const registerCapture = useCalendarStore((s) => s.registerCapture);
-
-  // 등록 성공 후 낙관적 표시용. 서버 item 갱신 없이 버튼을 "열기"로 전환한다.
-  const [justRegistered, setJustRegistered] = useState(false);
-  const [registeredHtmlLink, setRegisteredHtmlLink] = useState<string | null>(null);
-  // 이 버튼이 트리거한 작업 진행 여부. 중복 탭 방지 + 버튼 로딩 표시용.
-  const [localBusy, setLocalBusy] = useState(false);
-
-  // 서버 기준 등록 여부(calendarEventId) 또는 이번 세션 등록(justRegistered)이면 "열기".
-  const isRegistered = item.calendarEventId !== null || justRegistered;
-  // 딥링크는 서버 값 우선, 없으면 방금 등록 응답의 htmlLink를 쓴다.
-  const htmlLink = item.calendarHtmlLink ?? registeredHtmlLink;
-
-  // 스토어 작업 중이거나 이 화면이 띄운 작업 중이면 버튼 비활성(중복 탭 차단).
-  const busy = isBusy || localBusy;
-
-  /** 등록된 일정을 구글 캘린더 앱/웹에서 연다. 링크가 없으면 안내 토스트. */
-  const handleOpen = useCallback(async () => {
-    if (busy) return;
-    if (!htmlLink) {
-      // 등록은 됐지만 딥링크가 없을 수 있다(events.insert 응답에 htmlLink 누락 가능).
-      // 별도 키가 없어 "등록됨" 의미의 success 문구를 info 톤으로 안내한다.
-      toast.show({ tone: 'info', title: t('calendar.toast.registerSuccess') });
-      return;
-    }
-    try {
-      await Linking.openURL(htmlLink);
-    } catch (openError) {
-      console.error('[captures/detail] 캘린더 링크 열기 실패:', openError);
-      toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
-    }
-  }, [busy, htmlLink, toast]);
-
-  /** 캡처 이벤트를 구글 캘린더에 등록. 미연결이면 먼저 연결을 시도한다. */
-  const handleAdd = useCallback(async () => {
-    // 중복 탭 또는 이벤트 누락 시 무동작(타입상 event는 호출부에서 보장).
-    if (busy || !item.event) return;
-
-    setLocalBusy(true);
-    try {
-      // 미연결이면 먼저 OAuth 연결을 시도한다(취소/실패는 connect 내부에서 상태 반영).
-      if (useCalendarStore.getState().status !== 'connected') {
-        try {
-          await connect();
-        } catch (connectError) {
-          // connect 실패는 아래 status 재확인에서 needConnect로 안내하므로 여기선 로깅만.
-          console.error('[captures/detail] 캘린더 연결 실패:', connectError);
-          toast.show({ tone: 'danger', title: t('calendar.toast.connectError') });
-          return;
-        }
-      }
-
-      // 연결 시도 후에도 connected가 아니면(취소 등) 등록을 진행하지 않는다.
-      if (useCalendarStore.getState().status !== 'connected') {
-        toast.show({ tone: 'info', title: t('calendar.toast.needConnect') });
-        return;
-      }
-
-      const registration = await registerCapture({
-        captureId: item.id,
-        event: item.event,
-      });
-
-      // 낙관적 갱신: 서버 item 재조회 없이 즉시 "열기"로 전환한다.
-      setRegisteredHtmlLink(registration.htmlLink);
-      setJustRegistered(true);
-      toast.show({ tone: 'success', title: t('calendar.toast.registerSuccess') });
-    } catch (registerError) {
-      console.error('[captures/detail] 캘린더 등록 실패:', registerError);
-      toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
-    } finally {
-      setLocalBusy(false);
-    }
-  }, [busy, item.event, item.id, connect, registerCapture, toast]);
-
-  // 캘린더 액션(등록/열기)이 있을 때만 하단 액션 영역을 노출한다. 공유는 준비 중이라
-  // 비활성 버튼으로 자리만 차지해 미완성 인상을 주므로 렌더하지 않는다(구현 시 재노출).
-  const hasCalendarAction = isRegistered || (item.hasEvent && !!item.event);
-  if (!hasCalendarAction) return null;
-
-  return (
-    <View style={styles.actions}>
-      {isRegistered ? (
-        <Button
-          variant="primary"
-          size="lg"
-          loading={busy}
-          onPress={handleOpen}
-          accessibilityLabel={t('captures.detail.action.openInCalendar')}
-          leftIcon={<Icon name="calendar" size={20} color="onPrimary" />}
-        >
-          {t('captures.detail.action.openInCalendar')}
-        </Button>
+      {isDeleting ? (
+        <ActivityIndicator size="small" color={colors.danger} />
       ) : (
-        <Button
-          variant="primary"
-          size="lg"
-          loading={busy}
-          onPress={handleAdd}
-          accessibilityLabel={t('captures.detail.action.addToCalendar')}
-          leftIcon={<Icon name="calendar" size={20} color="onPrimary" />}
+        <Icon name="trash-2" size={24} color="danger" />
+      )}
+    </PressableScale>
+  ) : undefined;
+
+  return (
+    <View style={[styles.flex, { backgroundColor: colors.bgBase }]}>
+      <Header
+        title={t('captures.detail.title')}
+        onBack={handleBack}
+        backLabel={t('common.back')}
+        right={deleteButton}
+        topInset={insets.top}
+      />
+      {isLoading ? (
+        <DetailSkeleton />
+      ) : error || !item ? (
+        <EmptyState
+          icon="images"
+          // 불러오기 실패(일반 문구)와 정말 없는 경우를 나눠 안내한다.
+          title={error ?? t('captures.detail.notFound')}
+          body={error ? undefined : t('captures.detail.notFoundBody')}
+          action={{ label: t('captures.detail.goBack'), onPress: handleBack }}
+        />
+      ) : (
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacing['4xl'] }}
         >
-          {t('captures.detail.action.addToCalendar')}
-        </Button>
+          <DetailImage item={item} />
+          <TitleBlock item={item} />
+          <ExtractedBlock item={item} />
+          <OcrSection ocrText={item.ocrText} />
+        </ScrollView>
       )}
     </View>
   );
 }
 
-/** ISO8601 → 사람이 읽는 일시. 파싱 실패 시 원문 반환(앱이 깨지지 않음). */
-function formatDateTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  // 디바이스 로케일에 의존하지 않도록 앱 로케일을 명시한다(KO/EN 일관성).
-  const locale = getLocale() === 'ko' ? 'ko-KR' : 'en-US';
-  return date.toLocaleString(locale);
+/** 로딩 자리 표시 — 실제 배치(이미지·머리표·제목 두 줄)와 같은 모양. */
+function DetailSkeleton(): ReactNode {
+  return (
+    <View
+      style={styles.section}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={t('search.loading')}
+    >
+      <SkeletonBlock aspectRatio={IMAGE_ASPECT} rounded="md" />
+      <View style={styles.skeletonLines}>
+        <SkeletonBlock width="40%" height={spacing.md} />
+        <SkeletonBlock width="85%" height={spacing['2xl']} />
+        <SkeletonBlock width="60%" height={spacing['2xl']} />
+      </View>
+    </View>
+  );
 }
 
-const IMAGE_ASPECT_RATIO = 4 / 3;
+/**
+ * 큰 이미지 + 크롭 모서리. 썸네일에서 이어지는 느낌을 주려 살짝 작은 배율에서 페이드인한다
+ * (공유 요소 전환 대체). 모션 줄이기면 처음부터 최종 상태.
+ */
+function DetailImage({ item }: { item: CaptureListItem }): ReactNode {
+  const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const progress = useSharedValue(reducedMotion ? 1 : 0);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = withTiming(1, {
+      duration: motion.duration.slow,
+      easing: motion.easing.emphasized,
+    });
+  }, [reducedMotion, progress]);
+
+  const enterStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scale: IMAGE_ENTER_SCALE + (1 - IMAGE_ENTER_SCALE) * progress.value }],
+  }));
+
+  return (
+    <View style={styles.imageSection}>
+      <Animated.View style={enterStyle}>
+        <CropFrame outset={IMAGE_CROP_OUTSET} color="textPrimary">
+          <View style={[styles.image, { backgroundColor: colors.bgMuted }]}>
+            {item.thumbnailUrl ? (
+              <Image
+                style={StyleSheet.absoluteFill}
+                source={{ uri: item.thumbnailUrl }}
+                contentFit="cover"
+                contentPosition="top"
+                transition={motion.duration.fast}
+                accessibilityLabel={item.title}
+              />
+            ) : (
+              <View
+                style={styles.imagePlaceholder}
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={t('captures.detail.imagePlaceholder')}
+              >
+                <Icon name="images" size={32} color="textSecondary" />
+              </View>
+            )}
+          </View>
+        </CropFrame>
+      </Animated.View>
+    </View>
+  );
+}
+
+/** mono 메타 머리표(캡처 일시 · 상태) + 제목 + 요약. */
+function TitleBlock({ item }: { item: CaptureListItem }): ReactNode {
+  const stamp = formatStamp(item.createdAt);
+  const statusKey = `captures.detail.status.${item.status}`;
+  const statusLabel = t(statusKey);
+  // 알 수 없는 상태값이면 키가 그대로 돌아오므로 머리표에서 뺀다.
+  const meta = [stamp, statusLabel === statusKey ? '' : statusLabel]
+    .filter((s) => s.length > 0)
+    .join(' · ');
+  const title = item.title.trim().length > 0 ? item.title : t('captures.untitled');
+
+  return (
+    <View style={styles.titleBlock}>
+      {meta.length > 0 ? (
+        <Eyebrow
+          accessibilityLabel={`${t('captures.detail.meta.capturedAt', {
+            when: formatSpokenDateTime(item.createdAt),
+          })}, ${statusLabel}`}
+        >
+          {meta}
+        </Eyebrow>
+      ) : null}
+      <Text variant="title" accessibilityRole="header">
+        {title}
+      </Text>
+      {item.summary.trim().length > 0 ? (
+        <Text variant="body" color="textSecondary">
+          {item.summary}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * 뽑힌 항목(일정·택배). 각 항목은 구분선 한 줄로 나눈 행.
+ * 택배는 OCR 원문에서 운송장을 찾았을 때만, 한국어 로케일에서만 보인다(택배 기능이 ko 한정).
+ */
+function ExtractedBlock({ item }: { item: CaptureListItem }): ReactNode {
+  const { colors } = useTheme();
+  const parcel = useMemo(
+    () =>
+      getLocale() === 'ko' && isLikelyParcelSms(item.ocrText) ? extractParcel(item.ocrText) : null,
+    [item.ocrText],
+  );
+  const event = item.hasEvent ? item.event : null;
+
+  if (!event && !parcel) return null;
+
+  return (
+    <View>
+      {event ? (
+        <View style={[styles.extractRow, { borderTopColor: colors.border }]}>
+          <Eyebrow>{t('captures.detail.kind.event')}</Eyebrow>
+          <ExtractedEventRow event={event} />
+          <CalendarAction item={item} event={event} />
+        </View>
+      ) : null}
+      {parcel ? (
+        <View style={[styles.extractRow, { borderTopColor: colors.border }]}>
+          <Eyebrow>
+            {parcel.carrierNameHint
+              ? `${t('captures.detail.kind.parcel')} · ${parcel.carrierNameHint}`
+              : t('captures.detail.kind.parcel')}
+          </Eyebrow>
+          <Text variant="monoLg" selectable>
+            {maskInvoice(parcel.invoiceNo)}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * 일정 행의 캘린더 액션. 미등록이면 "캘린더에 등록"(미연결이면 먼저 연결 시도),
+ * 등록됐으면 "등록됨" 줄 + (딥링크가 있으면) "캘린더에서 열기".
+ * 흐름은 캡처 시트와 같은 useAddToCalendar 훅. 성공 피드백은 토스트 대신 화면 안 체크+형광펜 연출.
+ */
+function CalendarAction({ item, event }: { item: CaptureListItem; event: CaptureEvent }): ReactNode {
+  const calendar = useAddToCalendar({
+    captureId: item.id,
+    event,
+    initiallyAdded: item.calendarEventId !== null,
+    initialHtmlLink: item.calendarHtmlLink,
+    successFeedback: 'inline',
+    announceText: t('captures.detail.registered.text'),
+  });
+
+  if (!calendar.added) {
+    return (
+      <Button
+        variant="primary"
+        size="md"
+        fullWidth
+        loading={calendar.busy}
+        onPress={() => void calendar.add()}
+        accessibilityLabel={t('captures.detail.action.addToCalendar')}
+        leftIcon={<Icon name="calendar" size={20} color="onPrimary" />}
+        style={styles.actionButton}
+      >
+        {t('captures.detail.action.addToCalendar')}
+      </Button>
+    );
+  }
+
+  return (
+    <View style={styles.registered}>
+      <RegisteredLine justNow={calendar.justAdded} />
+      {calendar.htmlLink ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onPress={() => void calendar.open()}
+          accessibilityLabel={t('captures.detail.action.openInCalendar')}
+          rightIcon={<Icon name="chevron-right" size={16} color="primary" />}
+        >
+          {t('captures.detail.action.openInCalendar')}
+        </Button>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * "등록됨" 줄. 방금 등록했으면 체크가 튀어나오고 "등록했어요"에 형광펜이 그어진다(화면의 유일한 연출).
+ * 서버에서 이미 등록된 상태로 열었으면 조용한 success 색 줄만.
+ */
+function RegisteredLine({ justNow }: { justNow: boolean }): ReactNode {
+  const reducedMotion = useReducedMotion();
+  const animate = justNow && !reducedMotion;
+  const scale = useSharedValue(animate ? CHECK_ENTER_SCALE : 1);
+
+  useEffect(() => {
+    if (!animate) {
+      scale.value = 1;
+      return;
+    }
+    scale.value = withSpring(1, motion.spring.bouncy);
+  }, [animate, scale]);
+
+  const checkStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <View style={styles.registeredLine}>
+      <Animated.View style={checkStyle}>
+        <Icon name="check-circle" size={20} color="success" />
+      </Animated.View>
+      {justNow ? (
+        <Marked
+          variant="bodyStrong"
+          text={t('captures.detail.registered.text')}
+          mark={t('captures.detail.registered.mark')}
+          animate={animate}
+          delay={motion.duration.fast}
+        />
+      ) : (
+        // 라이트 success(#0F8A4A)는 종이 바탕에서 약 4.0:1 → 글씨는 잉크, 색은 체크 아이콘이 맡는다.
+        <Text variant="bodyStrong">
+          {t('captures.detail.registered.static')}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+/**
+ * OCR 원문 — 기본 접힘. "인식된 글자 보기"를 누르면 높이가 펼쳐진다.
+ * 본문은 절대 배치로 먼저 그려 높이를 재고, 바깥 상자의 높이만 0↔측정값으로 움직인다.
+ */
+function OcrSection({ ocrText }: { ocrText: string }): ReactNode {
+  const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  const progress = useSharedValue(0);
+  const contentHeight = useSharedValue(0);
+  const hasText = ocrText.trim().length > 0;
+
+  useEffect(() => {
+    const target = open ? 1 : 0;
+    progress.value = reducedMotion
+      ? target
+      : withTiming(target, { duration: motion.duration.slow, easing: motion.easing.standard });
+  }, [open, reducedMotion, progress]);
+
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: contentHeight.value * progress.value,
+    opacity: progress.value,
+  }));
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${progress.value * 90}deg` }],
+  }));
+
+  const handleLayout = (e: LayoutChangeEvent): void => {
+    contentHeight.value = e.nativeEvent.layout.height;
+  };
+
+  if (!hasText) {
+    return (
+      <View style={[styles.ocrSection, { borderTopColor: colors.border }]}>
+        <Text variant="caption" color="textSecondary" style={styles.ocrEmpty}>
+          {t('captures.detail.ocrEmpty')}
+        </Text>
+      </View>
+    );
+  }
+
+  const label = open ? t('captures.detail.ocrHide') : t('captures.detail.ocrShow');
+
+  return (
+    <View style={[styles.ocrSection, { borderTopColor: colors.border }]}>
+      <PressableScale
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ expanded: open }}
+        style={styles.ocrToggle}
+      >
+        <Text variant="bodyStrong" color="primary">
+          {label}
+        </Text>
+        <Animated.View style={chevronStyle}>
+          <Icon name="chevron-right" size={20} color="primary" />
+        </Animated.View>
+      </PressableScale>
+
+      <Animated.View
+        style={[styles.ocrClip, bodyStyle]}
+        accessibilityElementsHidden={!open}
+        importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
+      >
+        <View onLayout={handleLayout} style={styles.ocrMeasure}>
+          <Text variant="body" selectable style={styles.ocrText}>
+            {ocrText}
+          </Text>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
   headerButton: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: MIN_TOUCH,
+    minHeight: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  center: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
+  section: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
-  notFoundText: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-    textAlign: 'center',
-    paddingHorizontal: spacing.xl,
+  skeletonLines: {
+    gap: spacing.sm,
+    paddingTop: spacing.xl,
+  },
+  imageSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
   },
   image: {
     width: '100%',
-    aspectRatio: IMAGE_ASPECT_RATIO,
+    aspectRatio: IMAGE_ASPECT,
+    borderRadius: radius.md,
+    overflow: 'hidden',
   },
   imagePlaceholder: {
-    width: '100%',
-    aspectRatio: IMAGE_ASPECT_RATIO,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bodySection: {
-    paddingHorizontal: spacing.xl,
-  },
-  itemTitle: {
-    fontSize: typography.heading.size,
-    lineHeight: typography.heading.line,
-    fontWeight: typography.heading.weight,
-    letterSpacing: letterSpacingFor('heading'),
-  },
-  summary: {
-    fontSize: typography.body.size,
-    lineHeight: typography.body.line,
-    fontWeight: typography.body.weight,
-    marginTop: spacing.sm,
-  },
-  eventRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-  },
-  eventTexts: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  eventTitle: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  eventMeta: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
-  metaGroup: {
+  titleBlock: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing['2xl'],
+    paddingBottom: spacing.xl,
     gap: spacing.sm,
   },
-  label: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
+  extractRow: {
+    marginHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: spacing.xs,
+  },
+  actionButton: {
+    marginTop: spacing.md,
+  },
+  registered: {
+    marginTop: spacing.md,
+    gap: spacing.md,
+    alignItems: 'flex-start',
+  },
+  registeredLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  ocrSection: {
+    marginHorizontal: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  ocrEmpty: {
+    paddingVertical: spacing.lg,
+  },
+  ocrToggle: {
+    minHeight: MIN_TOUCH + spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ocrClip: {
+    overflow: 'hidden',
+  },
+  ocrMeasure: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   ocrText: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-  },
-  metaRowLabel: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-  },
-  metaRowValue: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-  actions: {
-    gap: spacing.md,
+    paddingBottom: spacing.lg,
   },
 });

@@ -1,13 +1,10 @@
 import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/design/components/Button/Button';
 import { Input } from '@/design/components/Input/Input';
 import { useToast } from '@/design/components/Toast';
-import { Icon } from '@/design/icons/Icon';
-import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
+import { CarrierRadioList } from '@/features/parcel/components/CarrierRadioList';
 import { ParcelSheet } from '@/features/parcel/components/ParcelSheet';
 import type { ParcelCarrier } from '@/features/parcel/types';
 import { extractInvoice } from '@/lib/parcel';
@@ -26,7 +23,7 @@ type ParcelManualInputSheetProps = {
 };
 
 /**
- * ParcelManualInputSheet — 운송장 직접 입력 → recommendCarrier로 후보 추정 → 선택(design.md §5.3).
+ * ParcelManualInputSheet — 운송장 직접 입력 → recommendCarrier로 후보 추정 → 선택.
  *
  * 운송장만 입력받고 택배사는 recommend API로 추정한다(코드 하드코딩 회피).
  * 후보 1개면 자동 선택, 복수면 라디오 선택. 키 미설정은 조용히 안내(notConfigured).
@@ -38,7 +35,6 @@ export function ParcelManualInputSheet({
   onResolved,
   busy = false,
 }: ParcelManualInputSheetProps): ReactNode {
-  const { colors } = useTheme();
   const toast = useToast();
 
   const [invoice, setInvoice] = useState(initialInvoice);
@@ -90,12 +86,17 @@ export function ParcelManualInputSheet({
   };
 
   return (
-    <ParcelSheet visible={visible} onClose={onClose} title={t('parcel.manualInputTitle')}>
+    <ParcelSheet
+      visible={visible}
+      onClose={onClose}
+      eyebrow={t('parcel.sheetEyebrow')}
+      title={t('parcel.manualInputTitle')}
+    >
       <Input
-        variant="filled"
+        variant="underline"
         size="md"
         label={t('parcel.manualInvoice')}
-        placeholder={t('parcel.manualInvoice')}
+        placeholder={t('parcel.manualInvoicePlaceholder')}
         value={invoice}
         onChangeText={setInvoice}
       />
@@ -104,49 +105,27 @@ export function ParcelManualInputSheet({
         <Button
           variant="secondary"
           size="md"
+          fullWidth
           loading={isRecommending}
           disabled={!digits || isRecommending}
           onPress={() => void handleRecommend()}
-          accessibilityLabel={t('parcel.manualCarrier')}
+          accessibilityLabel={t('parcel.findCarrier')}
         >
-          {t('parcel.manualCarrier')}
+          {t('parcel.findCarrier')}
         </Button>
       ) : (
-        <View style={styles.list} accessibilityRole="radiogroup" accessibilityLabel={t('parcel.manualCarrier')}>
-          {candidates.map((carrier) => {
-            const isSelected = carrier.code === selectedCode;
-            return (
-              <Pressable
-                key={carrier.code}
-                onPress={() => setSelectedCode(carrier.code)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: isSelected }}
-                accessibilityLabel={carrier.name}
-                style={[
-                  styles.option,
-                  {
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    backgroundColor: isSelected ? colors.primaryMuted : colors.bgSurface,
-                  },
-                ]}
-              >
-                <Text style={[styles.optionLabel, { color: colors.textPrimary }]} numberOfLines={1}>
-                  {carrier.name}
-                </Text>
-                {isSelected ? <Icon name="check" size={20} color="primary" /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
+        <CarrierRadioList
+          carriers={candidates}
+          selectedCode={selectedCode}
+          onSelect={setSelectedCode}
+          label={t('parcel.manualCarrier')}
+        />
       )}
-
-      {isRecommending ? (
-        <ActivityIndicator size="small" color={colors.primary} />
-      ) : null}
 
       <Button
         variant="primary"
-        size="md"
+        size="lg"
+        fullWidth
         loading={busy}
         disabled={!selected || busy}
         onPress={handleConfirm}
@@ -157,24 +136,3 @@ export function ParcelManualInputSheet({
     </ParcelSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  list: {
-    gap: spacing.sm,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-  },
-  optionLabel: {
-    flex: 1,
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-});

@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/design/components/Button/Button';
-import { Icon } from '@/design/icons/Icon';
-import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
+import { CarrierRadioList } from '@/features/parcel/components/CarrierRadioList';
 import { ParcelSheet } from '@/features/parcel/components/ParcelSheet';
 import type { ParcelCarrier } from '@/features/parcel/types';
 import { t } from '@/i18n';
@@ -21,8 +18,8 @@ type ParcelCarrierSelectSheetProps = {
 };
 
 /**
- * ParcelCarrierSelectSheet — 복수 택배사 후보 중 선택(design.md §3.2).
- * 라디오형 리스트에서 하나 고르고 "추적 시작"으로 확정한다.
+ * ParcelCarrierSelectSheet — 복수 택배사 후보 중 선택.
+ * 구분선 라디오 목록에서 하나 고르고 "택배 추적 시작"으로 확정한다.
  */
 export function ParcelCarrierSelectSheet({
   visible,
@@ -31,7 +28,6 @@ export function ParcelCarrierSelectSheet({
   onSelect,
   busy = false,
 }: ParcelCarrierSelectSheetProps): ReactNode {
-  const { colors } = useTheme();
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   const selected = candidates.find((c) => c.code === selectedCode) ?? null;
@@ -42,41 +38,23 @@ export function ParcelCarrierSelectSheet({
   };
 
   return (
-    <ParcelSheet visible={visible} onClose={onClose} title={t('capture.parcel.carrierSelectTitle')}>
-      <View
-        style={styles.list}
-        accessibilityRole="radiogroup"
-        accessibilityLabel={t('capture.parcel.carrierSelectTitle')}
-      >
-        {candidates.map((carrier) => {
-          const isSelected = carrier.code === selectedCode;
-          return (
-            <Pressable
-              key={carrier.code}
-              onPress={() => setSelectedCode(carrier.code)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={carrier.name}
-              style={[
-                styles.option,
-                {
-                  borderColor: isSelected ? colors.primary : colors.border,
-                  backgroundColor: isSelected ? colors.primaryMuted : colors.bgSurface,
-                },
-              ]}
-            >
-              <Text style={[styles.optionLabel, { color: colors.textPrimary }]} numberOfLines={1}>
-                {carrier.name}
-              </Text>
-              {isSelected ? <Icon name="check" size={20} color="primary" /> : null}
-            </Pressable>
-          );
-        })}
-      </View>
+    <ParcelSheet
+      visible={visible}
+      onClose={onClose}
+      eyebrow={t('parcel.sheetEyebrow')}
+      title={t('capture.parcel.carrierSelectTitle')}
+    >
+      <CarrierRadioList
+        carriers={candidates}
+        selectedCode={selectedCode}
+        onSelect={setSelectedCode}
+        label={t('capture.parcel.carrierSelectTitle')}
+      />
 
       <Button
         variant="primary"
-        size="md"
+        size="lg"
+        fullWidth
         loading={busy}
         disabled={!selected || busy}
         onPress={handleConfirm}
@@ -87,24 +65,3 @@ export function ParcelCarrierSelectSheet({
     </ParcelSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  list: {
-    gap: spacing.sm,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-  },
-  optionLabel: {
-    flex: 1,
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-  },
-});

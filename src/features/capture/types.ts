@@ -34,6 +34,13 @@ export type CaptureStage =
   | 'done'
   | 'error';
 
+/**
+ * 캡처 실패 종류. 화면은 이 코드로 분기하고 문구는 `capture.error.<code>` i18n 키로 고른다
+ * (번역 문자열 비교는 로케일이 바뀌면 깨진다).
+ * noText = 글자 없는 이미지라 저장하지 않음(실패가 아닌 조용한 안내).
+ */
+export type CaptureErrorCode = 'noText' | 'rateLimited' | 'generic';
+
 /** 진행 중/완료된 단일 캡처의 로컬 상태. */
 export type CaptureDraft = {
   id: string; // 로컬 생성 id
@@ -43,7 +50,10 @@ export type CaptureDraft = {
   storagePath?: string; // 업로드된 Storage 경로
   ocrText?: string;
   result?: ProcessCaptureResult;
-  error?: string;
+  /** stage === 'error'일 때의 실패 종류. */
+  errorCode?: CaptureErrorCode;
+  /** 온디바이스 OCR 줄 단위 글자 영역(이미지 기준 0~1, 위에서부터 최대 8개). 스캔 연출 형광펜 자리. */
+  ocrBoxes?: { x: number; y: number; width: number; height: number }[];
 };
 
 // ── 에이전트 간 인터페이스 계약 (구현은 각 에이전트) ──────────────────────────
