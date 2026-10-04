@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -17,13 +17,14 @@ import {
 } from '@/design';
 import { motion, spacing } from '@/design/tokens';
 import { CaptureGrid } from '@/features/home/CaptureGrid';
-import { countSince, pickHeadline, weekLabelParts, weekStartMs } from '@/features/home/home-summary';
+import { pickHeadline, weekLabelParts } from '@/features/home/home-summary';
 import type { HeadlineKind } from '@/features/home/home-summary';
 import { SkeletonBlock } from '@/features/home/Skeleton';
 import { StaggerIn } from '@/features/home/StaggerIn';
 import { TopicChips } from '@/features/home/TopicChips';
 import { UpcomingList } from '@/features/home/UpcomingList';
 import type { ParcelTrack } from '@/features/parcel/types';
+import { useCalendarAction } from '@/hooks/use-calendar-action';
 import { useCaptures } from '@/hooks/use-captures';
 import { useCategoryGroups } from '@/hooks/use-category-groups';
 import { useEventCaptures } from '@/hooks/use-event-captures';
@@ -36,8 +37,8 @@ import { useSettingsStore } from '@/stores/settings-store';
 
 /** 최근 캡처 미리보기 — 3열 × 2줄. 전체는 검색 탭에서. */
 const RECENT_LIMIT = 6;
-/** "다가오는 것"에 띄울 최대 일정·택배 수. */
-const UPCOMING_EVENT_LIMIT = 3;
+/** "놓치면 안 돼요"에 띄울 최대 일정·택배 수. 전체 일정은 캘린더 탭에서. */
+const UPCOMING_EVENT_LIMIT = 4;
 const UPCOMING_PARCEL_LIMIT = 2;
 /** 택배 진행 단계 중 배송완료. */
 const PARCEL_DELIVERED_LEVEL = 6;
@@ -61,11 +62,12 @@ function headlineKeys(kind: HeadlineKind, count: number): { text: string; mark?:
 }
 
 /**
- * 홈 — 이번 주에 건진 것 한눈에(명세 §6).
+ * 홈 — 놓치면 안 될 것 먼저(명세 §6 + 원격 #3 "놓침 방지 대시보드").
  *
- * 머리표(`10월 1주 · 38장`) → display 헤드라인 한 문장(형광펜 1곳) → 다가오는 것(일정·택배)
- * → 최근 캡처 3열 → 주제별 묶음 칩. 첫 로딩은 스켈레톤, 이후 갱신은 당겨서 새로고침일 때만
- * 스피너를 보인다. 연출은 헤드라인 형광펜 한 곳 + 섹션 첫 진입 stagger뿐.
+ * 머리표(`10월 1주 · 38장`) → display 헤드라인 한 문장(형광펜 1곳, 다가오는 일정 > 택배 > 캡처)
+ * → 놓치면 안 돼요(D-day 순 일정 + 배송 중 택배, 캘린더 등록/열기) → 최근 캡처 3열 → 주제별 칩.
+ * 첫 로딩은 스켈레톤, 이후 갱신은 당겨서 새로고침일 때만 스피너. 포그라운드 복귀 시
+ * D-day 기준 시각과 목록을 다시 읽는다(밤새 켜 둔 앱이 "내일"을 그대로 보여 주지 않게).
  */
 export default function HomeScreen(): ReactNode {
   const { colors } = useTheme();
@@ -88,10 +90,15 @@ export default function HomeScreen(): ReactNode {
     if (parcelsEnabled) void refreshParcels();
   }, [parcelsEnabled, refreshParcels]);
 
+  // D-day 기준 시각. 렌더에서 Date.now()를 직접 부르지 않는다(순수성).
+  const [now, setNow] = useState<number>(() => Date.now());
+  const { handleRegister, handleOpen, registeringId } = useCalendarAction(eventCaptures.refresh);
+
   // 당겨서 새로고침일 때만 스피너. 자동 갱신(savedCount)에는 스피너를 띄우지 않는다.
   const [pulling, setPulling] = useState(false);
   const handleRefresh = useCallback(async (): Promise<void> => {
     setPulling(true);
+    setNow(Date.now());
     try {
       await Promise.all([
         captures.refresh(),
@@ -104,6 +111,24 @@ export default function HomeScreen(): ReactNode {
       setPulling(false);
     }
   }, [captures, weeklyStats, categoryGroups, eventCaptures, parcelsEnabled, refreshParcels]);
+
+  // 포그라운드 복귀: 조용히(스피너 없이) D-day와 목록을 새로 읽는다.
+  // why ref: 리스너는 한 번만 붙이고 최신 갱신 함수를 부른다(매 렌더 재구독 방지).
+  const silentRefreshRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    silentRefreshRef.current = (): void => {
+      setNow(Date.now());
+      void eventCaptures.refresh();
+      void weeklyStats.refresh();
+      if (parcelsEnabled) void refreshParcels();
+    };
+  }, [eventCaptures, weeklyStats, parcelsEnabled, refreshParcels]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') silentRefreshRef.current();
+    });
+    return () => sub.remove();
+  }, []);
 
   // 첫 로딩: 목록·주간 통계가 아직 한 번도 안 왔으면 스켈레톤.
   const firstLoad =
@@ -122,24 +147,26 @@ export default function HomeScreen(): ReactNode {
 
   const summary = useMemo(() => {
     const stats = weeklyStats.stats;
-    const fromMs = stats ? weekStartMs(stats.weekStart) : null;
-    const eventItems = [...eventCaptures.upcoming, ...eventCaptures.past];
-    const events = fromMs === null ? 0 : countSince(eventItems.map((i) => i.createdAt), fromMs);
-    const parcels =
-      fromMs === null || !parcelsEnabled ? 0 : countSince(tracks.map((p) => p.createdAt), fromMs);
-    const capturesThisWeek = stats?.count ?? 0;
     const label = stats ? weekLabelParts(stats.weekStart, getLocale()) : null;
+    const capturesThisWeek = stats?.count ?? 0;
     return {
       eyebrow: label
         ? t('home.eyebrow', { month: label.month, week: label.week, count: capturesThisWeek })
         : '',
-      headline: pickHeadline({ events, parcels, captures: capturesThisWeek, hasAny }),
+      headline: pickHeadline({
+        upcomingEvents: eventCaptures.upcoming.length,
+        activeParcels: activeParcels.length,
+        captures: capturesThisWeek,
+        hasAny,
+      }),
     };
-  }, [weeklyStats.stats, eventCaptures.upcoming, eventCaptures.past, parcelsEnabled, tracks, hasAny]);
+  }, [weeklyStats.stats, eventCaptures.upcoming.length, activeParcels.length, hasAny]);
 
   const upcomingEvents = eventCaptures.upcoming.slice(0, UPCOMING_EVENT_LIMIT);
   const upcomingParcels = activeParcels.slice(0, UPCOMING_PARCEL_LIMIT);
   const hasUpcoming = upcomingEvents.length + upcomingParcels.length > 0;
+  // 일정 목록을 아직 한 번도 못 받았으면 "없어요"를 말하지 않는다(깜빡임 방지).
+  const upcomingSettled = !eventCaptures.isLoading || hasUpcoming;
   const recentItems = captures.items.slice(0, RECENT_LIMIT);
 
   const openCapture = useCallback(
@@ -224,15 +251,25 @@ export default function HomeScreen(): ReactNode {
           )}
         </StaggerIn>
 
-        {hasUpcoming ? (
+        {summary.headline.kind !== 'empty' && upcomingSettled ? (
           <StaggerIn index={1} style={[styles.pad, styles.section]}>
             <Eyebrow accessibilityRole="header">{t('home.section.upcoming')}</Eyebrow>
-            <UpcomingList
-              events={upcomingEvents}
-              parcels={upcomingParcels}
-              onOpenCapture={openCapture}
-              onOpenParcel={openParcel}
-            />
+            {hasUpcoming ? (
+              <UpcomingList
+                events={upcomingEvents}
+                parcels={upcomingParcels}
+                now={now}
+                registeringId={registeringId}
+                onRegister={handleRegister}
+                onOpenCalendar={handleOpen}
+                onOpenCapture={openCapture}
+                onOpenParcel={openParcel}
+              />
+            ) : (
+              <Text variant="body" color="textSecondary">
+                {t('home.upcoming.empty')}
+              </Text>
+            )}
           </StaggerIn>
         ) : null}
 

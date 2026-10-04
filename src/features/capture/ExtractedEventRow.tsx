@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { ConfidenceBadge } from '@/design/components/ConfidenceBadge/ConfidenceBadge';
 import { Text } from '@/design/components/Text/Text';
 import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
@@ -31,13 +32,22 @@ export type ExtractedEventRowProps = {
    * 캡처 시트는 행이 떠오르는 순간에 맞춰 긋는다("형광펜 박스에서 튀어나온" 느낌).
    */
   markDelay?: number;
+  /** 확신 낮은 일정에 "확인하고 추가해 주세요" 안내 문장을 붙인다(등록 버튼이 있는 곳에서만). */
+  showLowConfidenceHint?: boolean;
 };
 
 /**
- * 뽑힌 일정 한 줄 — 왼쪽 mono 날짜(형광펜)·요일·시각, 오른쪽 제목·장소.
- * 캡처 시트 결과용. 상세 화면의 이벤트 카드도 이 행으로 맞추면 두 곳의 모양이 같아진다.
+ * 뽑힌 일정 한 줄 — 왼쪽 mono 날짜(형광펜)·요일·시각, 오른쪽 제목·장소·확신도 배지.
+ * 캡처 시트 결과와 상세 화면이 같이 쓴다.
+ *
+ * 확신도(원격 #5): 서버가 날짜를 글에서 그대로 읽었으면 high, 상대·모호·추론이면 low.
+ * 구버전 캡처(confidence 없음)는 배지를 숨긴다 — 자동 등록 게이트는 capture-store가 low로 취급해 막는다.
  */
-export function ExtractedEventRow({ event, markDelay }: ExtractedEventRowProps): ReactNode {
+export function ExtractedEventRow({
+  event,
+  markDelay,
+  showLowConfidenceHint = false,
+}: ExtractedEventRowProps): ReactNode {
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const when = formatEventWhen(event.starts_at);
@@ -58,7 +68,14 @@ export function ExtractedEventRow({ event, markDelay }: ExtractedEventRowProps):
 
   const markStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: mark.value }] }));
 
-  const label = [t('capture.result.event'), event.title, when?.spoken, event.location]
+  const confidence = event.confidence;
+  const label = [
+    t('capture.result.event'),
+    event.title,
+    when?.spoken,
+    event.location,
+    confidence ? t(confidence === 'high' ? 'confidence.badge.high' : 'confidence.badge.low') : null,
+  ]
     .filter(Boolean)
     .join(', ');
 
@@ -92,6 +109,16 @@ export function ExtractedEventRow({ event, markDelay }: ExtractedEventRowProps):
             {event.location}
           </Text>
         ) : null}
+        {confidence ? (
+          <View style={styles.badge}>
+            <ConfidenceBadge level={confidence} />
+          </View>
+        ) : null}
+        {showLowConfidenceHint && confidence === 'low' ? (
+          <Text variant="caption" color="textSecondary">
+            {t('confidence.lowHint')}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -123,5 +150,8 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: 2,
+  },
+  badge: {
+    marginTop: spacing.xs,
   },
 });

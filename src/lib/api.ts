@@ -127,6 +127,8 @@ function normalizeResult(raw: unknown): ProcessCaptureResult {
       starts_at: e.starts_at as string,
       ends_at: typeof e.ends_at === 'string' ? e.ends_at : null,
       location: typeof e.location === 'string' ? e.location : null,
+      // 확신도는 화이트리스트로만 통과시킨다. 빠뜨리면 자동 등록 게이트가 모든 일정을 "낮음"으로 막는다.
+      ...(e.confidence === 'high' || e.confidence === 'low' ? { confidence: e.confidence } : null),
     };
   }
 

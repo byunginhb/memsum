@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Linking, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
-import { EmptyState, Header, useBottomBarClearance, useToast } from '@/design';
+import { EmptyState, Header, useBottomBarClearance } from '@/design';
 import { useTheme } from '@/design/theme/useTheme';
 import { spacing } from '@/design/tokens';
 import { CalendarConnectPrompt } from '@/features/calendar/CalendarConnectPrompt';
 import { EventCaptureList } from '@/features/calendar/EventCaptureList';
 import { SkeletonBlock } from '@/features/captures/CaptureSkeleton';
-import type { CaptureListItem } from '@/features/captures/types';
+import { useCalendarAction } from '@/hooks/use-calendar-action';
 import { useEventCaptures } from '@/hooks/use-event-captures';
 import { t } from '@/i18n';
 import { useCalendarStore } from '@/stores/calendar-store';
@@ -105,57 +105,13 @@ function TimelineSkeleton(): ReactNode {
  */
 function ConnectedBody(): ReactNode {
   const { colors } = useTheme();
-  const toast = useToast();
   const router = useRouter();
   const bottomClearance = useBottomBarClearance();
-  const registerCapture = useCalendarStore((s) => s.registerCapture);
   const { upcoming, past, isLoading, error, refresh } = useEventCaptures();
-
-  // 현재 등록 진행 중인 캡처 id. 해당 행만 로딩 처리하고 나머지는 잠근다(직렬 처리).
-  const [registeringId, setRegisteringId] = useState<string | null>(null);
+  // 등록·열기는 홈 "다가오는 것"과 같은 공용 훅(로직 중복 금지).
+  const { handleRegister, handleOpen, registeringId } = useCalendarAction(refresh);
 
   const hasItems = upcoming.length > 0 || past.length > 0;
-
-  const handleRegister = useCallback(
-    (item: CaptureListItem): void => {
-      const event = item.event;
-      if (!event) {
-        console.error('[calendar] 등록 시도했으나 event가 없습니다:', item.id);
-        return;
-      }
-      if (registeringId !== null) return;
-
-      setRegisteringId(item.id);
-      void (async () => {
-        try {
-          await registerCapture({ captureId: item.id, event });
-          toast.show({ tone: 'success', title: t('calendar.toast.registerSuccess') });
-          // 등록 결과(calendarEventId·htmlLink)를 반영하려면 목록을 다시 읽는다.
-          await refresh();
-        } catch (err) {
-          console.error('[calendar] 일정 등록 실패:', err);
-          toast.show({ tone: 'danger', title: t('calendar.toast.registerError') });
-        } finally {
-          setRegisteringId(null);
-        }
-      })();
-    },
-    [registeringId, registerCapture, refresh, toast],
-  );
-
-  const handleOpen = useCallback(
-    (htmlLink: string): void => {
-      void (async () => {
-        try {
-          await Linking.openURL(htmlLink);
-        } catch (err) {
-          console.error('[calendar] 캘린더 링크 열기 실패:', err);
-          toast.show({ tone: 'danger', title: t('calendar.error.openLink') });
-        }
-      })();
-    },
-    [toast],
-  );
 
   const handleOpenCapture = useCallback(
     (id: string): void => {

@@ -1,26 +1,35 @@
 @import 'tailwindcss';
+/* Syne — 수치·섹션마커 전용(라틴·숫자). Pretendard(한글)와 공존. */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap');
 
-/* 브랜드 토큰 — 앱 디자인시스템(Calm Glass)과 동일 팔레트 */
+/* 브랜드 토큰 — 컨셉 "Scan": 스크린샷 더미를 스캔 바가 훑어 라벨링.
+   고정 브랜드색(라벤더·코랄) 유지 + barely-lavender 뉴트럴. var명 보존(컴포넌트 무수정). */
 @theme {
-  --color-primary: #7c6fe8;
-  --color-primary-soft: #efedfc;
-  --color-primary-strong: #6a5cd8; /* CTA hover/pressed (보라 한 단계 진하게) */
-  --color-accent: #f2a65a;
-  --color-accent-soft: #fdeede; /* 코랄 10% 배경 (베스트 카드 글로우) */
-  --color-ink: #1f2430;
-  --color-ink-soft: #5a6172;
-  --color-ink-faint: #9aa0ad; /* 캡션·메타·푸터 미세 텍스트 */
-  --color-cream: #fbf5ed;
+  --color-primary: #7c6fe8; /* 라벤더 — 브랜드 액션(CTA·스캔 바·링크) */
+  --color-primary-soft: #eae7fb; /* 라벤더 틴트 패널 */
+  --color-primary-strong: #6459d4; /* CTA hover/pressed */
+  --color-accent: #f2a65a; /* 코랄 — 섹션당 1회 강조("되찾을 수 있는 것") */
+  --color-accent-soft: #fdf0e3;
+  --color-ink: #1c1826; /* Night — 따뜻한 보라-검정 */
+  --color-ink-soft: #5e5777; /* Slate — 본문(바이올렛 그레이) */
+  --color-ink-faint: #a89ebb; /* Mist — 캡션·메타·푸터 */
+  --color-cream: #f6f4fc; /* Quartz — barely-lavender 배경 (var명 유지) */
   --color-card: #ffffff;
-  --color-line: #ece5da;
+  --color-line: #e4dff4; /* 라벤더 틴트 구분선 */
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system,
     BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif;
+  /* 수치·섹션마커 — Syne(기하학 굵은 서체). 라틴·숫자 전용, 한글은 Pretendard 폴백 */
+  --font-display: 'Syne', 'Pretendard Variable', sans-serif;
+  /* 데이터 보이스 — OCR 라벨·타임스탬프(시스템 모노, 무설치) */
+  --font-mono: 'SFMono-Regular', ui-monospace, 'SF Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
 
   /* 그림자·라운드 표준 (전 섹션 통일) */
-  --shadow-card: 0 1px 2px rgba(31, 36, 48, 0.04),
-    0 8px 24px rgba(31, 36, 48, 0.06);
-  --shadow-float: 0 12px 40px rgba(124, 111, 232, 0.18);
-  --radius-block: 28px;
+  --shadow-card: 0 1px 2px rgba(28, 24, 38, 0.05),
+    0 8px 24px rgba(28, 24, 38, 0.07);
+  --shadow-float: 0 12px 40px rgba(124, 111, 232, 0.14); /* 라벤더 글로우 */
+  --shadow-scan: 0 0 16px 6px rgba(124, 111, 232, 0.35); /* 스캔 바 글로우 */
+  --radius-block: 20px; /* 28→20: 덜 부드러움, 덜 템플릿 */
 
   /* 모션 토큰 — 앱 디자인시스템 §7 그대로 이식 */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* 표준 진입 */
@@ -113,10 +122,10 @@ body {
 }
 @keyframes coral-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(242, 166, 90, 0.5);
+    box-shadow: 0 0 0 0 rgba(239, 168, 12, 0.5);
   }
   100% {
-    box-shadow: 0 0 0 12px rgba(242, 166, 90, 0);
+    box-shadow: 0 0 0 12px rgba(239, 168, 12, 0);
   }
 }
 
@@ -142,13 +151,77 @@ body {
   );
   background-repeat: no-repeat;
   background-position: 0 100%;
-  background-size: 0% 0.32em;
+  background-size: 0% 0.5em;
   transition: background-size 1000ms var(--ease-standard) 300ms;
   padding-bottom: 0.04em;
 }
 [data-revealed='true'] .coral-underline,
 .coral-underline[data-revealed='true'] {
-  background-size: 100% 0.32em;
+  background-size: 100% 0.5em;
+}
+
+/* ── 시그니처: 스캔 바 (Hero) ───────────────────────────────────
+   스크린샷 타일 더미 위를 라벤더 선이 위→아래로 훑고 지나가며,
+   지나간 행의 타일이 선명해지고 OCR 라벨 칩이 떠오른다.
+   JS 없이 CSS만: 스캔 바는 top 0→100% 스윕, 타일/칩은 행별
+   animation-delay(--resolve-delay)로 "스캔 통과 시점"에 깨어난다. */
+@keyframes scan-sweep {
+  from {
+    top: 0%;
+  }
+  to {
+    top: 100%;
+  }
+}
+@keyframes tile-resolve {
+  to {
+    filter: blur(0) saturate(1);
+    opacity: 1;
+  }
+}
+@keyframes chip-in {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.scan-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--color-primary);
+  box-shadow: var(--shadow-scan);
+  animation: scan-sweep 1600ms var(--ease-standard) 300ms forwards;
+}
+.scan-tile {
+  filter: blur(9px) saturate(0.2);
+  opacity: 0.85;
+  animation: tile-resolve 320ms var(--ease-standard) both;
+  animation-delay: var(--resolve-delay, 0ms);
+}
+.ocr-chip {
+  opacity: 0;
+  transform: scale(0.82);
+  animation: chip-in 200ms var(--ease-standard) both;
+  animation-delay: var(--resolve-delay, 0ms);
+}
+/* reduced-motion: 스캔 생략, 모든 타일 즉시 선명+라벨 */
+@media (prefers-reduced-motion: reduce) {
+  .scan-bar {
+    display: none;
+  }
+  .scan-tile {
+    filter: none !important;
+    opacity: 1 !important;
+    animation: none !important;
+  }
+  .ocr-chip {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
 }
 
 /* 9닷 정렬 모션 — 각 점이 작게→제자리 settle */
@@ -207,11 +280,12 @@ body {
 .faq-item[open] .faq-answer {
   grid-template-rows: 1fr;
 }
-.faq-item summary .faq-chevron {
-  transition: transform var(--dur-base) var(--ease-standard);
+/* Plus(닫힘) / Minus(열림) 토글 — JS 없이 [open] 셀렉터로 전환 */
+.faq-item:not([open]) .faq-minus {
+  display: none;
 }
-.faq-item[open] summary .faq-chevron {
-  transform: rotate(180deg);
+.faq-item[open] .faq-plus {
+  display: none;
 }
 
 /* ── reduced-motion — 콘텐츠 100% 표시, 모든 모션 정지 ───────── */
@@ -232,11 +306,10 @@ body {
     animation: none !important;
   }
   .coral-underline {
-    background-size: 100% 0.32em !important;
+    background-size: 100% 0.5em !important;
     transition: none !important;
   }
-  .faq-item .faq-answer,
-  .faq-item summary .faq-chevron {
+  .faq-item .faq-answer {
     transition: none !important;
   }
   /* StepFlow 연결선 — 즉시 완성 상태(그리기 모션 생략). */

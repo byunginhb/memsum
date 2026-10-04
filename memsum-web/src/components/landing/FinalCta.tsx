@@ -19,11 +19,16 @@ export function FinalCta({ copy }: { copy: LandingCopy }) {
       aria-labelledby="final-title"
       className="px-5 py-20 sm:px-6 sm:py-24"
     >
-      <div className="relative mx-auto w-full max-w-6xl overflow-hidden rounded-(--radius-block) bg-(--color-primary) px-6 py-16 text-center sm:px-12 sm:py-24">
-        {/* 보라 패널 위 미세 글로우 */}
+      <div className="relative mx-auto w-full max-w-6xl overflow-hidden rounded-(--radius-block) bg-(--color-ink) px-6 py-16 text-center sm:px-12 sm:py-24">
+        {/* 다크 패널 위 라벤더 글로우 */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-[70px]"
+          className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full bg-(--color-primary)/25 blur-[70px]"
+        />
+        {/* 코랄 글로우 — 페이지 전체에서 코랄이 가장 크게 쓰이는 마지막 클라이맥스 */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-20 -right-16 h-64 w-64 rounded-full bg-(--color-accent)/20 blur-[80px]"
         />
 
         <Reveal

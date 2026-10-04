@@ -1,12 +1,14 @@
 import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { getLandingCopy, type Lang } from '@/lib/landing-copy';
-import { SITE_NAME, SITE_URL } from '@/lib/site';
+import { OPERATOR_NAME, SITE_NAME, SITE_URL } from '@/lib/site';
 
+import { AppScreens } from './AppScreens';
 import { AudienceSection } from './AudienceSection';
 import { CompareTable } from './CompareTable';
 import { Faq } from './Faq';
 import { FeatureShowcase } from './FeatureShowcase';
 import { FinalCta } from './FinalCta';
+import { FounderStory } from './FounderStory';
 import { Hero } from './Hero';
 import { MobileCtaBar } from './MobileCtaBar';
 import { NotifyProvider } from './NotifyProvider';
@@ -14,6 +16,7 @@ import { ParcelSection } from './ParcelSection';
 import { ProblemSection } from './ProblemSection';
 import { ScrollProgress } from './ScrollProgress';
 import { StepFlow } from './StepFlow';
+import { Testimonials } from './Testimonials';
 
 /**
  * 랜딩 페이지 조립 — 로케일(`lang`) 하나로 ko/en 전체 화면을 렌더한다.
@@ -33,6 +36,7 @@ export function LandingPage({ lang }: { lang: Lang }) {
     description: copy.meta.appJsonLdDescription,
     url: copy.isKorean ? SITE_URL : `${SITE_URL}/en`,
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'KRW' },
+    author: { '@type': 'Person', name: OPERATOR_NAME },
   };
 
   const faqJsonLd = {
@@ -54,9 +58,12 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <ProblemSection copy={copy} />
         <StepFlow copy={copy} />
         <FeatureShowcase copy={copy} />
+        <AppScreens copy={copy} />
         {copy.isKorean && <ParcelSection copy={copy} />}
         <AudienceSection copy={copy} />
+        <FounderStory copy={copy} />
         <CompareTable copy={copy} />
+        <Testimonials copy={copy} />
         <Faq copy={copy} />
         <FinalCta copy={copy} />
       </main>

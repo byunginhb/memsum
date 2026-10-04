@@ -9,10 +9,12 @@
 //   - DB: report_feedback → weekly_reports → parcel_tracks → captures → user_profiles
 //         (FK on delete cascade가 있으나 순서 의존을 없애기 위해 명시적으로 자식부터 지운다)
 //   - 로컬: 택배 목록(parcel-store)·닉네임(settings-store) — 서버를 비워도 화면에 남지 않게
+//   - 예약 알림: 일정 전날 리마인드(일정 제목이 본문에 들어 있다) — 지운 일정이 알림으로 되살아나지 않게
 //
 // 익명 인증이라 auth.users 행 자체는 클라이언트에서 지울 수 없다(관리자 권한 필요).
 // 데이터는 모두 비워지고, 세션(빈 익명 계정)은 유지된다.
 
+import { cancelAllEventReminders } from '@/lib/notifications';
 import { getSupabase } from '@/lib/supabase';
 import { useParcelStore } from '@/stores/parcel-store';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -133,6 +135,9 @@ export async function deleteAllUserData(userId: string): Promise<void> {
     // 3) 로컬 상태 초기화 — 서버가 비었는데 택배 목록·닉네임이 화면에 남지 않게.
     useParcelStore.setState({ tracks: [] });
     useSettingsStore.getState().setNickname('');
+
+    // 4) 예약된 전날 리마인드 해제(실패해도 내부에서 로깅만 — 삭제 자체는 끝났다).
+    await cancelAllEventReminders();
   } catch (error) {
     const message =
       error instanceof Error

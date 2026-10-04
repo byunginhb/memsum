@@ -28,6 +28,7 @@ import {
   useTheme,
 } from '@/design';
 import { radius, spacing } from '@/design/tokens';
+import { AhaStep } from '@/features/onboarding/AhaStep';
 import { ONBOARDING_DEMO_BOXES, ONBOARDING_DEMO_RATIO } from '@/features/onboarding/onboarding-demo';
 import { t } from '@/i18n';
 import { ensureNotificationPermission } from '@/lib/notifications';
@@ -35,7 +36,7 @@ import { useOnboardingStore } from '@/stores/onboarding-store';
 
 import { requestPermission } from '../../../modules/photo-library-watcher';
 
-const PAGE_COUNT = 3;
+const PAGE_COUNT = 4;
 /** 인디케이터 점: 비활성 8, 활성 24(스크롤에 따라 폭이 부드럽게 바뀐다). */
 const DOT_SIZE = 8;
 const DOT_ACTIVE_WIDTH = 24;
@@ -54,11 +55,13 @@ const DETECT_FRAME_HEIGHT = 220;
 type PermissionResult = 'idle' | 'asking' | 'granted' | 'denied';
 
 /**
- * 온보딩 3페이지 — 1) 스캔 데모 2) 자동 감지 + 권한 3) 일요일 5줄 리포트 미리보기.
+ * 온보딩 4페이지 — 1) 스캔 데모 2) 내 스크린샷으로 해 보기(first-aha, 원격 #2)
+ * 3) 자동 감지 + 권한 4) 일요일 5줄 리포트 미리보기.
  *
+ * 명세 §6의 3페이지에 "직접 체험" 한 장을 더했다: 가치를 내 화면으로 본 다음에 권한을 묻는다.
  * 가로 페이징 스크롤의 위치(scrollX)를 UI 스레드에서 받아 인디케이터 폭을 연속으로 바꾼다.
- * 권한은 2페이지 버튼으로만 묻고, 거부해도 다음으로 갈 수 있다(나중에 설정에서 켠다).
- * 연출은 1페이지 스캔 한 곳. 페이지 전환 햅틱은 쓰지 않는다(명세 §5 햅틱 2곳 제한).
+ * 권한은 3페이지 버튼으로만 묻고, 거부해도 다음으로 갈 수 있다(나중에 설정에서 켠다).
+ * 연출은 스캔 한 종류(1페이지 예시, 2페이지 내 이미지). 페이지 전환 햅틱은 쓰지 않는다(명세 §5).
  */
 export default function OnboardingScreen(): ReactNode {
   const { colors } = useTheme();
@@ -128,10 +131,15 @@ export default function OnboardingScreen(): ReactNode {
         </Page>
 
         <Page width={width} topInset={insets.top}>
+          <Copy index={1} titleKey="onboarding.aha.title" bodyKey="onboarding.aha.body" />
+          <AhaStep />
+        </Page>
+
+        <Page width={width} topInset={insets.top}>
           <View style={[styles.visual, styles.center]}>
             <DetectDemo />
           </View>
-          <Copy index={1} titleKey="onboarding.detect.title" bodyKey="onboarding.detect.body" />
+          <Copy index={2} titleKey="onboarding.detect.title" bodyKey="onboarding.detect.body" />
           <PermissionAsk />
         </Page>
 
@@ -139,7 +147,7 @@ export default function OnboardingScreen(): ReactNode {
           <View style={styles.visual}>
             <ReportPreview />
           </View>
-          <Copy index={2} titleKey="onboarding.report.title" bodyKey="onboarding.report.body" />
+          <Copy index={3} titleKey="onboarding.report.title" bodyKey="onboarding.report.body" />
         </Page>
       </Animated.ScrollView>
 
@@ -258,7 +266,7 @@ function DetectDemo(): ReactNode {
   );
 }
 
-/** 2페이지 권한 버튼 — 사진(자동 감지)과 알림(일정·택배·리포트)을 차례로 묻는다. */
+/** 3페이지 권한 버튼 — 사진(자동 감지)과 알림(일정·택배·리포트)을 차례로 묻는다. */
 function PermissionAsk(): ReactNode {
   const [result, setResult] = useState<PermissionResult>('idle');
 
@@ -299,7 +307,7 @@ function PermissionAsk(): ReactNode {
   );
 }
 
-/** 3페이지 — 일요일 5줄 리포트 미리보기. 1위 줄만 형광펜(정적). */
+/** 4페이지 — 일요일 5줄 리포트 미리보기. 1위 줄만 형광펜(정적). */
 function ReportPreview(): ReactNode {
   const { colors } = useTheme();
   return (

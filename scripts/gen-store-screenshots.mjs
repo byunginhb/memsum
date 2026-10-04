@@ -62,7 +62,7 @@ const SCENES = [
 const CAPTIONS = {
   'ko-KR': {
     '01-scan': ['스크린샷을 찍으면', '{글자를 읽어} 정리해요'],
-    '02-home': ['쌓아 둔 캡처에서', '{다가오는 일정}을 꺼내요'],
+    '02-home': ['놓치면 안 될 일정을', '{D-day 순}으로 먼저 보여 줘요'],
     '03-result': ['캡처마다', '{제목과 요약}을 붙여요'],
     '04-calendar': ['날짜가 보이면', '{구글 캘린더}에 등록해요'],
     '05-report': ['일요일 저녁엔', '{다시 볼 5개}를 골라 줘요'],
@@ -70,7 +70,7 @@ const CAPTIONS = {
   },
   'en-US': {
     '01-scan': ['Take a screenshot.', 'Memsum {reads the text}'],
-    '02-home': ['See what’s coming up,', 'pulled from {screenshots}'],
+    '02-home': ['Upcoming plans first,', 'sorted by {D-day}'],
     '03-result': ['Every capture gets', '{a title and summary}'],
     '04-calendar': ['Dates go straight', 'to {Google Calendar}'],
     '05-report': ['Every Sunday, {5 captures}', 'worth a second look'],

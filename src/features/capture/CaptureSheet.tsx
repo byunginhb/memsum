@@ -321,7 +321,11 @@ function ResultView({ draft, result, onClose }: ResultViewProps): ReactNode {
         {event ? (
           <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
             <View style={[styles.rule, { backgroundColor: colors.border }]} />
-            <ExtractedEventRow event={event} markDelay={RESULT_BASE_DELAY + motion.stagger * 2} />
+            <ExtractedEventRow
+              event={event}
+              markDelay={RESULT_BASE_DELAY + motion.stagger * 2}
+              showLowConfidenceHint={!calendar.added}
+            />
           </StaggerIn>
         ) : null}
 
@@ -366,7 +370,12 @@ function ResultView({ draft, result, onClose }: ResultViewProps): ReactNode {
               leftIcon={<Icon name="calendar" size={16} color="onPrimary" />}
               style={styles.flex}
             >
-              {calendar.added ? t('capture.action.openInCalendar') : t('capture.action.addToCalendar')}
+              {calendar.added
+                ? t('capture.action.openInCalendar')
+                : // 확신 낮은 일정은 "확인 후 추가"로 한 번 더 보게 한다(자동 등록은 capture-store가 막는다).
+                  event.confidence === 'high'
+                  ? t('capture.action.addToCalendar')
+                  : t('capture.action.confirmAndAdd')}
             </Button>
           </>
         ) : (

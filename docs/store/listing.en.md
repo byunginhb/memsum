@@ -8,10 +8,10 @@ All copy reflects only features confirmed in the codebase (no overstatement, no 
 
 ## 1. App name
 
-- **App Store app name** (max 30 chars): `Memsum: Screenshot Organizer`
-  - (length: 28 chars — within 30)
-- **Google Play app name** (max 30 chars): `Memsum - Screenshot Sorter`
-  - (length: 26 chars — within 30)
+- **App Store app name** (max 30 chars): `Memsum: Your Screenshot Memory`
+  - (length: 30 chars — within 30)
+- **Google Play app name** (max 30 chars): `Memsum - Never Miss It`
+  - (length: 22 chars — within 30)
 - Brand usage: lowercase `memsum` for logo/icon, `Memsum` in body text.
 
 ---
@@ -19,13 +19,13 @@ All copy reflects only features confirmed in the codebase (no overstatement, no 
 ## 2. Subtitle / Short description
 
 - **App Store Subtitle** (max 30 chars):
-  `OCR captures into calendar`
-  - (length: 26 chars — within 30)
+  `Never miss what you captured`
+  - (length: 28 chars — within 30)
   - Alt A: `Sort screenshots, OCR, recap` (28 chars)
   - Alt B: `Turn old screenshots useful` (27 chars)
 
 - **Google Play Short description** (max 80 chars):
-  `OCR your screenshots, add events to Google Calendar, get a 5-line weekly recap.`
+  `Never miss what's in your screenshots — events to calendar, picks every Sunday.`
   - (length: 79 chars — within 80)
   - Alt: `Reads text from your screenshots, adds events to a calendar, recaps your week.` (78 chars)
 
@@ -85,9 +85,12 @@ PRIVACY
 - No ads.
 
 It's okay to forget. Memsum will remind you.
+
+WHO MADE THIS
+I built Memsum by myself. I used to have 1,800 screenshots piled up and still missed appointments — I needed something to remember for me. If anything feels off, email byunginhb@gmail.com and I'll reply directly.
 ```
 
-- (body length: ~1,250 chars — within 4,000)
+- (body length: ~1,470 chars — within 4,000)
 
 ---
 

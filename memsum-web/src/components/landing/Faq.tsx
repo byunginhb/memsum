@@ -1,13 +1,15 @@
-import { ChevronDown } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 
 import type { LandingCopy } from '@/lib/landing-copy';
 
+import { FaqNotifyCta } from './FaqNotifyCta';
 import { Reveal, RevealGroup } from './Reveal';
 
 /**
  * S7 FAQ — 마지막 불안 제거.
  * <details>/<summary> 네이티브 아코디언(JS 없이 동작·SSR·키보드 무료) + CSS 높이 트랜지션.
  * 첫 항목만 기본 열림. 카피는 로케일 사전(`copy.faq`)에서 주입.
+ * 토글 마커: 닫힘=Plus, 열림=Minus (CSS .faq-item[open] 셀렉터로 전환).
  */
 export function Faq({ copy }: { copy: LandingCopy }) {
   const c = copy.faq;
@@ -33,19 +35,23 @@ export function Faq({ copy }: { copy: LandingCopy }) {
               className="faq-item rounded-(--radius-block) border border-(--color-line) bg-(--color-card) shadow-(--shadow-card)"
               open={index === 0}
             >
-              <summary className={`flex items-center justify-between gap-4 px-6 py-5 text-left text-base font-bold tracking-tight ${bk} sm:text-lg`}>
+              <summary className={`flex items-center justify-between gap-4 px-6 py-5 text-left text-base font-semibold tracking-tight ${bk} text-(--color-ink) sm:text-lg`}>
                 <span>{item.q}</span>
-                <ChevronDown
-                  size={20}
-                  aria-hidden="true"
-                  className="faq-chevron shrink-0 text-(--color-primary)"
-                />
+                <span className="shrink-0 text-(--color-primary)" aria-hidden="true">
+                  <Plus size={20} className="faq-plus" />
+                  <Minus size={20} className="faq-minus" />
+                </span>
               </summary>
               <div className="faq-answer">
                 <div>
                   <p className={`px-6 pb-5 text-base leading-relaxed ${bk} text-(--color-ink-soft)`}>
                     {item.a}
                   </p>
+                  {item.ctaLabel ? (
+                    <div className="px-6 pb-6">
+                      <FaqNotifyCta label={item.ctaLabel} />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </details>

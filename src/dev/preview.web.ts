@@ -180,6 +180,7 @@ const SEEDS_KO: readonly Seed[] = [
     event: {
       title: "지민 ♥ 도윤 결혼식",
       starts_at: dayAt(6, 12, 30),
+      confidence: "high",
       ends_at: dayAt(6, 14, 0),
       location: "달빛정원홀 3층 그랜드홀",
     },
@@ -228,6 +229,7 @@ const SEEDS_KO: readonly Seed[] = [
     event: {
       title: "돌담식당 저녁 예약 (4명)",
       starts_at: dayAt(1, 19, 0),
+      confidence: "low",
       ends_at: null,
       location: "돌담식당 을지로점",
     },
@@ -256,6 +258,7 @@ const SEEDS_KO: readonly Seed[] = [
     event: {
       title: "맑은미소치과 스케일링",
       starts_at: dayAt(2, 10, 30),
+      confidence: "high",
       ends_at: dayAt(2, 11, 0),
       location: "맑은미소치과",
     },
@@ -279,6 +282,7 @@ const SEEDS_KO: readonly Seed[] = [
     event: {
       title: "올해의 작가상 2026 관람",
       starts_at: dayAt(-1, 14, 0),
+      confidence: "high",
       ends_at: null,
       location: "가람미술관 서울",
     },
@@ -372,6 +376,7 @@ const SEEDS_KO: readonly Seed[] = [
     event: {
       title: "HN 113 김포 → 제주",
       starts_at: dayAt(12, 8, 10),
+      confidence: "low",
       ends_at: dayAt(12, 9, 20),
       location: "김포공항 국내선",
     },
@@ -432,6 +437,7 @@ const SEEDS_EN: readonly Seed[] = [
     event: {
       title: "Mia & Daniel’s wedding",
       starts_at: dayAt(6, 12, 30),
+      confidence: "high",
       ends_at: dayAt(6, 14, 0),
       location: "The Chapel Hall, 3rd floor",
     },
@@ -478,6 +484,7 @@ const SEEDS_EN: readonly Seed[] = [
     event: {
       title: "Dinner at Juniper Kitchen (4)",
       starts_at: dayAt(1, 19, 0),
+      confidence: "low",
       ends_at: null,
       location: "Juniper Kitchen",
     },
@@ -506,6 +513,7 @@ const SEEDS_EN: readonly Seed[] = [
     event: {
       title: "Dental cleaning",
       starts_at: dayAt(2, 10, 30),
+      confidence: "high",
       ends_at: dayAt(2, 11, 0),
       location: "Bright Smile Dental",
     },
@@ -533,6 +541,7 @@ const SEEDS_EN: readonly Seed[] = [
     event: {
       title: "Modern Light 2026",
       starts_at: dayAt(-1, 14, 0),
+      confidence: "high",
       ends_at: null,
       location: "City Museum of Art",
     },
@@ -632,6 +641,7 @@ const SEEDS_EN: readonly Seed[] = [
     event: {
       title: "Flight CL 113 SFO → SEA",
       starts_at: dayAt(12, 8, 10),
+      confidence: "low",
       ends_at: dayAt(12, 10, 20),
       location: "SFO Terminal 2",
     },
@@ -948,6 +958,7 @@ function create(): PreviewSource | null {
           ? "sarah.kim@example.com"
           : "suhyun.lee@example.com",
     sheetDraft: buildSheetDraft(query.get("sheet")),
+    ahaDraft: buildSheetDraft(query.get("aha")),
   };
 }
 

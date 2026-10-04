@@ -19,4 +19,6 @@ export type PreviewSource = {
   calendarEmail: string | null;
   /** `?sheet=` 로 고른 캡처 시트 상태. 없으면 null. */
   sheetDraft: CaptureDraftWithBoxes | null;
+  /** `?aha=` 로 고른 온보딩 체험 스텝 상태(scan·result·error). 없으면 null. */
+  ahaDraft: CaptureDraftWithBoxes | null;
 };

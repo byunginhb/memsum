@@ -31,6 +31,7 @@ import {
   useToast,
 } from '@/design';
 import { Icon } from '@/design/icons/Icon';
+import type { IconName } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
 import { motion, radius, spacing } from '@/design/tokens';
 import { ExtractedEventRow } from '@/features/capture/ExtractedEventRow';
@@ -43,6 +44,7 @@ import { useCapture } from '@/hooks/use-capture';
 import { getLocale, t } from '@/i18n';
 import { deleteCapture } from '@/lib/captures';
 import { extractParcel, isLikelyParcelSms, maskInvoice } from '@/lib/parcel';
+import { maskForCategory } from '@/lib/sensitive-mask';
 import { useCaptureStore } from '@/stores/capture-store';
 
 /** 상세 이미지 비율 — 세로형 스크린샷의 윗부분(제목·날짜가 몰리는 곳)이 보이게 3:4. */
@@ -56,9 +58,16 @@ const CHECK_ENTER_SCALE = 0.4;
 /** 최소 터치 영역. */
 const MIN_TOUCH = 44;
 
+/** 데이터 처리 흐름 3단계(원격 #6) — 개인정보처리방침 §4와 같은 내용. */
+const DATA_FLOW_STEPS: readonly { icon: IconName; key: string }[] = [
+  { icon: 'smartphone', key: 'captures.detail.dataFlow.step1' },
+  { icon: 'cloud', key: 'captures.detail.dataFlow.step2' },
+  { icon: 'shield', key: 'captures.detail.dataFlow.step3' },
+];
+
 /**
  * 캡처 상세 — 명세 §6 "상세: 시스템 헤더 대신 공용 Header. 이미지 → 제목 → 뽑힌 일정/택배 →
- * OCR 원문은 접힘".
+ * OCR 원문은 접힘". 맨 아래 "데이터 처리" 흐름과 삭제 경로(원격 #6 데이터흐름 가시화).
  *
  * 카드로 감싸지 않고 머리카락 구분선으로 단을 나눈다. 메타(캡처 일시·상태)는 제목 위 mono 머리표 한 줄.
  * 이 화면의 연출은 "캘린더 등록 성공" 한 곳뿐(체크 + 형광펜). 이미지 진입은 조용한 페이드+스케일.
@@ -160,7 +169,8 @@ export default function CaptureDetailScreen(): ReactNode {
           <DetailImage item={item} />
           <TitleBlock item={item} />
           <ExtractedBlock item={item} />
-          <OcrSection ocrText={item.ocrText} />
+          <OcrSection ocrText={item.ocrText} category={item.category} />
+          <DataFlowSection />
         </ScrollView>
       )}
     </View>
@@ -296,7 +306,7 @@ function ExtractedBlock({ item }: { item: CaptureListItem }): ReactNode {
       {event ? (
         <View style={[styles.extractRow, { borderTopColor: colors.border }]}>
           <Eyebrow>{t('captures.detail.kind.event')}</Eyebrow>
-          <ExtractedEventRow event={event} />
+          <ExtractedEventRow event={event} showLowConfidenceHint={item.calendarEventId === null} />
           <CalendarAction item={item} event={event} />
         </View>
       ) : null}
@@ -332,6 +342,11 @@ function CalendarAction({ item, event }: { item: CaptureListItem; event: Capture
   });
 
   if (!calendar.added) {
+    // 확신 낮은(또는 확신도 없는 구버전) 일정은 "확인 후 추가" — 날짜를 한 번 더 보게 한다(원격 #5).
+    const label =
+      event.confidence === 'high'
+        ? t('captures.detail.action.addToCalendar')
+        : t('capture.action.confirmAndAdd');
     return (
       <Button
         variant="primary"
@@ -339,11 +354,11 @@ function CalendarAction({ item, event }: { item: CaptureListItem; event: Capture
         fullWidth
         loading={calendar.busy}
         onPress={() => void calendar.add()}
-        accessibilityLabel={t('captures.detail.action.addToCalendar')}
+        accessibilityLabel={label}
         leftIcon={<Icon name="calendar" size={20} color="onPrimary" />}
         style={styles.actionButton}
       >
-        {t('captures.detail.action.addToCalendar')}
+        {label}
       </Button>
     );
   }
@@ -411,14 +426,16 @@ function RegisteredLine({ justNow }: { justNow: boolean }): ReactNode {
 /**
  * OCR 원문 — 기본 접힘. "인식된 글자 보기"를 누르면 높이가 펼쳐진다.
  * 본문은 절대 배치로 먼저 그려 높이를 재고, 바깥 상자의 높이만 0↔측정값으로 움직인다.
+ * 영수증·쇼핑 캡처의 카드번호는 화면에서만 가린다(원문 데이터는 그대로, 원격 #6).
  */
-function OcrSection({ ocrText }: { ocrText: string }): ReactNode {
+function OcrSection({ ocrText, category }: { ocrText: string; category: string }): ReactNode {
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const progress = useSharedValue(0);
   const contentHeight = useSharedValue(0);
   const hasText = ocrText.trim().length > 0;
+  const display = useMemo(() => maskForCategory(ocrText, category), [ocrText, category]);
 
   useEffect(() => {
     const target = open ? 1 : 0;
@@ -475,10 +492,62 @@ function OcrSection({ ocrText }: { ocrText: string }): ReactNode {
       >
         <View onLayout={handleLayout} style={styles.ocrMeasure}>
           <Text variant="body" selectable style={styles.ocrText}>
-            {ocrText}
+            {display.text}
           </Text>
+          {display.masked ? (
+            <View style={styles.maskHint}>
+              <Icon name="shield" size={16} color="textSecondary" />
+              <Text variant="caption" color="textSecondary" style={styles.flex}>
+                {t('captures.detail.sensitivity.maskHint')}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </Animated.View>
+    </View>
+  );
+}
+
+/**
+ * 데이터 처리 — 무엇이 기기에서, 무엇이 서버에서 처리되는지 정직하게 적는다("기기에서만" 같은 과장 금지).
+ * 마지막 줄의 "내 데이터 삭제"는 설정 탭의 삭제 행으로 보낸다.
+ */
+function DataFlowSection(): ReactNode {
+  const { colors } = useTheme();
+  const router = useRouter();
+
+  return (
+    <View style={[styles.dataFlow, { borderTopColor: colors.border }]}>
+      <Eyebrow accessibilityRole="header">{t('captures.detail.dataFlow.label')}</Eyebrow>
+      <View>
+        {DATA_FLOW_STEPS.map((step, i) => (
+          <View
+            key={step.key}
+            style={[
+              styles.dataFlowRow,
+              i < DATA_FLOW_STEPS.length - 1
+                ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }
+                : null,
+            ]}
+          >
+            <Icon name={step.icon} size={16} color="textSecondary" />
+            <Text variant="caption" color="textSecondary" style={styles.flex}>
+              {t(step.key)}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <PressableScale
+        onPress={() => router.push('/settings')}
+        accessibilityRole="link"
+        accessibilityLabel={t('captures.detail.dataFlow.deleteLink')}
+        style={styles.dataFlowLink}
+      >
+        <Text variant="bodyStrong" color="primary">
+          {t('captures.detail.dataFlow.deleteLink')}
+        </Text>
+        <Icon name="chevron-right" size={16} color="primary" />
+      </PressableScale>
     </View>
   );
 }
@@ -556,6 +625,32 @@ const styles = StyleSheet.create({
   },
   ocrClip: {
     overflow: 'hidden',
+  },
+  maskHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+  },
+  dataFlow: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: spacing.sm,
+  },
+  dataFlowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  dataFlowLink: {
+    minHeight: MIN_TOUCH,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
   },
   ocrMeasure: {
     position: 'absolute',

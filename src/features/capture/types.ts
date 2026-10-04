@@ -7,6 +7,11 @@ export type CaptureEvent = {
   starts_at: string; // ISO8601 (KST, +09:00)
   ends_at: string | null;
   location: string | null;
+  /**
+   * GPT 추출 확신도. 날짜·시간이 텍스트에 명확히 특정되면 'high', 상대적·모호·추론이면 'low'.
+   * 구버전 캡처(confidence 없음) 호환: optional + 소비측 'low' 폴백.
+   */
+  confidence?: 'high' | 'low';
 };
 
 export type ProcessCaptureResult = {

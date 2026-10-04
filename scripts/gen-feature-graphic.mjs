@@ -35,17 +35,17 @@ const STORE_IMAGES = join(ROOT, 'docs', 'store', 'images');
 // 택배 추적은 스토어 설명 기준 주력 기능이 아니라 피처 그래픽에서 뺐다.
 const COPY = {
   ko: {
-    line1: '스크린샷 더미에서',
-    mark: '쓸모만',
-    rest: ' 건져요',
-    features: '자동 감지 · 캘린더 등록 · 일요일 5줄 리포트',
+    line1: '스크린샷 속 약속,',
+    mark: '놓치지 않게',
+    rest: ' 기억해요',
+    features: '자동 감지 · 전날 밤 리마인드 · 일요일 5줄 리포트',
     outs: [join(ROOT, 'assets', 'store', 'feature-graphic.png'), join(STORE_IMAGES, 'ko-KR', 'feature.png')],
   },
   en: {
-    line1: 'From the screenshot pile,',
-    mark: 'just what matters',
+    line1: 'Plans in your screenshots,',
+    mark: 'never missed',
     rest: '',
-    features: 'Auto-detect · Calendar · Sunday 5-line report',
+    features: 'Auto-detect · Reminders · Sunday 5-line report',
     outs: [join(STORE_IMAGES, 'en-US', 'feature.png')],
   },
 };

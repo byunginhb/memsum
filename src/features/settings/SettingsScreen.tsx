@@ -44,6 +44,14 @@ const TONE_OPTIONS: readonly SegmentOption<ToneStyle>[] = [
   { value: 'formal', labelKey: 'settings.tone.formal' },
 ];
 
+/** 일정 전날 리마인드 시각(저녁 7~10시, 기기 시간). 값은 시(hour) 문자열. */
+const EVENT_REMINDER_HOUR_OPTIONS: readonly SegmentOption<string>[] = [
+  { value: '19', labelKey: 'settings.eventReminder.hour19' },
+  { value: '20', labelKey: 'settings.eventReminder.hour20' },
+  { value: '21', labelKey: 'settings.eventReminder.hour21' },
+  { value: '22', labelKey: 'settings.eventReminder.hour22' },
+];
+
 /**
  * 설정 탭.
  *
@@ -70,6 +78,10 @@ export function SettingsScreen(): ReactNode {
   const setTone = useSettingsStore((state) => state.setTone);
   const setParcelTracking = useSettingsStore((state) => state.setParcelTracking);
   const setParcelOnboarded = useSettingsStore((state) => state.setParcelOnboarded);
+  const eventReminder = useSettingsStore((state) => state.eventReminder);
+  const eventReminderHour = useSettingsStore((state) => state.eventReminderHour);
+  const setEventReminder = useSettingsStore((state) => state.setEventReminder);
+  const setEventReminderHour = useSettingsStore((state) => state.setEventReminderHour);
 
   // 테마는 theme-store가 단일 진실(설정 스토어에 중복 저장하지 않는다).
   const themeMode = useThemeStore((state) => state.mode);
@@ -237,7 +249,30 @@ export function SettingsScreen(): ReactNode {
                 accessibilityLabel={t('settings.weeklyReport')}
               />
             }
+            showDivider
           />
+          <ListItem
+            title={t('settings.eventReminder.toggle')}
+            subtitle={t('settings.eventReminder.toggleSubtitle')}
+            trailing={
+              <Switch
+                value={eventReminder}
+                onValueChange={setEventReminder}
+                accessibilityLabel={t('settings.eventReminder.toggle')}
+              />
+            }
+            showDivider={eventReminder}
+          />
+          {eventReminder ? (
+            <SegmentRow label={t('settings.eventReminder.hour')}>
+              <SettingsSegmented
+                options={EVENT_REMINDER_HOUR_OPTIONS}
+                value={String(eventReminderHour)}
+                onChange={(v) => setEventReminderHour(Number.parseInt(v, 10))}
+                label={t('settings.eventReminder.hour')}
+              />
+            </SegmentRow>
+          ) : null}
         </Section>
 
         {showParcelSection ? (

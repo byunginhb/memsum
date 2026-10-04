@@ -20,6 +20,10 @@ type SettingsState = {
   parcelTracking: boolean;
   /** 택배 기능 온보딩(한계 고지) 시트를 본 적 있는지. */
   parcelOnboarded: boolean;
+  /** 이벤트 전날 리마인드 사용 여부. 기본 true. */
+  eventReminder: boolean;
+  /** 전날 리마인드 발송 시각(0-23, 기기 로컬 시간). 기본 21(오후 9시). */
+  eventReminderHour: number;
   /** AsyncStorage 복원이 끝났는지(런타임 전용, 영속 제외). */
   hydrated: boolean;
   setNickname: (nickname: string) => void;
@@ -29,6 +33,8 @@ type SettingsState = {
   setTone: (tone: ToneStyle) => void;
   setParcelTracking: (parcelTracking: boolean) => void;
   setParcelOnboarded: (parcelOnboarded: boolean) => void;
+  setEventReminder: (eventReminder: boolean) => void;
+  setEventReminderHour: (eventReminderHour: number) => void;
   /** 복원 완료 플래그 전환(내부용 — onRehydrateStorage에서 호출). */
   setHydrated: () => void;
 };
@@ -50,6 +56,8 @@ export const useSettingsStore = create<SettingsState>()(
       tone: 'friendly',
       parcelTracking: false,
       parcelOnboarded: false,
+      eventReminder: true,
+      eventReminderHour: 21,
       hydrated: false,
       // 불변 업데이트: zustand set은 새 부분 상태를 머지한다.
       setNickname: (nickname) => set({ nickname }),
@@ -59,6 +67,8 @@ export const useSettingsStore = create<SettingsState>()(
       setTone: (tone) => set({ tone }),
       setParcelTracking: (parcelTracking) => set({ parcelTracking }),
       setParcelOnboarded: (parcelOnboarded) => set({ parcelOnboarded }),
+      setEventReminder: (eventReminder) => set({ eventReminder }),
+      setEventReminderHour: (eventReminderHour) => set({ eventReminderHour }),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
@@ -73,6 +83,8 @@ export const useSettingsStore = create<SettingsState>()(
         tone: state.tone,
         parcelTracking: state.parcelTracking,
         parcelOnboarded: state.parcelOnboarded,
+        eventReminder: state.eventReminder,
+        eventReminderHour: state.eventReminderHour,
       }),
       // 복원이 끝난(또는 실패한) 시점에 hydrated를 켠다.
       onRehydrateStorage: () => (state) => {

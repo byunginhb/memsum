@@ -85,8 +85,10 @@ function reversedScheme(id: string): string {
 
 /**
  * OAuth redirect URI를 생성한다.
- * 이 reversed-scheme 기반 native redirect는 app.json의 scheme 배열에 등록돼 있어야
- * 브라우저가 앱으로 정상 복귀한다.
+ * makeRedirectUri는 앱 스킴(memsum)으로 memsum://oauthredirect를 만든다. 이 redirect는
+ * Expo Router의 딥링크로도 전달되므로, /oauthredirect 라우트(src/app/oauthredirect.tsx)가
+ * 존재해야 +not-found(Unmatched Route) 화면 대신 조용히 홈으로 복귀한다.
+ * 인증 코드 자체는 expo-web-browser의 auth 세션이 캡처하므로 연동은 정상 완료된다.
  */
 function redirectUri(): string {
   return AuthSession.makeRedirectUri({

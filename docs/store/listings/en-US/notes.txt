@@ -1,5 +1,6 @@
-First release of Memsum.
-- New screenshots trigger a notification. Tap [Save] to organize without opening the app.
-- Text in each capture is read, titled, summarized and sorted into six groups.
-- Captures with dates can be added to Google Calendar.
-- Every Sunday evening, get a report of five captures worth another look.
+More ways to keep you from missing things.
+- Home now puts upcoming plans first, sorted by D-day.
+- The evening before, one notification lists tomorrow's plans (time adjustable in Settings).
+- Plans with a vague date are marked "Check date" and never auto-added.
+- Try it with one of your own screenshots right from onboarding.
+- A refreshed design across the app.

@@ -1,72 +1,59 @@
-'use client';
-
-import { useReveal } from '@/hooks/use-reveal';
 import type { LandingCopy } from '@/lib/landing-copy';
 
 import { Reveal, RevealGroup } from './Reveal';
 
 /**
- * S3 작동 방식 — 신뢰·간단함 증명. primary-soft 블록 + 스텝 스태거.
- * 연결선은 카드가 reveal되면 "그려진다"(데스크톱 좌→우, 모바일 위→아래).
- * reduced-motion 시 CSS가 즉시 완성 상태로 폴백한다.
+ * S3 작동 방식 — 컨셉 "Scan": 3열 패널 대신 가로 타임라인.
+ * 페이지(Quartz) 위에 얇은 상단선이 지나고, 각 스텝이 그 선에서 아래로 걸린다.
+ * 각 카드 뒤에는 Syne 초대형 고스트 숫자(01/02/03)가 은은히 깔린다.
  * 카피는 로케일 사전(`copy.steps`)에서 주입.
  */
 export function StepFlow({ copy }: { copy: LandingCopy }) {
   const c = copy.steps;
   const bk = copy.isKorean ? 'break-keep' : '';
-  // 그리드가 뷰포트에 들어오면 카드 스태거와 함께 연결선 그리기를 트리거.
-  const { ref, revealed } = useReveal<HTMLElement>();
-  const drawn = revealed ? 'true' : 'false';
 
   return (
     <section
       id="how-it-works"
       aria-labelledby="step-title"
-      className="scroll-mt-20 px-5 sm:px-6"
+      className="scroll-mt-20 px-5 py-20 sm:px-6 sm:py-24"
     >
-      <div className="mx-auto w-full max-w-6xl rounded-(--radius-block) bg-(--color-primary-soft) px-5 py-16 sm:px-10 sm:py-20">
+      <div className="mx-auto w-full max-w-6xl">
         <Reveal
           as="h2"
           id="step-title"
-          className={`text-center text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
+          className={`text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
         >
           {c.title}
         </Reveal>
 
-        <RevealGroup
-          ref={ref}
-          className="relative mt-12 grid gap-6 md:grid-cols-3"
-        >
-          {/* 데스크톱 가로 연결선 — reveal 시 좌→우로 그려짐 */}
-          <div
-            aria-hidden="true"
-            data-drawn={drawn}
-            className="step-connector absolute left-[16%] right-[16%] top-7 hidden border-t-2 border-dashed border-(--color-primary)/30 md:block"
-          />
-          {/* 모바일 세로 연결선 — reveal 시 위→아래로 그려짐 */}
-          <div
-            aria-hidden="true"
-            data-drawn={drawn}
-            className="step-connector-v absolute left-1/2 top-7 bottom-7 -translate-x-1/2 border-l-2 border-dashed border-(--color-primary)/30 md:hidden"
-          />
+        {/* 가로 타임라인 — 상단 얇은 선에서 스텝이 아래로 걸린다 */}
+        <RevealGroup className="relative mt-14 grid gap-10 border-t border-(--color-line) md:grid-cols-3 md:gap-6">
           {c.items.map((step, index) => (
-            <Reveal
-              key={step.title}
-              className="relative flex flex-col items-center rounded-(--radius-block) bg-(--color-card) p-7 text-center shadow-(--shadow-card)"
-            >
+            <Reveal key={step.title} className="relative pt-8">
+              {/* 초대형 고스트 숫자 — Syne, 카드 뒤 은은히 */}
               <span
-                className={`flex h-14 w-14 items-center justify-center rounded-full text-xl font-extrabold text-white ${
-                  index === c.items.length - 1
-                    ? 'coral-pulse bg-(--color-primary)'
-                    : 'bg-(--color-primary)'
-                }`}
+                aria-hidden="true"
+                className="font-display pointer-events-none absolute -top-1 right-1 select-none text-[6.5rem] font-extrabold leading-none"
+                style={{
+                  color:
+                    'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+                }}
               >
-                {index + 1}
+                0{index + 1}
               </span>
-              <h3 className={`mt-5 text-lg font-bold tracking-tight ${bk}`}>
+              {/* 타임라인 위 라벤더 틱 */}
+              <span
+                aria-hidden="true"
+                className="absolute -top-[5px] left-0 h-2.5 w-2.5 rounded-full bg-(--color-primary)"
+              />
+              <p className="font-mono text-[11px] font-semibold tracking-[0.2em] text-(--color-ink-faint)">
+                STEP 0{index + 1}
+              </p>
+              <h3 className={`relative mt-2 text-lg font-bold tracking-tight ${bk}`}>
                 {step.title}
               </h3>
-              <p className={`mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}>
+              <p className={`relative mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}>
                 {step.body}
               </p>
             </Reveal>

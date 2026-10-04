@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "app.memsum",
-      "versionCode": 1,
+      "versionCode": 9,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#1530FF",

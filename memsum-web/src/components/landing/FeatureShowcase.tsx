@@ -19,6 +19,11 @@ import { Reveal } from './Reveal';
  * 기능 카드의 시각 메타(아이콘·강조). 언어 비의존이라 카피와 분리해 인덱스로 매핑한다.
  * 순서는 `copy.features.items`와 1:1 대응(읽기→분류→캘린더→주간→안전).
  */
+
+/** 각 기능 카드에 붙는 monospace 카테고리 태그. 인덱스는 copy.features.items와 1:1 대응. */
+const KO_TAGS = ['[OCR]', '[분류]', '[캘린더]', '[리포트]', '[보안]'] as const;
+const EN_TAGS = ['[OCR]', '[SORT]', '[CALENDAR]', '[RECAP]', '[PRIVACY]'] as const;
+
 const FEATURE_META: readonly { Icon: LucideIcon; accent?: boolean }[] = [
   { Icon: ScanText },
   { Icon: Tags },
@@ -111,6 +116,7 @@ export function FeatureShowcase({ copy }: { copy: LandingCopy }) {
           {c.items.map((feature, index) => {
             const meta = FEATURE_META[index];
             const Icon = meta.Icon;
+            const tag = copy.isKorean ? KO_TAGS[index] : EN_TAGS[index];
             return (
               <article
                 key={feature.title}
@@ -128,7 +134,10 @@ export function FeatureShowcase({ copy }: { copy: LandingCopy }) {
                     <Icon size={24} aria-hidden="true" />
                   </span>
                 </Reveal>
-                <Reveal as="h3" delay={80} className={`mt-4 text-lg font-bold tracking-tight ${bk}`}>
+                <Reveal as="h3" delay={80} className={`mt-4 flex flex-col gap-1.5 text-lg font-bold tracking-tight ${bk}`}>
+                  <span className="self-start rounded bg-(--color-primary-soft) px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.15em] text-(--color-primary)">
+                    {tag}
+                  </span>
                   {feature.title}
                 </Reveal>
                 <Reveal

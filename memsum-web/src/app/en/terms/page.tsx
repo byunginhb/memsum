@@ -10,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function TermsEnPage() {
-  return <LegalPage contentFile="terms.en.md" />;
+  return <LegalPage contentFile="terms.en.md" lang="en" />;
 }

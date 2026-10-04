@@ -1,6 +1,11 @@
-Memsum handles screenshot auto-detection → notification → organizing in one flow. When you take a new screenshot, Memsum detects it and asks in a notification whether to save it. Tap [Save] and it reads the text and adds a title, summary, category and any dates, without opening the app.
+Plans you screenshot are easy to miss if you never look at them again. Memsum remembers your screenshots for you and brings them back before they slip by.
 
-Receipts, plans in a chat, coupons, articles you meant to read. If your screenshots pile up and you never find them again, Memsum pulls out what matters, like running a highlighter over the page.
+When you take a new screenshot, Memsum detects it and asks in a notification whether to save it. Tap [Save] and it reads the text and adds a title, summary, category and any dates, without opening the app. Receipts, plans in a chat, coupons, articles you meant to read: Memsum pulls out what matters, like running a highlighter over the page.
+
+[Heads-up before you miss it]
+- Home puts upcoming plans first, sorted by D-day. Today and tomorrow come first.
+- The evening before, one notification lists tomorrow's plans. Pick the time in Settings.
+- Every Sunday at 7 PM, Memsum picks five captures from the week worth a second look.
 
 [Screenshot detection and notifications]
 - Even while you are using other apps, a new screenshot triggers a notification.
@@ -16,17 +21,19 @@ Receipts, plans in a chat, coupons, articles you meant to read. If your screensh
 
 [Dates go to Google Calendar]
 - Memsum spots dates and times in a capture.
-- Connect Google Calendar to add events with one tap, or turn on auto-add in Settings.
+- Dates spelled out in the text are marked "Date clear"; vague ones like "next week" are marked "Check date".
+- Connect Google Calendar to add events with one tap, or turn on auto-add in Settings. Auto-add only adds events with a clear date.
 - Calendar access is used only to add events. Memsum does not read your existing events.
-
-[Sunday 5-line report]
-- Every Sunday at 7 PM, Memsum picks five captures from the week worth a second look.
-- You can turn the report notification off in Settings.
 
 [Privacy]
 - No sign-up or email needed. Start right away.
 - Photo access is used only to detect and organize screenshots.
+- Text is recognized on your device first; sorting and summaries run on our server. Original images are kept in private storage only you can access.
+- Sensitive numbers such as card numbers on receipts are hidden on screen.
 - You can delete all your data anytime from Settings.
 - No ads.
+
+[Who made this]
+I built Memsum on my own. I had 1,800 screenshots piled up and still missed plans, so I needed something to remember for me. If anything feels off, email byunginhb@gmail.com and I'll reply directly.
 
 Privacy policy: https://memsum.app/en/privacy

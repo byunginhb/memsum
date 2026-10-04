@@ -34,6 +34,9 @@ export type { CardProps, CardVariant, CardPadding } from './Card/Card';
 export { Badge } from './Badge/Badge';
 export type { BadgeProps, BadgeVariant, BadgeTone } from './Badge/Badge';
 
+export { ConfidenceBadge } from './ConfidenceBadge/ConfidenceBadge';
+export type { ConfidenceLevel } from './ConfidenceBadge/ConfidenceBadge';
+
 export { SearchBar } from './SearchBar/SearchBar';
 export type { SearchBarProps } from './SearchBar/SearchBar';
 
