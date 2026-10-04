@@ -26,7 +26,7 @@
 | 푸시 | APNs(iOS) + FCM(Android) | Expo Notifications 래핑 |
 | 관측 | Sentry + PostHog | dev 빌드에서 비활성화 옵션 |
 | 상태관리 | Zustand | Context API 남용 금지 |
-| 디자인 시스템 | gluestack-ui v2 + NativeWind | 디자인시스템.md 참조 |
+| 디자인 시스템 | 자체 토큰·컴포넌트(`src/design/`) + reanimated 4 | `docs/design/redesign-2026-10.md` 가 기준 |
 
 ---
 
@@ -73,7 +73,9 @@ npx expo run:ios
 npx expo run:android
 npx expo prebuild --clean
 
-# 빌드 (EAS — 시뮬레이터 단계 끝난 후)
+# 안드로이드 출시: 로컬 gradle 서명 빌드 + Play API 제출 → docs/store/mobile-app.md (EAS 미사용)
+
+# 빌드 (EAS — iOS용, 시뮬레이터 단계 끝난 후)
 eas build --profile development --platform ios
 eas build --profile development --platform android
 eas build --profile preview --platform all
@@ -188,7 +190,7 @@ chore(deps): expo SDK 51 → 52 업그레이드
 | `npx expo prebuild` 후 `ios/`·`android/` 미커밋 | CI 빌드 실패 | 두 폴더 모두 커밋 |
 | `PHPhotoLibraryChangeObserver` 미해제 | 메모리 누수 | `deinit`에서 unregister |
 | Supabase RLS 정책 누락 | 데이터 노출 | 테이블 생성과 동시에 정책 작성 |
-| iOS·Android 폰트 폴백 차이 | 한글 깨짐 | Pretendard를 양쪽 asset에 포함 |
+| 안드로이드 굵기 미적용 | 굵은 글씨가 보통으로 나옴 | 굵기별 정적 서체(Wanted Sans) + 공용 `Text` variant만 사용 |
 | Android 키보드가 입력 필드 가림 | UX 깨짐 | `KeyboardAvoidingView` + `android:windowSoftInputMode` |
 | OpenAI 키 클라이언트 노출 | 비용 폭탄 | 반드시 Edge Function 경유 |
 
@@ -197,7 +199,7 @@ chore(deps): expo SDK 51 → 52 업그레이드
 ## 10. 작업 흐름 (사용자 ↔ Claude Code)
 
 1. 사용자가 자연어로 지시 ("스크린샷 감지 모듈 만들어줘")
-2. Claude Code는 이 문서·디자인시스템.md 규칙대로 **명령·코드·파일** 한 번에 생성
+2. Claude Code는 이 문서·docs/design/redesign-2026-10.md 규칙대로 **명령·코드·파일** 한 번에 생성
 3. 빌드/실행 명령은 항상 명시 (사용자 그대로 복붙)
 4. **첫 단계 목표는 시뮬레이터·에뮬레이터까지**. 실기기·스토어 제출은 이후
 5. 사용자가 직접 해야 할 (Claude Code가 대신 못 함):
@@ -219,7 +221,7 @@ chore(deps): expo SDK 51 → 52 업그레이드
 
 - `개발기획서.md` — 제품 요구사항
 - `기능명세.md` — 화면·플로우·DB·API 명세
-- **`디자인시스템.md`** — 토큰·컴포넌트·라이브러리 (gluestack-ui v2)
+- ~~`디자인시스템.md`~~ — 2026-10 리디자인으로 폐기. 저장소의 `docs/design/redesign-2026-10.md`를 따른다
 - `페르소나.md` — 이수현 외 페르소나·시나리오
 - `마스터플랜.md` — 16주 로드맵
 - `주차별/W1-수정.md` — 현재 진행 중인 주차 가이드

@@ -1,0 +1,5 @@
+First release of Memsum.
+- New screenshots trigger a notification. Tap [Save] to organize without opening the app.
+- Text in each capture is read, titled, summarized and sorted into six groups.
+- Captures with dates can be added to Google Calendar.
+- Every Sunday evening, get a report of five captures worth another look.

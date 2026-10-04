@@ -5,7 +5,41 @@
 
 ---
 
-## 🔴 지금 시작하면 좋은 준비 (후보 2·3 — 시간 걸리는 계정/결제/OAuth)
+## 🟢 지금 Ben이 할 일 — Google Play 첫 출시 (2026-10-04 갱신, 이 절이 최신)
+
+> Play 개발자 계정은 이미 있고 인증도 끝났습니다(아래 옛 절의 "Play Console 가입"은 끝난 일).
+> 빌드·서명·스토어 문구·설문 답안·업로드 스크립트는 Claude가 준비했습니다. 자세한 절차는 `docs/store/mobile-app.md`,
+> 설문 답은 `docs/store/console-answers.md`.
+
+1. **`.env` 파일 복원** (이 맥에 없음 — 빌드 전 필수)
+   - 예전 맥(또는 백업)의 `memsum/.env`를 이 맥의 같은 위치로 옮겨 주세요. 채팅에 내용을 붙여넣지 마세요.
+   - 없으면 키 5개를 다시 채워야 합니다: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
+     `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`, (분석을 켤 거면) `EXPO_PUBLIC_POSTHOG_KEY`.
+   - `.env` 없이 빌드하면 앱은 뜨지만 서버 연결이 꺼진 상태라 제출하면 안 됩니다.
+2. **업로드 키 백업** — `~/android-tools/memsum-upload.keystore`와 `~/android-tools/memsum-keystore-password.txt` 두 파일을
+   비밀번호 관리자나 외장 백업에 복사해 두세요. 잃어버리면 Play 고객센터에 키 재설정을 요청해야 합니다.
+3. **Play Console에서 앱 만들기** — https://play.google.com/console → 앱 만들기
+   - 앱 이름 `Memsum 멤섬 - 스크린샷 정리`, 기본 언어 **한국어**, 앱, 무료, 선언 두 개 체크
+4. **첫 AAB 수동 업로드(내부 테스트)** — `.env` 복원 후 Claude가 만든 `~/android-tools/memsum-v1.0.0.aab`를
+   테스트 및 출시 → **내부 테스트** → 새 버전 만들기 → Play 앱 서명 동의 → AAB 업로드 → 출시명 `1.0.0` → 저장·출시.
+   테스터 목록에 본인 구글 계정을 넣고 링크로 폰에 설치합니다. (첫 번들은 API로 못 올려서 이 한 번만 손으로 합니다)
+   - ⚠️ 패키지 이름 `app.memsum`은 이 순간 영구 고정됩니다.
+   - 콘솔이 "앱 콘텐츠를 먼저 완료하라"며 출시 버튼을 막으면 6번을 먼저 하고 돌아오세요(저장까지는 됩니다).
+5. **서비스 계정에 이 앱 권한 추가** — 콘솔 **홈의 "사용자 및 권한"**(앱 안 아님) → 목록의
+   `play-publisher@maldongmu.iam.gserviceaccount.com` 행 **수정(연필)** → 앱 권한 → 앱 추가 → Memsum →
+   "릴리스 관리"·"스토어 등록정보 관리" 체크 → 저장. ("새 사용자 초대"는 누르지 마세요 — 이미 있는 계정이라 오류가 납니다)
+   이후 버전 업로드·등록정보·이미지는 Claude가 스크립트로 올립니다.
+6. **앱 콘텐츠 설문** (정책 및 프로그램 → 앱 콘텐츠) — `docs/store/console-answers.md` 순서대로:
+   개인정보처리방침 URL, 앱 액세스(로그인 불필요), 광고 없음, **광고 ID 아니요**, 콘텐츠 등급, 타겟층 18세 이상,
+   데이터 보안, **사진 및 동영상 권한 선언**(영문 문구 그대로 붙여넣기).
+7. **앱 서명 키 SHA-1 전달** — 테스트 및 출시 → 설정 → **앱 무결성 → 앱 서명** 화면의 "앱 서명 키 인증서" SHA-1 값을
+   알려 주세요(공개값이라 채팅에 붙여도 됩니다). 내부 테스트 앱에서 구글 캘린더 연결이 실패하면 이 값으로
+   Google Cloud에 Android OAuth 클라이언트를 추가합니다(`mobile-app.md` §6).
+8. 스토어 이미지(아이콘 512·피처 그래픽·스크린샷)는 리디자인 반영 후 Claude가 새로 만들어 올립니다. 그 전까지는 프로덕션 제출 보류.
+
+---
+
+## (지난 기록, 2026-06) 지금 시작하면 좋은 준비 (후보 2·3 — 시간 걸리는 계정/결제/OAuth)
 
 > 아래는 **사람만 할 수 있는 설정**입니다. 제가 코드·에셋·메타데이터·정책 문서는 전부 준비하니, 시간이 걸리는 계정 가입·결제·OAuth 발급을 지금부터 병행해 주시면 매끄럽게 출시까지 갑니다.
 
@@ -49,7 +83,7 @@ pnpm android   # = expo run:android
 
 ---
 
-## 🔴 배포 직전 체크리스트 — 남은 것은 4가지 (2026-06-12 갱신)
+## (지난 기록) 배포 직전 체크리스트 — 2026-06-12 기준. Play 관련은 맨 위 "지금 Ben이 할 일"이 최신
 
 코드·검증·문서·정책 호스팅까지 끝났습니다. **아래 4가지만 하시면 스토어 제출이 가능합니다.**
 (순서 = 리드타임 긴 순. 1·2·3은 오늘 시작 권장)
@@ -97,7 +131,7 @@ eas login && eas init      # projectId가 app.json에 자동 기록됨
   [저장] 무음 저장(32초, 앱 미전환) 전부 PASS
 - **스토어 스크린샷 5종 → 제출 품질로 교체**: release 빌드 + 실제 파이프라인 데이터
   (실제 썸네일·GPT 제목/요약/일정·리포트 1~5위 랭킹) + 깨끗한 상태바(데모 모드 9:00).
-  `assets/store/screenshots/` — 그대로 콘솔 업로드 가능
+  `assets/store/screenshots/` — 그대로 콘솔 업로드 가능 (2026-10 리디자인 후 삭제, `docs/store/images/`로 대체)
 - **연속 캡처 유실 버그 수정(중요)**: 백그라운드에서 여러 장 찍고 응답 없이 앱에 돌아오면
   **마지막 1장만** 정리되던 캐치업 버그(LIMIT 1)를 발견·수정(양 플랫폼, 상한 20).
   데모 시드 5건 연속 주입 → 5건 전부 자동 정리되는 것 라이브 검증 완료
@@ -182,8 +216,8 @@ eas login && eas init      # projectId가 app.json에 자동 기록됨
 ### 제가 완료한 것 (커밋됨)
 - **eas.json** — development/preview/production 빌드 프로파일 + submit 설정(플레이스홀더)
 - **app.json** — version 1.0.0 / iOS buildNumber 1 / Android versionCode 1 / iOS 수출규정(ITSAppUsesNonExemptEncryption=false)
-- **브랜드 아이콘·스플래시** — Expo 템플릿 → Memsum 9닷 마크(라벤더 #7C6FE8 + 흰 점 + 우하단 코랄). `scripts/gen-icons.mjs`로 재생성 가능
-- **애니메이션 스플래시** — 첫 실행 시 9닷이 움직이는 모션 약 1초 후 앱 전환(`src/components/AnimatedSplash.tsx`)
+- **브랜드 아이콘·스플래시** — (2026-10 갱신) 코발트(#1530FF) 바탕 + 종이색 크롭 모서리 4개 프레임 + 가로지르는 형광펜(#E8FF3A) 막대. 스플래시는 라이트 paper / 다크 ink 바탕에 같은 마크. `scripts/gen-icons.mjs`로 재생성 가능. 옛 9닷·라벤더·코랄 마크는 폐기(기준: `docs/design/redesign-2026-10.md` §8)
+- **애니메이션 스플래시** — 첫 실행 시 브랜드 마크 모션 약 1초 후 앱 전환(`src/components/AnimatedSplash.tsx`). 옛 9닷 모션은 지난 기록
 - **인앱 데이터 삭제** — 설정 → 데이터 → "내 데이터 삭제"(개인정보·스토어 데이터 삭제 요건 충족, 라이브 검증됨)
 - **스토어 문서** (`docs/store/`) — 개인정보처리방침(ko/en)·리스팅 카피(ko/en)·데이터안전 양식·제출 체크리스트(코드 기준 정확, 교차검증 완료)
 
@@ -206,14 +240,16 @@ eas build --profile production --platform all   # 스토어 빌드
 ```
 
 **4. 그래픽·스크린샷 — ✅ 제가 생성 완료**
-- **피처 그래픽** `assets/store/feature-graphic.png` (1024×500, 브랜드 라벤더 + 9닷 + 워드마크/태그라인). 그대로 Google Play에 업로드 가능.
-- **스크린샷 5종** `assets/store/screenshots/` (홈 대시보드·주간 리포트·이벤트 상세·캘린더 연결·설정). 시드 데이터로 캡처한 것이라 썸네일은 placeholder입니다.
-- ✅ **(2026-06-12 갱신) release 빌드 + 실제 데이터로 교체 완료** — 그대로 콘솔 업로드 가능.
-  기기 프레임/캡션을 입힌 마케팅 버전은 선택 사항(원하시면 추후 제작).
-- 생성 스크립트: `node scripts/gen-icons.mjs`(아이콘), `node scripts/gen-feature-graphic.mjs`(피처 그래픽) — 색·문구 수정 시 재실행.
+- **업로드용 이미지 일체** `docs/store/images/` (2026-10 리디자인 "형광펜 & 코발트") — `scripts/store/play_publish.py`가 이 폴더 구조를 그대로 읽는다.
+  - `icon.png` 512×512 — `assets/images/icon.png`에서 sips로 축소
+  - `ko-KR/feature.png`, `en-US/feature.png` 1024×500 (한국어판은 `assets/store/feature-graphic.png`와 같은 파일)
+  - `ko-KR/phone/`, `en-US/phone/` 각 6장 1080×1920 — 캡션 + 실제 앱 화면(웹 미리보기 예시 데이터로 촬영). 원본 화면은 `assets/store/raw/<lang>/`
+  - 모두 알파 채널 없는 PNG(`sips -g hasAlpha` → no)
+- 옛 보라색 스크린샷 `assets/store/screenshots/`는 삭제했다.
+- 생성 스크립트: `node scripts/gen-icons.mjs`(아이콘), `node scripts/gen-feature-graphic.mjs [--lang ko|en|all]`(피처 그래픽), `node scripts/gen-store-screenshots.mjs`(휴대전화 스크린샷 합성) — 색·문구 수정 시 재실행.
 
 ### ❗ 네이티브 재빌드 1회 필요 (아이콘·스플래시·secure-store 반영)
-브랜드 아이콘·라벤더 스플래시·캘린더 secure-store는 **네이티브 설정**이라 재빌드해야 실제 적용됩니다(JS 화면은 Metro로 즉시 반영).
+브랜드 아이콘·스플래시(새 브랜드)·캘린더 secure-store는 **네이티브 설정**이라 재빌드해야 실제 적용됩니다(JS 화면은 Metro로 즉시 반영).
 ```bash
 pnpm ios       # = expo run:ios  (자동 prebuild 포함)
 pnpm android   # = expo run:android
@@ -256,7 +292,7 @@ pnpm android   # = expo run:android
 **3개 워크스트림 병행**(주간 5줄 리포트 / 설정 화면 / 디자인 잔여 정합)을 멀티 에이전트로 **계획→공통 컴포넌트→화면·백엔드→교차검증→라이브 검증**까지 완료.
 
 ### 신규 기능
-- **주간 5줄 리포트(Hero Moment)** — 제품 핵심 가치. 한 주 캡처 중 gpt-4o-mini가 5개 선별·랭킹·요약. 1위 카드 coral 강조(display 28pt) + 2~5위 elevated, ritual(1200ms) stagger 등장 + 1위 reveal 햅틱, up/down 피드백. 온디맨드 생성 + 주당 캐시(재호출 시 OpenAI 0회), 캡처<5 빈 상태, OpenAI 실패 시 created_at 폴백.
+- **주간 5줄 리포트(Hero Moment)** — 제품 핵심 가치. 한 주 캡처 중 gpt-4o-mini가 5개 선별·랭킹·요약. 1위 카드 coral 강조(display 28pt) + 2~5위 elevated (지난 기록 — 2026-10 리디자인 "형광펜 & 코발트"로 대체, 기준: `docs/design/redesign-2026-10.md`), ritual(1200ms) stagger 등장 + 1위 reveal 햅틱, up/down 피드백. 온디맨드 생성 + 주당 캐시(재호출 시 OpenAI 0회), 캡처<5 빈 상태, OpenAI 실패 시 created_at 폴백.
 - **설정 화면** — 계정(닉네임·Avatar)/권한(자동감지·캘린더·리포트 Switch)/스타일(다크모드 3택·말투 2택)/데이터(백업·내보내기·삭제 "준비 중" 토스트). 로컬 영속 닉네임으로 리포트 개인화("{name} 님이 던지신…").
 - **공통 컴포넌트 7종** — Input·ListItem·Switch·Avatar·Toast(전역)·NotificationCard(Liquid Glass)·Card padding 3단계. 홈 헤더에 검색·리포트·설정 진입점 추가.
 
@@ -286,7 +322,7 @@ pnpm android   # = expo run:android
 
 ### 구현 (W5-A~C)
 - **온보딩 플로우**: 환영(애니메이션 DotsGrid 로고) → 가치 3종(자동감지·캘린더·일요일 5줄) → 시작. `pagingEnabled` 스와이프 + [다음]/[건너뛰기], AsyncStorage 영속 게이트(`completed`).
-- **디자인 컴포넌트**: Badge·EmptyState·Header·SearchBar + 브랜드 9닷 로고 애니메이션(`DotsGrid`, reanimated4 spring).
+- **디자인 컴포넌트**: Badge·EmptyState·Header·SearchBar + 브랜드 9닷 로고 애니메이션(`DotsGrid`, reanimated4 spring). (지난 기록 — 2026-10 리디자인 "형광펜 & 코발트"로 대체, 기준: `docs/design/redesign-2026-10.md`)
 - **Calm Glass**: 캡처 Sheet 상단에 Liquid Glass 밴드(64px, iOS26+ `GlassView` / 그 외 tint 폴백), 따뜻한 한국어 카피.
 
 ### 교차검증 후 반영 (W5-E)
@@ -372,7 +408,7 @@ iOS 시뮬레이터 · Android 에뮬레이터 양쪽에서 **빌드·실행·�
 |---|---|---|
 | iOS 빌드·실행 (iPhone 16) | ✅ | Build Succeeded + app.memsum 설치·실행, 디자인 시스템 렌더 |
 | Android 빌드·실행 (API 36) | ✅ | BUILD SUCCESSFUL + 디자인 시스템 라이트/다크 렌더 |
-| 디자인 시스템 (Button 5종·Card 4종·다크모드·Pretendard) | ✅ | 라이트/다크 캡처 |
+| 디자인 시스템 (Button 5종·Card 4종·다크모드·Pretendard — 지난 기록, 지금은 Wanted Sans·JetBrains Mono) | ✅ | 라이트/다크 캡처 |
 | Android 스크린샷 감지 `[Screenshot]` 로그 | ✅ | Metro 로그에 uri·displayName·createdAt 출력 확인 |
 | iOS 네이티브 모듈 로드 + 사진 권한 문구 | ✅ | 첫 실행 권한 다이얼로그에 커스텀 문구 표시 |
 

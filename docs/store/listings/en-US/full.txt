@@ -1,0 +1,32 @@
+Memsum handles screenshot auto-detection → notification → organizing in one flow. When you take a new screenshot, Memsum detects it and asks in a notification whether to save it. Tap [Save] and it reads the text and adds a title, summary, category and any dates, without opening the app.
+
+Receipts, plans in a chat, coupons, articles you meant to read. If your screenshots pile up and you never find them again, Memsum pulls out what matters, like running a highlighter over the page.
+
+[Screenshot detection and notifications]
+- Even while you are using other apps, a new screenshot triggers a notification.
+- [Save] organizes it in the background. [Dismiss] just clears the notification.
+- Regular photos are left alone. Memsum only looks for screenshots.
+- Older screenshots can be picked from your gallery and imported.
+
+[Text recognition and auto-organizing]
+- Text in the image is recognized on your device, then cleaned up for typos and line breaks.
+- Each capture gets a one-line title and a one-line summary.
+- Captures are sorted into six groups: marketing, events, receipts, shopping, info and other.
+- Search finds words inside your screenshots, not just titles.
+
+[Dates go to Google Calendar]
+- Memsum spots dates and times in a capture.
+- Connect Google Calendar to add events with one tap, or turn on auto-add in Settings.
+- Calendar access is used only to add events. Memsum does not read your existing events.
+
+[Sunday 5-line report]
+- Every Sunday at 7 PM, Memsum picks five captures from the week worth a second look.
+- You can turn the report notification off in Settings.
+
+[Privacy]
+- No sign-up or email needed. Start right away.
+- Photo access is used only to detect and organize screenshots.
+- You can delete all your data anytime from Settings.
+- No ads.
+
+Privacy policy: https://memsum.app/en/privacy
