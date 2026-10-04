@@ -1,98 +1,164 @@
-import { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { Text } from '@/design/components/Text/Text';
 import { Icon } from '@/design/icons/Icon';
 import type { IconName } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, radius, spacing, typography } from '@/design/tokens';
+import { elevation, motion, radius, spacing } from '@/design/tokens';
 import { usePhotoImport } from '@/hooks/use-photo-import';
 import { t } from '@/i18n';
 
 import type { BottomBarProps, BottomBarTab } from './BottomBar.types';
 
-// 최소 탭 터치 영역 — 디자인시스템.md §10 (44pt).
-const MIN_TOUCH = 44;
-// 중앙 캡처+ 버튼 지름. 탭바 위로 살짝 솟도록 탭바 높이보다 크게.
-const CAPTURE_BUTTON_SIZE = 56;
-// 캡처+ 버튼이 위로 솟는 정도.
-const CAPTURE_BUTTON_LIFT = 8;
-// 탭바 본문 높이(safe-area inset 제외).
-const BAR_HEIGHT = 56;
-// 5칸(탭4 + 캡처1) 균등 분할 폭. flex:1 분배가 콘텐츠 차로 어긋나는 것을 막기 위해
-// 명시 퍼센트로 고정한다. as const로 DimensionValue('${number}%') 타입을 만족시킨다.
-const SLOT_WIDTH = '20%' as const;
+/** 알약 높이. */
+const BAR_HEIGHT = 64;
+/** 가운데 가져오기 코발트 원 지름. */
+const IMPORT_SIZE = 48;
+/** 활성 형광펜 점 지름. */
+const ACTIVE_DOT = 6;
+/** 활성 점 위쪽 가장자리의 알약 중심 아래 거리(아이콘 24 아래 4px 띄움). */
+const ACTIVE_DOT_OFFSET = 16;
+/** 화면 아래에서 떠 있는 최소 간격(홈 인디케이터 없는 기기). */
+const FLOAT_GAP = spacing.md;
+/** 감지 표시 줄 높이(mono 16 + 간격). */
+const DETECTING_ROW = 16 + spacing.xs;
+/** 5칸(탭 4 + 가져오기 1). 가운데가 가져오기. */
+const SLOT_COUNT = 5;
+const IMPORT_SLOT = 2;
 
-// 캡처+ 버튼 좌측에 들어갈 두 탭, 우측에 들어갈 두 탭.
-const LEADING_TABS: readonly BottomBarTab[] = [
-  { routeName: 'index', icon: 'home', labelKey: 'home.tab.home' },
-  { routeName: 'search', icon: 'search', labelKey: 'home.tab.search' },
-];
-const TRAILING_TABS: readonly BottomBarTab[] = [
-  { routeName: 'calendar', icon: 'calendar', labelKey: 'home.tab.calendar' },
-  { routeName: 'settings', icon: 'settings', labelKey: 'home.tab.settings' },
+const TABS: readonly (BottomBarTab & { slot: number })[] = [
+  { routeName: 'index', icon: 'home', labelKey: 'home.tab.home', slot: 0 },
+  { routeName: 'search', icon: 'search', labelKey: 'home.tab.search', slot: 1 },
+  { routeName: 'calendar', icon: 'calendar', labelKey: 'home.tab.calendar', slot: 3 },
+  { routeName: 'settings', icon: 'settings', labelKey: 'home.tab.settings', slot: 4 },
 ];
 
 /**
- * 하단 탭바 — 홈/검색/[캡처+]/캘린더/설정 5칸.
- *
- * expo-router Tabs의 커스텀 tabBar로 주입된다(레이아웃: (tabs)/_layout.tsx).
- * 4개 탭은 state.routes에서 name으로 찾아 매핑하고, 활성 판별은 state.index를 쓴다.
- * 중앙 캡처+는 라우트가 아니라 "사진첩에서 골라 정리"(수동 반입)를 여는 액션 버튼이다
- * (usePhotoImport — 시스템 사진 선택기 → 캡처 파이프라인).
- * 색·간격·반경은 토큰만 사용하고, safe-area 하단 inset을 반영한다.
+ * 탭 화면이 스크롤 콘텐츠 하단에 줘야 할 여백(px). 탭바가 콘텐츠 위에 떠 있으므로
+ * 마지막 행이 가리지 않게 contentContainerStyle paddingBottom에 쓴다.
  */
-export function BottomBar({ state, navigation }: BottomBarProps): React.ReactNode {
+export function useBottomBarClearance(): number {
+  const insets = useSafeAreaInsets();
+  return Math.max(insets.bottom, FLOAT_GAP) + BAR_HEIGHT + DETECTING_ROW + spacing.lg;
+}
+
+/**
+ * 하단 탭바 — 바닥에서 떨어진 잉크색 알약(명세 §6).
+ *
+ * 아이콘만 보이고 활성 탭 아래에 형광펜 점이 레이아웃 스프링으로 미끄러진다.
+ * 가운데 코발트 원은 라우트가 아니라 "사진첩에서 가져오기" 액션(usePhotoImport).
+ * detecting이면 알약 위에 `● 감지 중` mono 표시. 콘텐츠 위에 떠 있으므로 화면은
+ * useBottomBarClearance()만큼 하단 여백을 둔다.
+ */
+export function BottomBar({
+  state,
+  navigation,
+  detecting = false,
+  detectingLabel,
+}: BottomBarProps): ReactNode {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const { onImport, isImporting } = usePhotoImport();
+  const [barWidth, setBarWidth] = useState(0);
 
-  // 현재 활성 라우트 이름(state.index 기준)으로 탭 활성 여부를 판별한다.
   const activeRouteName = state.routes[state.index]?.name;
+  const activeSlot = TABS.find((tab) => tab.routeName === activeRouteName)?.slot ?? -1;
 
-  const handleNavigate = useCallback(
-    (routeName: string): void => {
-      navigation.navigate(routeName);
-    },
-    [navigation],
-  );
+  const slotWidth = barWidth / SLOT_COUNT;
+  // -1 = 아직 자리 안 잡음 → 첫 배치는 미끄러지지 않고 바로 놓는다.
+  const dotX = useSharedValue(-1);
+  const dotVisible = activeSlot >= 0 && barWidth > 0;
 
-  const renderTab = useCallback(
-    (tab: BottomBarTab) => {
-      // 라우트가 (tabs)에 등록돼 있을 때만 렌더(방어적 — 미등록 시 빈 칸 방지).
-      const route = state.routes.find((r) => r.name === tab.routeName);
-      if (!route) return null;
-      const isActive = activeRouteName === tab.routeName;
-      return (
-        <TabItem
-          key={tab.routeName}
-          icon={tab.icon}
-          label={t(tab.labelKey)}
-          isActive={isActive}
-          onPress={() => handleNavigate(tab.routeName)}
-        />
-      );
-    },
-    [state.routes, activeRouteName, handleNavigate],
-  );
+  useEffect(() => {
+    if (!dotVisible) return;
+    const target = slotWidth * activeSlot + slotWidth / 2 - ACTIVE_DOT / 2;
+    const jump = reducedMotion || dotX.value < 0;
+    dotX.value = jump ? target : withSpring(target, motion.spring.layout);
+  }, [dotVisible, slotWidth, activeSlot, reducedMotion, dotX]);
+
+  const dotStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: dotX.value }],
+  }));
+
+  const handleLayout = (e: LayoutChangeEvent): void => {
+    setBarWidth(e.nativeEvent.layout.width);
+  };
+
+  const showDetecting = detecting && !!detectingLabel;
 
   return (
     <View
-      style={[
-        styles.bar,
-        {
-          paddingBottom: insets.bottom,
-          backgroundColor: colors.bgSurface,
-          borderTopColor: colors.border,
-        },
-      ]}
+      pointerEvents="box-none"
+      style={[styles.anchor, { paddingBottom: Math.max(insets.bottom, FLOAT_GAP) }]}
     >
-      <View style={[styles.row, { height: BAR_HEIGHT }]}>
-        {LEADING_TABS.map(renderTab)}
+      {showDetecting ? (
+        <View style={styles.detecting} accessibilityRole="text" accessibilityLabel={detectingLabel}>
+          <View style={[styles.detectingDot, { backgroundColor: colors.primary }]} />
+          <Text variant="mono" color="textSecondary">
+            {detectingLabel}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ height: DETECTING_ROW }} />
+      )}
 
-        <CaptureButton onPress={onImport} disabled={isImporting} />
+      <View
+        onLayout={handleLayout}
+        accessibilityRole="tablist"
+        style={[styles.bar, elevation[4], { backgroundColor: colors.barBg }]}
+      >
+        {dotVisible ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.activeDot, { backgroundColor: colors.marker }, dotStyle]}
+          />
+        ) : null}
 
-        {TRAILING_TABS.map(renderTab)}
+        {Array.from({ length: SLOT_COUNT }, (_, slot) => {
+          if (slot === IMPORT_SLOT) {
+            return (
+              <View key="import" style={styles.slot}>
+                <PressableScale
+                  onPress={onImport}
+                  disabled={isImporting}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isImporting }}
+                  accessibilityLabel={t('home.tab.capture')}
+                  accessibilityHint={t('home.tab.captureHint')}
+                  style={[styles.importCircle, { backgroundColor: colors.primary }]}
+                >
+                  <Icon name="images" size={24} color="onPrimary" />
+                </PressableScale>
+              </View>
+            );
+          }
+          const tab = TABS.find((item) => item.slot === slot);
+          // 라우트가 (tabs)에 등록돼 있을 때만 그린다(미등록 시 빈 칸).
+          if (!tab || !state.routes.some((r) => r.name === tab.routeName)) {
+            return <View key={`empty-${slot}`} style={styles.slot} />;
+          }
+          return (
+            <TabItem
+              key={tab.routeName}
+              icon={tab.icon}
+              label={t(tab.labelKey)}
+              isActive={activeSlot === slot}
+              onPress={() => navigation.navigate(tab.routeName)}
+            />
+          );
+        })}
       </View>
     </View>
   );
@@ -105,112 +171,73 @@ type TabItemProps = {
   onPress: () => void;
 };
 
-/** 단일 탭 셀 — 아이콘 + 라벨. 활성 시 primary, 비활성 시 textSecondary. */
-function TabItem({ icon, label, isActive, onPress }: TabItemProps) {
-  const { colors } = useTheme();
-  const tint = isActive ? 'primary' : 'textSecondary';
+function TabItem({ icon, label, isActive, onPress }: TabItemProps): ReactNode {
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityState={{ selected: isActive }}
       accessibilityLabel={label}
-      android_ripple={{ borderless: true }}
-      // 정적 style 배열 사용: NativeWind 래핑 Pressable의 함수형 style은
-      // flex 등 레이아웃 속성을 누락시켜 탭이 가장자리로 몰린다(W1 동일 버그).
+      containerStyle={styles.slot}
       style={styles.tab}
     >
-      <Icon name={icon} size={24} color={tint} />
-      <Text
-        style={[
-          styles.label,
-          { color: isActive ? colors.primary : colors.textSecondary },
-        ]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-type CaptureButtonProps = {
-  onPress: () => void;
-  disabled: boolean;
-};
-
-/** 중앙 캡처+ 액션 버튼 — primary 원형, 위로 살짝 솟은 형태. 라우트 아님. */
-function CaptureButton({ onPress, disabled }: CaptureButtonProps) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.captureSlot}>
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        accessibilityLabel={t('home.tab.capture')}
-        accessibilityHint={t('home.tab.captureHint')}
-        android_ripple={{ borderless: true }}
-        style={styles.captureButton}
-      >
-        {/* 색 원은 내부 View에 둔다: NativeWind 래핑 Pressable은 inline
-            backgroundColor를 누락시켜(투명 원) 흰 아이콘만 보이게 되므로,
-            배경색이 정상 적용되는 일반 View로 원을 그린다.
-            아이콘은 '촬영'으로 오인되는 카메라 대신 사진첩(images)을 써서
-            "사진첩에서 골라 정리"라는 실제 동작을 시각적으로 알린다. */}
-        <View style={[styles.captureCircle, { backgroundColor: colors.primary }]}>
-          <Icon name="images" size={24} color="onPrimary" />
-        </View>
-      </Pressable>
-    </View>
+      <Icon name={icon} size={24} color={isActive ? 'barFg' : 'barFgMuted'} />
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+  anchor: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing['2xl'],
   },
-  row: {
+  detecting: {
+    height: DETECTING_ROW,
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tab: {
-    // 5칸(탭4 + 캡처1)을 정확히 균등 분할한다. flex:1은 캡처 슬롯과 탭의
-    // 콘텐츠 차이로 셀 폭이 어긋나(탭 239 / 캡처 124) 간격이 불규칙해졌으므로,
-    // 명시적 20% 고정 폭으로 5칸을 동일하게 맞춘다(중심 간격 균등 보장).
-    width: SLOT_WIDTH,
-    minHeight: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
+    paddingBottom: spacing.xs,
   },
-  pressed: {
-    opacity: 0.7,
+  detectingDot: {
+    width: ACTIVE_DOT,
+    height: ACTIVE_DOT,
+    borderRadius: radius.pill,
   },
-  label: {
-    fontSize: typography.caption.size,
-    lineHeight: typography.caption.line,
-    fontWeight: typography.caption.weight,
-    letterSpacing: letterSpacingFor('caption'),
+  bar: {
+    height: BAR_HEIGHT,
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  captureSlot: {
-    // 탭과 동일한 20% 고정 폭. 캡처 버튼(원형)을 이 슬롯 중앙에 둔다.
-    width: SLOT_WIDTH,
+  slot: {
+    flex: 1,
+    height: BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captureButton: {
+  tab: {
+    width: BAR_HEIGHT,
+    height: BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  captureCircle: {
-    width: CAPTURE_BUTTON_SIZE,
-    height: CAPTURE_BUTTON_SIZE,
-    borderRadius: radius.full,
+  importCircle: {
+    width: IMPORT_SIZE,
+    height: IMPORT_SIZE,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    // 탭바 위로 살짝 솟은 형태.
-    marginTop: -CAPTURE_BUTTON_LIFT,
+  },
+  activeDot: {
+    position: 'absolute',
+    left: 0,
+    top: BAR_HEIGHT / 2 + ACTIVE_DOT_OFFSET,
+    width: ACTIVE_DOT,
+    height: ACTIVE_DOT,
+    borderRadius: radius.pill,
   },
 });

@@ -1,14 +1,15 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import type { Theme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
+import { radius, spacing } from '@/design/tokens';
+import type { SemanticColorName } from '@/design/tokens';
 
 export type BadgeVariant = 'solid' | 'subtle' | 'dot';
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'accent';
 
-type BadgeProps = {
+export type BadgeProps = {
   variant?: BadgeVariant;
   tone?: BadgeTone;
   /** dot variant에서는 children 없이도 사용 가능. */
@@ -18,69 +19,46 @@ type BadgeProps = {
 };
 
 type ToneColors = {
-  bg: string;
-  fg: string;
-  dot: string;
+  bg: SemanticColorName | 'transparent';
+  fg: SemanticColorName;
+  dot: SemanticColorName;
+  /** subtle은 바탕을 칠하지 않고 rule 테두리만 두른다(알파 결합 대신). */
+  outlined: boolean;
 };
 
 /**
- * tone별 색 계산 — 의미 토큰 기반.
- * solid: 진한 배경 + 밝은 텍스트, subtle: 연한 배경 + 진한 텍스트.
+ * tone × variant → 의미 색.
+ * - solid: 진한 바탕 + 대비 글씨. accent(형광펜)는 바탕 전용이라 글씨는 항상 onMarker.
+ * - subtle: 투명 바탕 + rule 테두리 + 톤 글씨. accent subtle은 글씨색으로 형광펜을 못 쓰므로 형광펜 바탕.
  */
-function toneColors(tone: BadgeTone, variant: BadgeVariant, colors: Theme['colors']): ToneColors {
+function toneColors(tone: BadgeTone, variant: BadgeVariant): ToneColors {
+  const subtle = variant === 'subtle';
   switch (tone) {
     case 'primary':
-      return {
-        bg: variant === 'subtle' ? colors.primaryMuted : colors.primary,
-        fg: variant === 'subtle' ? colors.primary : colors.onPrimary,
-        dot: colors.primary,
-      };
+      return subtle
+        ? { bg: 'primaryMuted', fg: 'primary', dot: 'primary', outlined: false }
+        : { bg: 'primary', fg: 'onPrimary', dot: 'primary', outlined: false };
     case 'success':
-      return {
-        // TODO: 알파 토큰화 — `${color}22` 결합 대신 semantic alpha 토큰 도입
-        bg: variant === 'subtle' ? `${colors.success}22` : colors.success,
-        fg: variant === 'subtle' ? colors.success : colors.onPrimary,
-        dot: colors.success,
-      };
     case 'warning':
-      return {
-        // TODO: 알파 토큰화 — `${color}22` 결합 대신 semantic alpha 토큰 도입
-        bg: variant === 'subtle' ? `${colors.warning}22` : colors.warning,
-        fg: variant === 'subtle' ? colors.warning : colors.onPrimary,
-        dot: colors.warning,
-      };
     case 'danger':
-      return {
-        // TODO: 알파 토큰화 — `${color}22` 결합 대신 semantic alpha 토큰 도입
-        bg: variant === 'subtle' ? `${colors.danger}22` : colors.danger,
-        fg: variant === 'subtle' ? colors.danger : colors.onPrimary,
-        dot: colors.danger,
-      };
+      return subtle
+        ? { bg: 'transparent', fg: tone, dot: tone, outlined: true }
+        : { bg: tone, fg: 'onPrimary', dot: tone, outlined: false };
     case 'accent':
-      return {
-        // TODO: 알파 토큰화 — `${color}22` 결합 대신 semantic alpha 토큰 도입
-        bg: variant === 'subtle' ? `${colors.accent}22` : colors.accent,
-        fg: variant === 'subtle' ? colors.accent : colors.textOnAccent,
-        dot: colors.accent,
-      };
+      return { bg: 'marker', fg: 'onMarker', dot: 'marker', outlined: false };
     case 'neutral':
     default:
-      return {
-        bg: variant === 'subtle' ? colors.bgMuted : colors.textSecondary,
-        fg: variant === 'subtle' ? colors.textSecondary : colors.bgSurface,
-        dot: colors.textSecondary,
-      };
+      return subtle
+        ? { bg: 'bgMuted', fg: 'textSecondary', dot: 'textSecondary', outlined: false }
+        : { bg: 'textPrimary', fg: 'bgBase', dot: 'textSecondary', outlined: false };
   }
 }
 
-/** dot variant 직경 — 상태 표시용 소형 원. */
 const DOT_SIZE = 8;
 
 /**
- * Badge — 디자인시스템.md §3.5
- * variants: solid | subtle | dot
- * tones: neutral | primary | success | warning | danger | accent
- * dot variant는 원형 소형 상태 표시자 (children 불필요).
+ * Badge — 작은 상태 표시. 글자는 caption, 반경 sm(6)으로 각지게(알약 남발 회피).
+ * dot variant는 원형 상태 점(children 불필요, 스크린리더 제외).
  */
 export function Badge({
   variant = 'subtle',
@@ -89,15 +67,14 @@ export function Badge({
   leftIcon,
 }: BadgeProps): ReactNode {
   const { colors } = useTheme();
-  const tc = toneColors(tone, variant, colors);
+  const tc = toneColors(tone, variant);
 
   if (variant === 'dot') {
     return (
       <View
-        // 순수 시각 요소 — 스크린리더에서 제외 (상태 의미는 인접 텍스트가 전달)
         accessibilityElementsHidden
         importantForAccessibility="no"
-        style={[styles.dot, { backgroundColor: tc.dot }]}
+        style={[styles.dot, { backgroundColor: colors[tc.dot] }]}
       />
     );
   }
@@ -106,14 +83,22 @@ export function Badge({
     <View
       style={[
         styles.pill,
-        { backgroundColor: tc.bg },
+        {
+          backgroundColor: tc.bg === 'transparent' ? 'transparent' : colors[tc.bg],
+          borderWidth: tc.outlined ? StyleSheet.hairlineWidth : 0,
+          borderColor: colors.borderStrong,
+        },
       ]}
     >
       {leftIcon ? <View style={styles.iconSlot}>{leftIcon}</View> : null}
-      {children ? (
-        <Text style={[styles.label, { color: tc.fg }]} numberOfLines={1}>
-          {children}
-        </Text>
+      {children != null ? (
+        typeof children === 'string' || typeof children === 'number' ? (
+          <Text variant="caption" color={tc.fg} numberOfLines={1}>
+            {children}
+          </Text>
+        ) : (
+          children
+        )
       ) : null}
     </View>
   );
@@ -125,14 +110,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.full,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
     gap: spacing.xs,
-  },
-  label: {
-    fontSize: typography.caption.size,
-    fontWeight: typography.caption.weight,
-    lineHeight: typography.caption.line,
   },
   iconSlot: {
     alignItems: 'center',
@@ -141,6 +121,6 @@ const styles = StyleSheet.create({
   dot: {
     width: DOT_SIZE,
     height: DOT_SIZE,
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
   },
 });

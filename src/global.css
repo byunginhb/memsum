@@ -3,50 +3,51 @@
 @tailwind utilities;
 
 /*
- * 의미 색 토큰을 CSS 변수(RGB triplet)로 정의 — 디자인시스템.md §2.1, §5
- * <alpha-value> 패턴(`rgb(var(--color-x) / <alpha-value>)`)을 위해 공백 구분 RGB로 둔다.
- * :root = light, .dark = dark. NativeWind useColorScheme이 .dark 클래스를 토글한다.
+ * 의미 색 토큰 CSS 변수(RGB triplet) — src/design/tokens/colors.ts와 같은 값.
+ * 현재 화면은 className을 쓰지 않고 useTheme()만 쓴다. 이 파일은 NativeWind 진입점이자
+ * (.dark 클래스로 다크 전환) 혹시 className을 쓸 때를 위한 동기화본이다.
+ * rule 계열(border)은 알파가 들어간 색이라 잉크/종이 RGB만 두고 투명도는 클래스(/10 등)로 준다.
  */
 :root {
-  --color-primary: 124 111 232;
-  --color-primary-muted: 229 225 249;
-  --color-primary-hover: 90 79 204;
+  --color-primary: 21 48 255;
+  --color-primary-muted: 220 224 255;
+  --color-primary-hover: 14 34 204;
   --color-on-primary: 255 255 255;
-  --color-bg-base: 255 248 240;
-  --color-bg-surface: 255 255 255;
+  --color-bg-base: 242 243 240;
+  --color-bg-surface: 250 250 248;
   --color-bg-elevated: 255 255 255;
-  --color-bg-muted: 245 239 228;
-  --color-text-primary: 45 45 61;
-  --color-text-secondary: 109 109 128;
-  --color-text-on-accent: 255 255 255;
-  --color-text-disabled: 212 212 220;
-  --color-border: 242 242 245;
-  --color-border-strong: 212 212 220;
-  --color-accent: 255 184 77;
-  --color-success: 34 197 94;
-  --color-danger: 239 68 68;
-  --color-warning: 245 158 11;
-  --color-info: 59 130 246;
+  --color-bg-muted: 230 232 227;
+  --color-text-primary: 13 14 18;
+  --color-text-secondary: 86 90 99;
+  --color-text-on-accent: 13 14 18;
+  --color-text-disabled: 13 14 18;
+  --color-border: 13 14 18;
+  --color-border-strong: 13 14 18;
+  --color-accent: 232 255 58;
+  --color-success: 15 138 74;
+  --color-danger: 217 45 32;
+  --color-warning: 178 94 0;
+  --color-info: 21 48 255;
 }
 
 .dark {
-  --color-primary: 181 171 238;
-  --color-primary-muted: 42 37 87;
-  --color-primary-hover: 124 111 232;
-  --color-on-primary: 45 45 61;
-  --color-bg-base: 22 22 30;
-  --color-bg-surface: 30 30 42;
-  --color-bg-elevated: 38 38 53;
-  --color-bg-muted: 42 42 58;
-  --color-text-primary: 245 245 248;
-  --color-text-secondary: 160 160 181;
-  --color-text-on-accent: 45 45 61;
-  --color-text-disabled: 74 74 90;
-  --color-border: 46 46 62;
-  --color-border-strong: 63 63 80;
-  --color-accent: 255 184 77;
-  --color-success: 52 211 153;
-  --color-danger: 248 113 113;
-  --color-warning: 251 191 36;
-  --color-info: 96 165 250;
+  --color-primary: 112 131 255;
+  --color-primary-muted: 28 34 80;
+  --color-primary-hover: 142 157 255;
+  --color-on-primary: 13 14 18;
+  --color-bg-base: 13 14 18;
+  --color-bg-surface: 22 23 28;
+  --color-bg-elevated: 30 31 37;
+  --color-bg-muted: 34 35 42;
+  --color-text-primary: 242 243 240;
+  --color-text-secondary: 158 162 172;
+  --color-text-on-accent: 13 14 18;
+  --color-text-disabled: 242 243 240;
+  --color-border: 242 243 240;
+  --color-border-strong: 242 243 240;
+  --color-accent: 232 255 58;
+  --color-success: 61 220 132;
+  --color-danger: 255 107 94;
+  --color-warning: 255 181 71;
+  --color-info: 112 131 255;
 }

@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { ToastProvider } from '@/design/components/Toast';
+import { fontAssets, setFontsReady } from '@/design/theme/fonts';
 import { ThemeProvider } from '@/design/theme/ThemeProvider';
 import { useTheme } from '@/design/theme/useTheme';
 import { useAutoCapture } from '@/hooks/use-auto-capture';
@@ -19,7 +20,7 @@ import { useOnboardingStore } from '@/stores/onboarding-store';
 
 import '@/global.css';
 
-// 네이티브 스플래시(라벤더+점)를 JS가 준비될 때까지 유지한다(자동 숨김 방지).
+// 네이티브 스플래시(종이/잉크 바탕 + 브랜드 마크)를 JS가 준비될 때까지 유지한다(자동 숨김 방지).
 // 첫 프레임에서 AnimatedSplash가 같은 화면을 그린 뒤 hideAsync로 매끄럽게 이어받는다.
 // 모듈 로드 시 1회. 실패해도 앱 기동을 막지 않는다(best-effort).
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -33,21 +34,22 @@ SplashScreen.preventAutoHideAsync().catch(() => {
  * - AuthProvider: 마운트 시 익명 세션 보장(비차단). 로딩/에러 중에도 앱은 뜸.
  * - OnboardingGate: 첫 실행 시 /onboarding으로 보냄. 복원 전엔 화면을 가려 깜빡임 방지.
  * - 캡처 Sheet는 RN 내장 Modal 기반이라 별도 root provider가 필요 없다(@gorhom 제거).
- * Pretendard Variable 로드 시도. 실패해도 시스템 폰트 폴백으로 진행(빌드/렌더 막지 않음).
+ * Wanted Sans·JetBrains Mono 로드 시도. 실패해도 시스템 폰트로 진행(빌드/렌더 막지 않음).
  */
 export default function RootLayout() {
-  // 폰트 로드 실패 시에도 화면을 차단하지 않는다(graceful fallback).
-  // loaded/error는 폴백 동작을 위해 의도적으로 게이팅에 사용하지 않는다.
-  useFonts({
-    'Pretendard-Variable': require('@/assets/fonts/PretendardVariable.ttf'),
-  });
+  // 폰트 로드 실패 시에도 화면을 차단하지 않는다(대체 동작).
+  // 로드 결과는 공용 Text에 알려, 로드 전·실패 시엔 시스템 폰트로 그리게 한다.
+  const [fontsLoaded] = useFonts(fontAssets);
+  useEffect(() => {
+    setFontsReady(fontsLoaded);
+  }, [fontsLoaded]);
 
   // 애니메이션 스플래시가 끝나면 true. 그 전까지 오버레이로 앱을 가린다.
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
   // 첫 프레임 렌더 직후 네이티브 스플래시를 숨긴다.
-  // 이 시점엔 AnimatedSplash가 같은 라벤더 화면을 그리고 있어 깜빡임 없이 이어받는다.
+  // 이 시점엔 AnimatedSplash가 같은 바탕·마크를 그리고 있어 깜빡임 없이 이어받는다.
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {
       /* 이미 숨겨짐 — 무시 */
@@ -70,7 +72,7 @@ export default function RootLayout() {
               <OnboardingGate>
                 <Stack screenOptions={{ headerShown: false }} />
               </OnboardingGate>
-              {/* 최상단 오버레이: 점 애니메이션 스플래시(약 1초) → 페이드아웃 후 언마운트. */}
+              {/* 최상단 오버레이: 축약 스캔 스플래시 → 페이드아웃 후 언마운트. */}
               {!splashDone ? <AnimatedSplash onFinish={handleSplashFinish} /> : null}
             </ToastProvider>
           </AuthProvider>

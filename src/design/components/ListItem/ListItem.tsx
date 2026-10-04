@@ -1,45 +1,31 @@
-import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { spacing } from '@/design/tokens';
 
-type ListItemProps = {
+export type ListItemProps = {
   leading?: ReactNode;
   title: string;
   subtitle?: string;
   trailing?: ReactNode;
   onPress?: () => void;
+  /** 아래 1px rule 구분선. 마지막 행은 false. */
   showDivider?: boolean;
-  /**
-   * 스크린리더 라벨. 미지정 시 title을 쓴다. trailing의 시각 정보(개수 등)를
-   * 음성에도 합쳐 전달할 때 사용(예: "마케팅 자료 2장"). design.md §35.
-   */
+  /** 스크린리더 라벨. 미지정 시 title. trailing의 시각 정보를 합칠 때 사용(예: "마케팅 자료 2장"). */
   accessibilityLabel?: string;
 };
 
-/** 1줄(subtitle 없음) 행 높이 — design.md §17 (≥44 탭타깃 충족). */
 const SINGLE_LINE_HEIGHT = 56;
-
-/** 2줄(subtitle 있음) 행 높이 — design.md §17. */
-const TWO_LINE_HEIGHT = 72;
-
-/** iOS 탭 시 opacity. SearchBar/Button과 동일. */
-const PRESSED_OPACITY = 0.7;
+const TWO_LINE_HEIGHT = 68;
+/** 행 전체가 줄어드는 건 과하므로 눌림 배율을 버튼보다 약하게. */
+const ROW_PRESS_SCALE = 0.985;
 
 /**
- * 디바이더 좌측 들여쓰기 — design.md §17.
- * iOS: 본문 정렬에 맞춰 좌측 spacing.lg(16) 들여쓰기 / Android: 풀너비(0).
- * Platform.select 인라인 대신 상수로 추출(매직값 방지).
- */
-const BORDER_LEFT_INSET = Platform.select({ ios: spacing.lg, default: 0 }) ?? 0;
-
-/**
- * ListItem — design.md §17
- * leading/title/subtitle/trailing 행. onPress 있으면 Pressable(iOS opacity / Android ripple),
- * 없으면 View(예: trailing이 Switch라 단독 토글하는 경우 — 호출측 책임).
- * a11y: onPress 시 role=button, label=title.
+ * ListItem — 구분선형 목록 행. 카드로 감싸지 않고 머리카락 rule로만 나눈다.
+ * onPress 있으면 눌림(scale), 없으면 정적 행(예: trailing Switch가 단독 토글).
  */
 export function ListItem({
   leading,
@@ -51,53 +37,34 @@ export function ListItem({
   accessibilityLabel,
 }: ListItemProps): ReactNode {
   const { colors } = useTheme();
-  const [pressed, setPressed] = useState(false);
-
   const hasSubtitle = typeof subtitle === 'string' && subtitle.length > 0;
-  const rowHeight = hasSubtitle ? TWO_LINE_HEIGHT : SINGLE_LINE_HEIGHT;
+  const rowStyle = [styles.row, { minHeight: hasSubtitle ? TWO_LINE_HEIGHT : SINGLE_LINE_HEIGHT }];
 
   const content = (
-    <View style={styles.row}>
-      {leading ? <View style={styles.leading}>{leading}</View> : null}
-
+    <>
+      {leading ? <View style={styles.side}>{leading}</View> : null}
       <View style={styles.body}>
-        <Text
-          style={[styles.title, { color: colors.textPrimary }]}
-          numberOfLines={1}
-        >
+        <Text variant="body" numberOfLines={1}>
           {title}
         </Text>
         {hasSubtitle ? (
-          <Text
-            style={[styles.subtitle, { color: colors.textSecondary }]}
-            numberOfLines={1}
-          >
+          <Text variant="caption" color="textSecondary" numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
       </View>
-
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
-    </View>
+      {trailing ? <View style={styles.side}>{trailing}</View> : null}
+    </>
   );
 
   const divider = showDivider ? (
-    <View
-      style={[
-        styles.divider,
-        {
-          backgroundColor: colors.border,
-          marginLeft: BORDER_LEFT_INSET,
-        },
-      ]}
-    />
+    <View style={[styles.divider, { backgroundColor: colors.border }]} />
   ) : null;
 
-  // onPress 없으면 정적 View(Switch류 trailing이 단독 토글하는 케이스).
   if (!onPress) {
     return (
       <View>
-        <View style={[styles.container, { minHeight: rowHeight }]}>{content}</View>
+        <View style={rowStyle}>{content}</View>
         {divider}
       </View>
     );
@@ -105,65 +72,38 @@ export function ListItem({
 
   return (
     <View>
-      <Pressable
+      <PressableScale
         onPress={onPress}
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setPressed(false)}
+        scaleTo={ROW_PRESS_SCALE}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? title}
-        android_ripple={{ color: colors.primaryMuted }}
-        style={[
-          styles.container,
-          { minHeight: rowHeight },
-          Platform.OS === 'ios' && pressed ? styles.pressed : null,
-        ]}
+        style={rowStyle}
       >
         {content}
-      </Pressable>
+      </PressableScale>
       {divider}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  pressed: {
-    opacity: PRESSED_OPACITY,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  leading: {
+  side: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   body: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.bodyMd.weight,
-    letterSpacing: letterSpacingFor('bodyMd'),
-  },
-  subtitle: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
-    letterSpacing: letterSpacingFor('bodySm'),
-    marginTop: spacing.xs,
-  },
-  trailing: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 2,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
+    marginHorizontal: spacing.lg,
   },
 });

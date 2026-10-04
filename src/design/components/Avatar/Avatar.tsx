@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
 import { radius } from '@/design/tokens';
 
@@ -25,6 +26,8 @@ const SIZE_MAP: Record<AvatarSize, number> = {
 
 /** 이니셜 폰트 크기 = 컨테이너 변 길이 × 비율. 시각적 균형용 고정 비율. */
 const FONT_SIZE_RATIO = 0.4;
+/** 이니셜 행간 = 글자 크기 × 비율(한글 위아래 잘림 방지). */
+const LINE_RATIO = 1.2;
 
 /** fallback 문자열의 첫 글자를 대문자 이니셜로 변환. 빈 값이면 빈 문자열. */
 function initialOf(fallback: string | undefined): string {
@@ -33,7 +36,7 @@ function initialOf(fallback: string | undefined): string {
 }
 
 /**
- * Avatar — 디자인시스템.md §19
+ * Avatar — 원형 사진 또는 이니셜(코발트 연한 바탕 + 코발트 글자).
  *
  * source가 있으면 expo-image(cover)로 렌더(CaptureCard 선례), 없으면 fallback 이니셜.
  * radius full(원형). badge가 있으면 우하단 absolute 슬롯에 렌더.
@@ -47,7 +50,7 @@ export function Avatar({ source, fallback, size = 'md', badge }: AvatarProps): R
   const containerStyle = {
     width: dimension,
     height: dimension,
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
   };
 
   return (
@@ -67,9 +70,11 @@ export function Avatar({ source, fallback, size = 'md', badge }: AvatarProps): R
           accessibilityLabel={fallback}
         >
           <Text
+            variant="bodyStrong"
+            color="primary"
             style={[
               styles.initial,
-              { color: colors.primary, fontSize: dimension * FONT_SIZE_RATIO },
+              { fontSize: dimension * FONT_SIZE_RATIO, lineHeight: dimension * FONT_SIZE_RATIO * LINE_RATIO },
             ]}
             numberOfLines={1}
           >
@@ -92,7 +97,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
   },
   fallback: {
     position: 'absolute',
@@ -102,7 +107,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.full,
+    borderRadius: radius.pill,
     overflow: 'hidden',
   },
   initial: {

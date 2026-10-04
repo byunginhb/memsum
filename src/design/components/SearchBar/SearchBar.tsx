@@ -1,24 +1,19 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 
-import { Search, X } from 'lucide-react-native';
-
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { useTypeStyle } from '@/design/components/Text/Text';
+import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
+import { spacing } from '@/design/tokens';
 import { t } from '@/i18n';
 
-type SearchBarProps = {
+export type SearchBarProps = {
   value: string;
   onChangeText: (text: string) => void;
-  /** value 있을 때 X 버튼 탭 콜백. 미지정 시 onChangeText('') 폴백. */
+  /** value 있을 때 X 버튼 탭 콜백. 미지정 시 onChangeText('') 대체. */
   onClear?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
@@ -28,22 +23,16 @@ type SearchBarProps = {
   inputProps?: Omit<TextInputProps, 'value' | 'onChangeText' | 'placeholder' | 'autoFocus' | 'onSubmitEditing'>;
 };
 
-/** lucide stroke-width — 디자인시스템.md §6: 1.75 통일. */
-const STROKE_WIDTH = 1.75;
-/** 아이콘 크기 — 본문 기본 20. */
-const ICON_SIZE = 20;
-/** 최소 탭 영역 — iOS 44pt / Android 48dp. */
-const MIN_TAP_SIZE = Platform.select({ ios: 44, default: 48 });
-/** clear(X) 배경 원 크기 — borderRadius는 절반(완전한 원). */
-const CLEAR_ICON_SIZE = 18;
-/** clear(X) 글리프 크기 — 배경 원 안에 맞도록 축소. */
-const CLEAR_GLYPH_SIZE = 12;
+/** 입력 줄 높이 — 최소 터치 44 이상. */
+const HEIGHT = 48;
+/** 밑줄 두께: 기본 1px, 포커스 2px(코발트). */
+const UNDERLINE = 1;
+const UNDERLINE_FOCUS = 2;
+const MIN_TOUCH = 44;
 
 /**
- * SearchBar — 디자인시스템.md §3.3 underline/filled 검색 입력
- * Search prefix 아이콘 + value 있으면 clear(X) 버튼.
- * filled 스타일(bgMuted 배경, 테두리 없음)로 구현 — 검색 필드 관례.
- * a11y: role searchbox, clearButton label 포함.
+ * SearchBar — 밑줄형 검색창(명세 §6). 바탕 없이 rule 밑줄, 포커스 시 코발트 2px.
+ * 왼쪽 돋보기, 값이 있으면 오른쪽 지우기(X).
  */
 export function SearchBar({
   value,
@@ -56,81 +45,58 @@ export function SearchBar({
 }: SearchBarProps): ReactNode {
   const { colors } = useTheme();
   const inputRef = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
+  const typeStyle = useTypeStyle('headline');
 
   const handleClear = (): void => {
-    if (onClear) {
-      onClear();
-    } else {
-      onChangeText('');
-    }
-    // 클리어 후 포커스 유지
+    if (onClear) onClear();
+    else onChangeText('');
     inputRef.current?.focus();
   };
-
-  const hasClear = value.length > 0;
 
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: colors.bgMuted,
-          borderRadius: radius.lg,
+          borderBottomColor: focused ? colors.primary : colors.borderStrong,
+          borderBottomWidth: focused ? UNDERLINE_FOCUS : UNDERLINE,
+          // 두께가 바뀌어도 높이가 흔들리지 않게 보정.
+          paddingBottom: focused ? 0 : UNDERLINE_FOCUS - UNDERLINE,
         },
       ]}
     >
-      {/* 검색 아이콘 prefix */}
-      <View style={styles.prefixIcon} pointerEvents="none">
-        <Search
-          size={ICON_SIZE}
-          color={colors.textSecondary}
-          strokeWidth={STROKE_WIDTH}
-        />
-      </View>
+      <Icon name="search" size={20} color={focused ? 'primary' : 'textSecondary'} />
 
       <TextInput
         ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textDisabled}
+        placeholderTextColor={colors.textSecondary}
         autoFocus={autoFocus}
         onSubmitEditing={onSubmit}
         returnKeyType="search"
-        clearButtonMode="never" // 네이티브 clear 버튼 비활성화 — 직접 구현
+        clearButtonMode="never"
         accessibilityRole="search"
-        style={[
-          styles.input,
-          {
-            color: colors.textPrimary,
-            fontSize: typography.body.size,
-          },
-        ]}
+        selectionColor={colors.primary}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        // TextInput에 lineHeight를 주면 안드로이드에서 글자가 잘린다.
+        style={[styles.input, typeStyle, { lineHeight: undefined, color: colors.textPrimary }]}
         {...inputProps}
       />
 
-      {/* value 있을 때 clear 버튼 */}
-      {hasClear ? (
-        <Pressable
+      {value.length > 0 ? (
+        <PressableScale
           onPress={handleClear}
           accessibilityRole="button"
           accessibilityLabel={t('search.clear')}
           hitSlop={spacing.sm}
-          style={({ pressed }) => [
-            styles.clearButton,
-            { minWidth: MIN_TAP_SIZE, minHeight: MIN_TAP_SIZE },
-            Platform.OS === 'ios' && pressed ? styles.pressed : null,
-          ]}
+          style={styles.clear}
         >
-          <View
-            style={[
-              styles.clearIcon,
-              { backgroundColor: colors.textSecondary },
-            ]}
-          >
-            <X size={CLEAR_GLYPH_SIZE} color={colors.bgSurface} strokeWidth={STROKE_WIDTH} />
-          </View>
-        </Pressable>
+          <Icon name="x" size={20} color="textSecondary" />
+        </PressableScale>
       ) : null}
     </View>
   );
@@ -140,32 +106,17 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: MIN_TAP_SIZE, // 최소 탭 높이 — 디자인시스템.md §3.1
-    paddingHorizontal: spacing.md,
+    height: HEIGHT,
     gap: spacing.sm,
-  },
-  prefixIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   input: {
     flex: 1,
-    // lineHeight을 TextInput에 직접 지정하면 Android에서 클리핑 발생
     paddingVertical: 0,
-    fontWeight: typography.body.weight,
   },
-  clearButton: {
+  clear: {
+    minWidth: MIN_TOUCH,
+    minHeight: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  clearIcon: {
-    width: CLEAR_ICON_SIZE,
-    height: CLEAR_ICON_SIZE,
-    borderRadius: CLEAR_ICON_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

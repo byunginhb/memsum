@@ -3,7 +3,7 @@ import { Platform, Switch as RNSwitch } from 'react-native';
 
 import { useTheme } from '@/design/theme/useTheme';
 
-type SwitchProps = {
+export type SwitchProps = {
   value: boolean;
   onValueChange: (v: boolean) => void;
   disabled?: boolean;
@@ -11,10 +11,8 @@ type SwitchProps = {
 };
 
 /**
- * Switch — 디자인시스템.md §32 "Material 트랙"
- *
- * RN 내장 Switch 래퍼. 동작은 플랫폼 기본을 따르고 색만 의미 토큰으로 덮는다.
- * thumb는 Android에서만 토큰을 강제(iOS는 시스템 흰색 기본이 자연스러워 미지정).
+ * Switch — RN 내장 스위치 래퍼. 동작은 플랫폼 기본, 색만 토큰(켜짐 코발트, 꺼짐 ruleStrong).
+ * iOS thumb는 시스템 흰색이 자연스러워 두고, Android·웹 thumb만 토큰으로 맞춘다.
  */
 export function Switch({
   value,
@@ -23,15 +21,17 @@ export function Switch({
   accessibilityLabel,
 }: SwitchProps): ReactNode {
   const { colors } = useTheme();
+  // react-native-web은 켜짐 thumb 기본색이 청록(#009688)이라 웹 전용 prop으로 맞춘다.
+  const webThumb = Platform.OS === 'web' ? ({ activeThumbColor: colors.bgElevated } as object) : null;
 
   return (
     <RNSwitch
+      {...webThumb}
       value={value}
       onValueChange={onValueChange}
       disabled={disabled}
       trackColor={{ false: colors.borderStrong, true: colors.primary }}
-      // iOS는 시스템 흰색 thumb가 가장 자연스러워 미지정. Android만 토큰으로 통일.
-      thumbColor={Platform.OS === 'android' ? colors.bgSurface : undefined}
+      thumbColor={Platform.OS === 'ios' ? undefined : colors.bgElevated}
       ios_backgroundColor={colors.borderStrong}
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled }}

@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// 의미 색 토큰을 CSS 변수로 매핑 — 디자인시스템.md §2.1
+// 의미 색 토큰을 CSS 변수로 매핑 — src/global.css, src/design/tokens/colors.ts와 동기화
 // className="bg-primary text-text-primary dark:bg-bg-base" 형태로 사용.
 const semanticColor = (name) => `rgb(var(--color-${name}) / <alpha-value>)`;
 
@@ -29,6 +29,7 @@ module.exports = {
         'border-strong': semanticColor('border-strong'),
 
         accent: semanticColor('accent'),
+        marker: semanticColor('accent'),
         success: semanticColor('success'),
         danger: semanticColor('danger'),
         warning: semanticColor('warning'),

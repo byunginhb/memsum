@@ -1,108 +1,88 @@
 import type { ReactNode } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Eyebrow } from '@/design/components/Eyebrow/Eyebrow';
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { Text } from '@/design/components/Text/Text';
+import { Icon } from '@/design/icons/Icon';
 import { useTheme } from '@/design/theme/useTheme';
-import { letterSpacingFor, spacing, typography } from '@/design/tokens';
+import { spacing } from '@/design/tokens';
 
-type HeaderProps = {
-  /** 네비게이션 바 제목. */
+export type HeaderProps = {
   title: string;
-  /** 좌측 슬롯 (뒤로가기 버튼 등). */
+  /** 왼쪽 슬롯(직접 그린 버튼). onBack이 있으면 무시된다. */
   left?: ReactNode;
-  /** 우측 슬롯 (액션 버튼 등). */
+  /** 오른쪽 슬롯(액션 버튼 등). */
   right?: ReactNode;
-  /**
-   * true면 iOS 큰 제목 스타일(34pt), false면 컴팩트(17pt).
-   * Android는 항상 고정 56dp + 20sp 좌측 정렬 — 디자인시스템.md §3.9.
-   */
+  /** true면 바 아래에 display 큰 제목(탭 화면). false면 바 안에 headline 제목(상세 화면). */
   large?: boolean;
-  /**
-   * SafeArea top inset(px). 미지정 시 0 — 호출측이 useSafeAreaInsets()로 전달 책임.
-   * Header 자체는 SafeAreaView를 쓰지 않아 레이아웃 유연성을 유지한다.
-   */
+  /** large 제목 위 mono 머리표. 예: `10월 1주 · 38장`. */
+  eyebrow?: string;
+  /** 주면 왼쪽에 뒤로가기(chevron) 버튼을 그린다. */
+  onBack?: () => void;
+  /** 뒤로가기 버튼 스크린리더 라벨(i18n 문구). */
+  backLabel?: string;
+  /** SafeArea top inset(px). 호출측이 useSafeAreaInsets()로 넘긴다. */
   topInset?: number;
 };
 
-/** 플랫폼별 네비게이션 바 높이 — iOS 44 / Android 56 (Material). */
-const BAR_HEIGHT = Platform.select({ ios: 44, default: 56 });
+/** 바 높이 — 양 플랫폼 통일. */
+const BAR_HEIGHT = 52;
+/** 최소 터치 영역. */
+const MIN_TOUCH = 44;
 
 /**
- * Header — 디자인시스템.md §3.9
- * iOS: large=true → 큰제목(34pt) / false → 컴팩트(17pt)
- * Android: 고정 56dp, 제목 20sp 좌측 정렬
- * SafeArea top은 topInset prop으로 주입 (호출측 책임).
+ * Header — 통일 헤더(시스템 헤더 대신). 양 플랫폼 같은 모양, 왼쪽 정렬, 바탕은 화면색(bgBase),
+ * 그림자·하단 테두리 없음. 제목은 Text가 서체를 처리한다.
  */
 export function Header({
   title,
   left,
   right,
   large = false,
+  eyebrow,
+  onBack,
+  backLabel,
   topInset = 0,
 }: HeaderProps): ReactNode {
   const { colors } = useTheme();
 
-  const isIOS = Platform.OS === 'ios';
-  const showLarge = isIOS && large;
+  const leftNode = onBack ? (
+    <PressableScale
+      onPress={onBack}
+      accessibilityRole="button"
+      accessibilityLabel={backLabel}
+      hitSlop={spacing.sm}
+      style={styles.touch}
+    >
+      <Icon name="chevron-left" size={24} color="textPrimary" />
+    </PressableScale>
+  ) : (
+    left
+  );
+
+  const hasBarContent = leftNode != null || right != null || !large;
 
   return (
-    <View
-      style={[
-        styles.wrapper,
-        {
-          paddingTop: topInset,
-          backgroundColor: colors.bgSurface,
-          borderBottomColor: colors.border,
-        },
-      ]}
-    >
-      {/* 컴팩트 바 — iOS 항상 표시, Android 항상 표시 */}
-      <View style={[styles.bar, { height: BAR_HEIGHT }]}>
-        {/* 좌측 슬롯 */}
-        <View style={styles.sideSlot}>{left ?? null}</View>
-
-        {/* 중앙 제목 (컴팩트 / Android) */}
-        {!showLarge ? (
-          <View style={styles.titleCenter}>
-            <Text
-              style={[
-                styles.titleCompact,
-                isIOS
-                  ? {
-                      fontSize: typography.title.size,
-                      fontWeight: typography.title.weight,
-                      letterSpacing: letterSpacingFor('title'),
-                    }
-                  : {
-                      fontSize: typography.bodyMd.size,
-                      fontWeight: typography.bodyMd.weight,
-                      textAlign: 'left',
-                    },
-                { color: colors.textPrimary },
-              ]}
-              numberOfLines={1}
-            >
-              {title}
-            </Text>
+    <View style={{ paddingTop: topInset, backgroundColor: colors.bgBase }}>
+      {hasBarContent ? (
+        <View style={styles.bar}>
+          {leftNode != null ? <View style={styles.touch}>{leftNode}</View> : null}
+          <View style={styles.barTitle}>
+            {!large ? (
+              <Text variant="headline" numberOfLines={1} accessibilityRole="header">
+                {title}
+              </Text>
+            ) : null}
           </View>
-        ) : (
-          // iOS compact 모드에서 large title이 있으면 중앙 제목 숨김
-          <View style={styles.titleCenter} />
-        )}
+          {right != null ? <View style={styles.right}>{right}</View> : null}
+        </View>
+      ) : null}
 
-        {/* 우측 슬롯 */}
-        <View style={styles.sideSlot}>{right ?? null}</View>
-      </View>
-
-      {/* iOS Large Title 영역 */}
-      {showLarge ? (
-        <View style={styles.largeSection}>
-          <Text
-            style={[
-              styles.titleLarge,
-              { color: colors.textPrimary },
-            ]}
-            numberOfLines={1}
-          >
+      {large ? (
+        <View style={styles.large}>
+          {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
+          <Text variant="display" numberOfLines={2} accessibilityRole="header">
             {title}
           </Text>
         </View>
@@ -112,36 +92,33 @@ export function Header({
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   bar: {
+    height: BAR_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
   },
-  sideSlot: {
-    // 최소 탭 영역 확보 — 디자인시스템.md §10: 44pt
-    minWidth: 44,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  titleCenter: {
-    flex: 1,
+  touch: {
+    minWidth: MIN_TOUCH,
+    minHeight: MIN_TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titleCompact: {
-    // Android는 좌측 정렬로 override
+  barTitle: {
+    flex: 1,
+    paddingHorizontal: spacing.sm,
   },
-  largeSection: {
+  right: {
+    minHeight: MIN_TOUCH,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  large: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  titleLarge: {
-    fontSize: typography.display.size,
-    fontWeight: typography.display.weight,
-    lineHeight: typography.display.line,
-    letterSpacing: letterSpacingFor('display'),
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: spacing.xs,
   },
 });

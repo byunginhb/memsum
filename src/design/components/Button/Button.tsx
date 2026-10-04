@@ -1,46 +1,37 @@
-import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { haptic } from '@/design/theme/platform';
+import { PressableScale } from '@/design/components/PressableScale/PressableScale';
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import type { Theme } from '@/design/theme/useTheme';
-import { radius, spacing, typography } from '@/design/tokens';
+import { radius, spacing } from '@/design/tokens';
+import type { SemanticColorName, TextVariant } from '@/design/tokens';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'destructive' | 'accent';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
-type ButtonProps = {
+export type ButtonProps = {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
   disabled?: boolean;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  /** 가로를 꽉 채운다(시트 하단 주 버튼 등). */
+  fullWidth?: boolean;
   onPress: () => void;
   accessibilityLabel?: string;
+  /** 바깥 레이아웃(여백·flex). */
+  style?: StyleProp<ViewStyle>;
   children: ReactNode;
 };
 
-/** size별 높이 — 디자인시스템.md §3.1: sm 36 / md 44(iOS 최소 탭) / lg 52. */
+/** 높이 — 모두 최소 터치 44 이상. */
 const SIZE_HEIGHT: Record<ButtonSize, number> = {
-  sm: 36,
-  md: 44,
-  lg: 52,
-};
-
-const SIZE_FONT: Record<ButtonSize, number> = {
-  sm: typography.bodySm.size,
-  md: typography.bodyMd.size,
-  lg: typography.title.size,
+  sm: 44,
+  md: 48,
+  lg: 56,
 };
 
 const SIZE_PADDING: Record<ButtonSize, number> = {
@@ -49,32 +40,35 @@ const SIZE_PADDING: Record<ButtonSize, number> = {
   lg: spacing.xl,
 };
 
-type VariantColors = {
-  bg: string;
-  fg: string;
-  border: string;
+const SIZE_TEXT: Record<ButtonSize, TextVariant> = {
+  sm: 'bodyStrong',
+  md: 'bodyStrong',
+  lg: 'headline',
 };
 
-/** variant별 의미 색 매핑 — 모든 색은 테마 토큰에서 가져온다(하드코딩 금지). */
-function variantColors(variant: ButtonVariant, colors: Theme['colors']): VariantColors {
-  switch (variant) {
-    case 'primary':
-      return { bg: colors.primary, fg: colors.onPrimary, border: colors.primary };
-    case 'secondary':
-      return { bg: colors.primaryMuted, fg: colors.primary, border: colors.primaryMuted };
-    case 'ghost':
-      return { bg: 'transparent', fg: colors.primary, border: 'transparent' };
-    case 'destructive':
-      return { bg: colors.danger, fg: colors.onPrimary, border: colors.danger };
-    case 'accent':
-      return { bg: colors.accent, fg: colors.textOnAccent, border: colors.accent };
-  }
-}
+/** 비활성 시 불투명도. */
+const DISABLED_OPACITY = 0.4;
+
+type VariantColors = {
+  bg: SemanticColorName | 'transparent';
+  fg: SemanticColorName;
+};
 
 /**
- * Button — 디자인시스템.md §3.1
- * iOS: Pressable opacity 0.7 + haptic('light') / Android: android_ripple.
- * a11y: role/label/state 필수.
+ * variant → 의미 색. 대비: primary 코발트/흰 글씨 8:1, accent 형광펜/잉크 글씨,
+ * destructive 빨강/onPrimary(라이트 흰·다크 잉크) 모두 AA 이상.
+ */
+const VARIANT_COLORS: Record<ButtonVariant, VariantColors> = {
+  primary: { bg: 'primary', fg: 'onPrimary' },
+  secondary: { bg: 'primaryMuted', fg: 'primary' },
+  ghost: { bg: 'transparent', fg: 'primary' },
+  destructive: { bg: 'danger', fg: 'onPrimary' },
+  accent: { bg: 'marker', fg: 'onMarker' },
+};
+
+/**
+ * Button — 주 버튼은 코발트. 눌림은 PressableScale(scale 0.97 스프링).
+ * 햅틱은 쓰지 않는다(명세: 스캔 완료·리포트 1위 공개만).
  */
 export function Button({
   variant = 'primary',
@@ -83,78 +77,63 @@ export function Button({
   disabled = false,
   leftIcon,
   rightIcon,
+  fullWidth = false,
   onPress,
   accessibilityLabel,
+  style,
   children,
 }: ButtonProps): ReactNode {
   const { colors } = useTheme();
   const isInactive = disabled || loading;
-  const [pressed, setPressed] = useState(false);
-  const vc = useMemo(() => variantColors(variant, colors), [variant, colors]);
-
-  const containerStyle = useMemo<StyleProp<ViewStyle>>(
-    () => ({
-      height: SIZE_HEIGHT[size],
-      paddingHorizontal: SIZE_PADDING[size],
-      borderRadius: radius.md,
-      backgroundColor: vc.bg,
-      borderColor: vc.border,
-      borderWidth: variant === 'ghost' ? 0 : StyleSheet.hairlineWidth,
-      opacity: isInactive ? 0.5 : 1,
-    }),
-    [size, vc, variant, isInactive],
-  );
-
-  const handlePress = async (): Promise<void> => {
-    if (isInactive) return;
-    // iOS 탭 피드백. Android는 android_ripple로 시각 피드백 제공.
-    if (Platform.OS === 'ios') {
-      await haptic('light');
-    }
-    onPress();
-  };
+  const vc = VARIANT_COLORS[variant];
+  const bg = vc.bg === 'transparent' ? 'transparent' : colors[vc.bg];
 
   return (
-    <Pressable
-      onPress={handlePress}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
+    <PressableScale
+      onPress={onPress}
       disabled={isInactive}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: isInactive, busy: loading }}
-      android_ripple={{ color: colors.primaryMuted }}
-      // NativeWind로 래핑된 Pressable은 함수형 style에서 배경색이 누락된다.
-      // Card와 동일하게 정적 배열 style을 사용하고 pressed는 상태로 처리한다.
+      containerStyle={[fullWidth ? styles.fullWidth : null, style]}
       style={[
         styles.base,
-        containerStyle,
-        Platform.OS === 'ios' && pressed && !isInactive ? styles.pressed : null,
+        {
+          height: SIZE_HEIGHT[size],
+          paddingHorizontal: SIZE_PADDING[size],
+          backgroundColor: bg,
+          opacity: isInactive ? DISABLED_OPACITY : 1,
+        },
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={vc.fg} />
+        <ActivityIndicator size="small" color={colors[vc.fg]} />
       ) : (
         <View style={styles.content}>
           {leftIcon ? <View style={styles.icon}>{leftIcon}</View> : null}
-          <Text style={[styles.label, { color: vc.fg, fontSize: SIZE_FONT[size] }]}>
-            {children}
-          </Text>
+          {typeof children === 'string' || typeof children === 'number' ? (
+            <Text variant={SIZE_TEXT[size]} color={vc.fg} numberOfLines={1}>
+              {children}
+            </Text>
+          ) : (
+            children
+          )}
           {rightIcon ? <View style={styles.icon}>{rightIcon}</View> : null}
         </View>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
+  fullWidth: {
+    alignSelf: 'stretch',
+  },
   base: {
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-  },
-  pressed: {
-    opacity: 0.7,
+    borderRadius: radius.md,
   },
   content: {
     flexDirection: 'row',
@@ -164,9 +143,5 @@ const styles = StyleSheet.create({
   icon: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  label: {
-    fontWeight: typography.bodyMd.weight,
-    textAlign: 'center',
   },
 });

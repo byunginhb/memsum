@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,8 +18,9 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Button } from '@/design/components/Button/Button';
+import { Text } from '@/design/components/Text/Text';
 import { useTheme } from '@/design/theme/useTheme';
-import { elevation, motion, radius, spacing, typography, zIndex } from '@/design/tokens';
+import { elevation, motion, radius, spacing, zIndex } from '@/design/tokens';
 import type { SemanticColorName } from '@/design/tokens';
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'danger';
@@ -48,8 +49,7 @@ const ICON_STROKE_WIDTH = 1.75;
 const ICON_SIZE = 20;
 
 /** 안전영역 위/아래 추가 오프셋(px) — design.md §21 위치 명세. */
-const IOS_TOP_OFFSET = spacing.md; // statusBar + 12 (Dynamic Island 회피)
-const ANDROID_BOTTOM_OFFSET = spacing.lg; // navigation bar 위 16 (Material 결)
+const TOP_OFFSET = spacing.md; // statusBar + 12 (Dynamic Island 회피)
 
 /** 진입 시 슬라이드 거리(px). iOS는 위에서, Android는 아래에서. */
 const SLIDE_DISTANCE = spacing['2xl'];
@@ -70,27 +70,19 @@ const TONE_VISUAL: Record<ToastTone, ToneVisual> = {
 };
 
 /**
- * iOS는 상단, Android는 하단에 고정하기 위한 위치 스타일.
- * Platform.select를 상수로 추상화(인라인 분기 금지 규칙).
+ * 양 플랫폼 모두 상단 고정. 하단에는 플로팅 탭바가 떠 있어 겹치므로 아래에 두지 않는다.
  */
 function positionStyle(insets: ReturnType<typeof useSafeAreaInsets>) {
-  return Platform.select({
-    ios: { top: insets.top + IOS_TOP_OFFSET },
-    android: { bottom: insets.bottom + ANDROID_BOTTOM_OFFSET },
-    default: { top: insets.top + IOS_TOP_OFFSET },
-  });
+  return { top: insets.top + TOP_OFFSET };
 }
 
-/**
- * 진입 시작 시 화면 밖으로 밀어둘 초기 translateY.
- * iOS(상단)는 위로(-), Android(하단)는 아래로(+).
- */
-const ENTER_FROM_Y = Platform.OS === 'android' ? SLIDE_DISTANCE : -SLIDE_DISTANCE;
+/** 진입 시작 시 위로 밀어둘 초기 translateY. */
+const ENTER_FROM_Y = -SLIDE_DISTANCE;
 
 /**
  * Toast — design.md §21 시각 컴포넌트.
  *
- * bgElevated + elevation[4] + radius.xl 컨테이너에 tone별 leading 아이콘/색,
+ * bgElevated + elevation[4](토스트는 그림자 허용) + radius.lg 컨테이너에 tone별 leading 아이콘/색,
  * 제목·설명, 우측 ghost 액션 버튼. 위치/모션/큐는 ToastProvider가 관리하고,
  * 이 컴포넌트는 "보이는 1개"의 진입/퇴장 애니메이션과 레이아웃만 담당한다.
  *
@@ -156,7 +148,7 @@ export function Toast({ tone, title, description, action }: ToastProps): ReactNo
           styles.container,
           // elevation[4] — 플랫폼별 shadow/elevation(테마 독립).
           elevation[4],
-          { backgroundColor: colors.bgElevated },
+          { backgroundColor: colors.bgElevated, borderColor: colors.border },
           animatedStyle,
         ]}
       >
@@ -169,14 +161,11 @@ export function Toast({ tone, title, description, action }: ToastProps): ReactNo
         </View>
 
         <View style={styles.textCol}>
-          <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>
+          <Text variant="bodyStrong" numberOfLines={2}>
             {title}
           </Text>
           {description ? (
-            <Text
-              style={[styles.description, { color: colors.textSecondary }]}
-              numberOfLines={3}
-            >
+            <Text variant="caption" color="textSecondary" numberOfLines={3}>
               {description}
             </Text>
           ) : null}
@@ -212,7 +201,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   leading: {
     alignItems: 'center',
@@ -220,17 +210,7 @@ const styles = StyleSheet.create({
   },
   textCol: {
     flex: 1,
-    gap: spacing.xs,
-  },
-  title: {
-    fontSize: typography.bodyMd.size,
-    lineHeight: typography.bodyMd.line,
-    fontWeight: typography.title.weight,
-  },
-  description: {
-    fontSize: typography.bodySm.size,
-    lineHeight: typography.bodySm.line,
-    fontWeight: typography.bodySm.weight,
+    gap: 2,
   },
   actionSlot: {
     alignItems: 'center',
