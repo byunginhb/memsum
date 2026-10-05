@@ -16,7 +16,10 @@
 --user-fraction(0~1 미만) 지정 시 릴리스 status=inProgress(단계적 배포), 없으면 completed(전체 배포).
 --commit 없으면 검증만 하고 편집을 버린다. 키: PLAY_SA_JSON 또는 ~/android-tools/play-service-account.json
 """
-import argparse, glob, os, sys
+import argparse, glob, os, socket, sys
+
+# 큰 AAB·mapping(수십 MB) 업로드가 기본 소켓 타임아웃(60초)에 끊기지 않게 한다.
+socket.setdefaulttimeout(600)
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -37,6 +40,8 @@ def main():
     ap.add_argument("--user-fraction", type=float, help="단계적 배포 비율(0 < x < 1). 지정 시 status=inProgress")
     ap.add_argument("--default-language")
     ap.add_argument("--skip-images", action="store_true")
+    # 등록정보·이미지는 트랙과 무관하게 공개 스토어에 바로 반영된다. 테스트 트랙만 올릴 땐 이 옵션으로 건드리지 않는다.
+    ap.add_argument("--release-only", action="store_true", help="AAB·출시 노트만 올리고 등록정보·이미지는 그대로 둔다")
     ap.add_argument("--commit", action="store_true")
     a = ap.parse_args()
     if a.user_fraction is not None and not 0 < a.user_fraction < 1:
@@ -63,7 +68,7 @@ def main():
             print("AAB versionCode", vc)
             if a.mapping:
                 e.deobfuscationfiles().upload(packageName=P, editId=eid, apkVersionCode=vc, deobfuscationFileType="proguard",
-                                              media_body=MediaFileUpload(a.mapping, mimetype="application/octet-stream", resumable=True)).execute()
+                                              media_body=MediaFileUpload(a.mapping, mimetype="application/octet-stream", resumable=True, chunksize=8 << 20)).execute()
             rel = {"name": a.release_name or str(vc), "versionCodes": [str(vc)], "status": "completed"}
             if a.user_fraction is not None:
                 rel["status"] = "inProgress"
@@ -85,7 +90,7 @@ def main():
                 e.images().upload(packageName=P, editId=eid, language=lang, imageType=kind, media_body=MediaFileUpload(p, mimetype="image/png")).execute()
             print(f"  [{lang}] {kind} {len(paths)}")
 
-        for l in langs:
+        for l in ([] if a.release_only else langs):
             d = os.path.join(listings, l)
             body = {"language": l, "title": read(os.path.join(d, "title.txt")),
                     "shortDescription": read(os.path.join(d, "short.txt")), "fullDescription": read(os.path.join(d, "full.txt"))}
