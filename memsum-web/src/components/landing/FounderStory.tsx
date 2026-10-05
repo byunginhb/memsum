@@ -1,52 +1,38 @@
-import { Mail } from 'lucide-react';
-
-import { SUPPORT_EMAIL } from '@/lib/site';
 import type { LandingCopy } from '@/lib/landing-copy';
+import { SUPPORT_EMAIL } from '@/lib/site';
 
 import { FounderAvatar } from './FounderAvatar';
-import { Reveal } from './Reveal';
 
 /**
- * 창작자 스토리 섹션 — 콜드스타트 신뢰 자산.
- * "누가 왜 만들었나"를 사진(이니셜 폴백)·인용·직접 문의 경로로 노출한다.
- * copy.founder는 landing-copy.ts에서 로케일별로 주입된다.
+ * 만든 사람 — 한 사람의 목소리라 장식 없이 큰 인용 한 문단 + 서명.
  */
 export function FounderStory({ copy }: { copy: LandingCopy }) {
   const c = copy.founder;
-  const bk = copy.isKorean ? 'break-keep' : '';
 
   return (
-    <section aria-labelledby="founder-title" className="px-5 sm:px-6">
-      <div className="mx-auto w-full max-w-3xl rounded-(--radius-block) border border-(--color-line) bg-(--color-card) px-6 py-14 shadow-(--shadow-card) sm:px-12 sm:py-16">
-        <Reveal className="flex flex-col items-center gap-5 text-center">
+    <section aria-label={c.role} className="border-y border-rule bg-surface">
+      <figure className="wrap grid gap-10 py-20 sm:py-24 lg:grid-cols-12 lg:gap-10">
+        <blockquote className="lg:col-span-8 lg:col-start-3">
+          <p className="text-[clamp(1.375rem,3vw,2.125rem)] leading-[1.5] font-bold tracking-[-0.025em]">
+            {c.quote}
+          </p>
+        </blockquote>
+        <figcaption className="flex flex-wrap items-center gap-6 lg:col-span-8 lg:col-start-3">
           <FounderAvatar name={c.name} photoAlt={c.photoAlt} />
-
-          <div>
-            <p className="text-base font-semibold text-(--color-ink)">{c.name}</p>
-            <p className="mt-0.5 text-sm text-(--color-ink-soft)">{c.role}</p>
-          </div>
-
-          <Reveal
-            as="blockquote"
-            variant="fade"
-            delay={80}
-            id="founder-title"
-            className={`max-w-xl text-lg font-medium leading-relaxed ${bk} text-(--color-ink) sm:text-xl`}
-          >
-            &ldquo;{c.quote}&rdquo;
-          </Reveal>
-
-          <Reveal variant="fade" delay={160}>
+          <div className="min-w-0">
+            <p lang="en" className="text-[17px] font-bold">
+              {c.name}
+            </p>
+            <p className="mt-1 text-[14px] text-ink-2">{c.role}</p>
             <a
               href={`mailto:${SUPPORT_EMAIL}`}
-              className="inline-flex items-center gap-1.5 text-sm text-(--color-primary) underline underline-offset-2 hover:text-(--color-primary-strong)"
+              className="mt-2 inline-flex min-h-8 items-center text-[14px] font-bold text-cobalt underline decoration-2 underline-offset-[5px] decoration-cobalt/30 hover:decoration-cobalt"
             >
-              <Mail size={15} aria-hidden="true" />
               {c.contactCta}
             </a>
-          </Reveal>
-        </Reveal>
-      </div>
+          </div>
+        </figcaption>
+      </figure>
     </section>
   );
 }

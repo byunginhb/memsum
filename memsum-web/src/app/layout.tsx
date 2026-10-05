@@ -1,9 +1,18 @@
 import type { Metadata } from 'next';
+import { JetBrains_Mono } from 'next/font/google';
 
 import { getLandingCopy } from '@/lib/landing-copy';
 import { GOOGLE_SITE_VERIFICATION, SITE_NAME, SITE_URL } from '@/lib/site';
 
 import './globals.css';
+
+// 시각·날짜·개수·머리표 전용 mono(라틴/숫자). 한글은 Wanted Sans가 맡는다.
+const mono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['500'],
+  variable: '--font-jetbrains',
+  display: 'swap',
+});
 
 // landing-copy.ts를 SSOT로 삼아 메타데이터를 동기화한다.
 const koMeta = getLandingCopy('ko').meta;
@@ -40,14 +49,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={mono.variable}>
       <head>
         {/* 폰트 CDN 선연결 — 렌더 블로킹 CSS의 핸드셰이크 시간을 줄인다. */}
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
-        {/* Pretendard Variable — 앱과 동일 서체(가변·동적 서브셋) */}
+        {/* Wanted Sans Variable — 앱과 같은 서체. 유니코드 구간별로 잘린 woff2라 쓰는 글자만 받는다. */}
         <link
           rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+          href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
         />
       </head>
       <body className="min-h-dvh antialiased">{children}</body>

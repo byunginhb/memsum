@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { DotsLogo } from '@/components/DotsLogo';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { useOptionalNotify } from '@/components/landing/NotifyProvider';
 import { getLandingCopy, type Lang, type LandingCopy } from '@/lib/landing-copy';
 import { OPERATOR_NAME, SUPPORT_EMAIL } from '@/lib/site';
@@ -20,6 +20,9 @@ type ChromeProps = {
   copy?: LandingCopy;
 };
 
+/** 헤더가 배경·구분선을 얻는 스크롤 거리(px). */
+const SCROLLED_AT = 40;
+
 /** 수동 선택을 미들웨어가 존중하도록 NEXT_LOCALE 쿠키를 1년간 저장한다. */
 function persistLocale(locale: Lang) {
   // SameSite=Lax: 일반 내비게이션에서 전송되어 미들웨어가 즉시 읽을 수 있다.
@@ -29,32 +32,31 @@ function persistLocale(locale: Lang) {
 /** 헤더 언어 토글 — 클릭 시 쿠키 저장 + 해당 로케일 페이지로 이동(미들웨어가 존중). */
 function LangToggle({ copy }: { copy: LandingCopy }) {
   const t = copy.langToggle;
-  const linkBase =
-    'rounded-full px-2.5 py-1 text-xs font-semibold transition-colors';
-  const active = 'bg-(--color-primary) text-white';
-  const inactive = 'text-(--color-ink-soft) hover:text-(--color-ink)';
+  const base =
+    'relative py-1 text-[13px] font-semibold transition-colors after:absolute after:inset-x-0 after:-bottom-0.5 after:h-[2px] after:transition-colors';
+  const active = 'text-ink after:bg-cobalt';
+  const inactive = 'text-ink-2 hover:text-ink after:bg-transparent';
 
   return (
-    <div
-      role="group"
-      aria-label={t.ariaLabel}
-      className="flex items-center gap-1 rounded-full bg-(--color-primary-soft) p-0.5"
-    >
+    <div role="group" aria-label={t.ariaLabel} className="flex items-center gap-3">
       <Link
         href="/"
         hrefLang="ko"
+        lang="ko"
         onClick={() => persistLocale('ko')}
         aria-current={copy.isKorean ? 'true' : undefined}
-        className={`${linkBase} ${copy.isKorean ? active : inactive}`}
+        className={`${base} ${copy.isKorean ? active : inactive}`}
       >
         {t.ko}
       </Link>
+      <span aria-hidden="true" className="h-3 w-px bg-rule-strong" />
       <Link
         href="/en"
         hrefLang="en"
+        lang="en"
         onClick={() => persistLocale('en')}
         aria-current={copy.isKorean ? undefined : 'true'}
-        className={`${linkBase} ${copy.isKorean ? inactive : active}`}
+        className={`${base} ${copy.isKorean ? inactive : active}`}
       >
         {t.en}
       </Link>
@@ -63,8 +65,8 @@ function LangToggle({ copy }: { copy: LandingCopy }) {
 }
 
 /**
- * 공통 상단 바 — 로고 + 워드마크(홈 링크) + 언어 토글.
- * 스크롤 40px↓: backdrop-blur + cream 90% 배경 + 하단 line + 컴팩트 CTA("받기") 등장(§3.6).
+ * 공통 상단 바 — 브랜드 마크 + 워드마크(홈 링크) · 정책 링크 · 언어 토글.
+ * 스크롤하면 종이색 바탕과 머리카락 구분선이 생기고 컴팩트 CTA("받기")가 나타난다.
  */
 export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
   const c = resolveCopy(lang, copy);
@@ -88,7 +90,7 @@ export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
-        setScrolled(window.scrollY > 40);
+        setScrolled(window.scrollY > SCROLLED_AT);
         ticking = false;
       });
     };
@@ -104,28 +106,23 @@ export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
 
   return (
     <header
-      className={`sticky top-0 z-40 transition-all duration-200 ease-(--ease-standard) ${
+      lang={c.isKorean ? 'ko' : 'en'}
+      className={`sticky top-0 z-40 border-b transition-colors duration-200 ${
         scrolled
-          ? 'border-b border-(--color-line) bg-(--color-cream)/90 shadow-(--shadow-card) backdrop-blur-md'
-          : 'border-b border-transparent bg-transparent'
+          ? 'border-rule bg-paper/92 backdrop-blur-md'
+          : 'border-transparent bg-paper/0'
       }`}
     >
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4 sm:px-6">
-        <Link href={homeHref} className="flex items-center gap-2.5">
-          <DotsLogo size={32} />
-          <span className="text-lg font-bold tracking-tight">Memsum</span>
+      <div className="wrap flex h-16 items-center justify-between gap-4">
+        <Link href={homeHref} className="flex items-center gap-2.5 rounded-sm">
+          <BrandMark size={30} />
+          <span className="text-[19px] font-black tracking-[-0.03em]">Memsum</span>
         </Link>
-        <nav className="flex items-center gap-3 text-sm text-(--color-ink-soft) sm:gap-4">
-          <Link
-            href={privacyHref}
-            className="hidden hover:text-(--color-ink) sm:inline"
-          >
+        <nav className="flex items-center gap-5 text-[13px] font-medium text-ink-2">
+          <Link href={privacyHref} className="hidden hover:text-ink md:inline">
             {c.header.privacy}
           </Link>
-          <Link
-            href={termsHref}
-            className="hidden hover:text-(--color-ink) sm:inline"
-          >
+          <Link href={termsHref} className="hidden hover:text-ink md:inline">
             {c.header.terms}
           </Link>
           <LangToggle copy={c} />
@@ -133,10 +130,10 @@ export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
           <button
             type="button"
             onClick={handleGet}
-            className={`hidden rounded-full bg-(--color-primary) px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-(--color-primary-strong) sm:inline-block ${
-              scrolled
-                ? 'translate-x-0 opacity-100'
-                : 'pointer-events-none translate-x-2 opacity-0'
+            tabIndex={scrolled ? 0 : -1}
+            aria-hidden={scrolled ? undefined : true}
+            className={`press hidden h-9 rounded-full bg-cobalt px-4 text-[13px] font-bold text-white hover:bg-cobalt-strong sm:inline-block ${
+              scrolled ? 'opacity-100' : 'pointer-events-none opacity-0'
             }`}
           >
             {c.header.getIt}
@@ -153,38 +150,43 @@ export function SiteFooter({ lang = 'ko', copy }: ChromeProps) {
   // 법적 링크는 현재 로케일 우선. 다른 로케일 정책 링크도 함께 노출(접근성·SEO).
   const privacyHref = c.isKorean ? '/privacy' : '/en/privacy';
   const termsHref = c.isKorean ? '/terms' : '/en/terms';
+  const linkClass = 'hover:text-ink underline-offset-4 hover:underline';
 
   return (
-    <footer className="mt-20 border-t border-(--color-line)">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-5 py-8 text-sm text-(--color-ink-soft) sm:px-6">
-        <nav className="flex flex-wrap gap-x-4 gap-y-2">
-          <Link href={privacyHref} className="hover:text-(--color-ink)">
-            {c.footer.privacy}
-          </Link>
-          <Link href={termsHref} className="hover:text-(--color-ink)">
-            {c.footer.terms}
-          </Link>
-          {/* 반대 로케일 정책 링크(영문 사용자도 한국어 정책 접근 가능 — 기존 동작 유지) */}
-          {c.isKorean ? (
-            <>
-              <Link href="/en/privacy" className="hover:text-(--color-ink)">
-                {c.footer.privacyPolicy}
-              </Link>
-              <Link href="/en/terms" className="hover:text-(--color-ink)">
-                {c.footer.termsOfService}
-              </Link>
-            </>
-          ) : null}
-        </nav>
-        <p>
-          {c.footer.contact}{' '}
-          <a className="underline underline-offset-2" href={`mailto:${SUPPORT_EMAIL}`}>
-            {SUPPORT_EMAIL}
-          </a>
-        </p>
-        <p>
-          © 2026 {OPERATOR_NAME}. All rights reserved.
-        </p>
+    <footer lang={c.isKorean ? 'ko' : 'en'} className="border-t border-rule">
+      <div className="wrap grid gap-8 pt-10 pb-28 text-[13px] text-ink-2 sm:grid-cols-[auto_1fr] sm:items-start lg:pb-12">
+        <div className="flex items-center gap-2.5 text-ink">
+          <BrandMark size={24} />
+          <span className="text-base font-black tracking-[-0.03em]">Memsum</span>
+        </div>
+        <div className="grid gap-3 sm:justify-items-end sm:text-right">
+          <nav className="flex flex-wrap gap-x-5 gap-y-2 sm:justify-end">
+            <Link href={privacyHref} className={linkClass}>
+              {c.footer.privacy}
+            </Link>
+            <Link href={termsHref} className={linkClass}>
+              {c.footer.terms}
+            </Link>
+            {/* 반대 로케일 정책 링크(영문 사용자도 한국어 정책 접근 가능 — 기존 동작 유지) */}
+            {c.isKorean ? (
+              <>
+                <Link href="/en/privacy" lang="en" className={linkClass}>
+                  {c.footer.privacyPolicy}
+                </Link>
+                <Link href="/en/terms" lang="en" className={linkClass}>
+                  {c.footer.termsOfService}
+                </Link>
+              </>
+            ) : null}
+          </nav>
+          <p>
+            {c.footer.contact}{' '}
+            <a className="t-mono text-ink underline underline-offset-4" href={`mailto:${SUPPORT_EMAIL}`}>
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
+          <p className="t-mono text-[12px]">© 2026 {OPERATOR_NAME}. All rights reserved.</p>
+        </div>
       </div>
     </footer>
   );

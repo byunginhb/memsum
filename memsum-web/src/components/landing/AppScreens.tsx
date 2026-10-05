@@ -1,56 +1,40 @@
 import type { LandingCopy } from '@/lib/landing-copy';
-
-import { Reveal } from './Reveal';
+import { SCREEN_SIZE, screenKeyFromLegacySrc, screenSrc } from '@/lib/screens';
 
 /**
- * 앱 화면 미리보기 — 실제 앱 화면(기기 목업)을 나열해 "받으면 이렇게 보인다"를 전시.
- * 이미지는 투명 배경 + 라벤더 글로우 그림자가 구워져 있어 별도 카드 프레임이 필요 없다.
- * 카피는 로케일 사전(`copy.appScreens`)에서 주입.
+ * 앱 화면 미리보기 — 새 디자인 실제 화면 3장을 나란히. 기기 목업·그림자 없이 화면 그대로.
+ * 모바일에선 섹션 안에서만 옆으로 넘기는 줄(페이지 자체는 가로로 밀리지 않음).
  */
 export function AppScreens({ copy }: { copy: LandingCopy }) {
   const c = copy.appScreens;
-  const bk = copy.isKorean ? 'break-keep' : '';
+  const lang = copy.isKorean ? 'ko' : 'en';
 
   return (
-    <section
-      aria-labelledby="screens-title"
-      className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-6 sm:py-24"
-    >
-      <Reveal
-        as="h2"
-        id="screens-title"
-        className={`text-center text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
-      >
-        {c.title}
-      </Reveal>
-      <Reveal
-        as="p"
-        delay={80}
-        className={`mx-auto mt-4 max-w-xl text-center text-base leading-relaxed ${bk} text-(--color-ink-soft) sm:text-lg`}
-      >
-        {c.subtitle}
-      </Reveal>
+    <section aria-labelledby="screens-title" className="py-20 sm:py-24">
+      <div className="wrap flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-10">
+        <h2 id="screens-title" className="t-title text-[clamp(1.875rem,4.4vw,3rem)]">
+          {c.title}
+        </h2>
+        <p className="max-w-sm text-[17px] leading-[1.7] text-ink-2 md:text-right">{c.subtitle}</p>
+      </div>
 
-      {/* 기기 목업은 항상 표시(reveal opacity 게이팅 없이) — 실제 화면 전시가 목적이라
-          마지막 항목까지 확실히 보이게 한다. */}
-      <div className="mt-14 grid gap-8 sm:grid-cols-3">
-        {c.items.map((s) => (
-          <div key={s.src} className="flex flex-col items-center">
-            <div className="flex h-[480px] w-full items-end justify-center">
-              {/* 장식용 기기 목업(투명 PNG, 그림자 내장). next/image 대신 img로 단순 표시. */}
+      <div className="wrap mt-12">
+        <ul className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-6 sm:overflow-visible sm:px-0 lg:gap-10">
+          {c.items.map((s) => (
+            <li key={s.src} className="w-[70%] shrink-0 snap-start sm:w-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={s.src}
+                src={screenSrc(lang, screenKeyFromLegacySrc(s.src))}
                 alt={s.alt}
+                width={SCREEN_SIZE.width}
+                height={SCREEN_SIZE.height}
                 loading="lazy"
-                className="max-h-full w-auto"
+                className="block w-full rounded-[10px] shadow-[0_0_0_1px_var(--color-rule)]"
               />
-            </div>
-            <p className={`mt-6 text-center text-sm ${bk} text-(--color-ink-soft)`}>
-              {s.caption}
-            </p>
-          </div>
-        ))}
+              <p className="mt-5 border-t border-ink pt-3 text-[15px] font-semibold">{s.caption}</p>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+import { CropFrame } from '@/components/brand/CropFrame';
 
 type Props = {
   name: string;
@@ -9,12 +11,19 @@ type Props = {
 };
 
 /**
- * 파운더 아바타.
- * /founder.png가 존재하면 실제 사진을, 없거나 로드 실패 시 이름 이니셜로 폴백한다.
- * 가짜 사진 커밋 없이 레이아웃이 깨지지 않는 것을 보장한다.
+ * 파운더 아바타 — 크롭 모서리 안의 정사각형.
+ * /founder.png가 있으면 실제 사진, 없거나 로드 실패 시 이름 이니셜로 폴백한다
+ * (가짜 사진 커밋 없이 레이아웃이 깨지지 않게).
  */
 export function FounderAvatar({ name, photoAlt, src = '/founder.png' }: Props) {
   const [failed, setFailed] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // 하이드레이션 전에 로드가 이미 실패했으면 onError가 불리지 않으므로 마운트 때 한 번 확인한다.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth === 0) setFailed(true);
+  }, []);
 
   const initials = name
     .split(' ')
@@ -23,24 +32,26 @@ export function FounderAvatar({ name, photoAlt, src = '/founder.png' }: Props) {
     .slice(0, 2)
     .toUpperCase();
 
-  if (failed) {
-    return (
-      <div
-        role="img"
-        aria-label={photoAlt}
-        className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-(--color-primary-soft) text-2xl font-bold text-(--color-primary) sm:h-24 sm:w-24"
-      >
-        {initials}
-      </div>
-    );
-  }
-
   return (
-    <img
-      src={src}
-      alt={photoAlt}
-      onError={() => setFailed(true)}
-      className="h-20 w-20 shrink-0 rounded-full object-cover sm:h-24 sm:w-24"
-    />
+    <CropFrame className="size-20 shrink-0 [--crop-len:12px] [--crop-out:6px] sm:size-24">
+      {failed ? (
+        <div
+          role="img"
+          aria-label={photoAlt}
+          className="t-mono flex size-full items-center justify-center rounded-[6px] bg-cobalt text-[26px] text-white"
+        >
+          {initials}
+        </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          ref={imgRef}
+          src={src}
+          alt={photoAlt}
+          onError={() => setFailed(true)}
+          className="size-full rounded-[6px] bg-muted object-cover"
+        />
+      )}
+    </CropFrame>
   );
 }

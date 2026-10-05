@@ -14,13 +14,13 @@ import { MobileCtaBar } from './MobileCtaBar';
 import { NotifyProvider } from './NotifyProvider';
 import { ParcelSection } from './ParcelSection';
 import { ProblemSection } from './ProblemSection';
-import { ScrollProgress } from './ScrollProgress';
 import { StepFlow } from './StepFlow';
 import { Testimonials } from './Testimonials';
 
 /**
  * 랜딩 페이지 조립 — 로케일(`lang`) 하나로 ko/en 전체 화면을 렌더한다.
- * 스크롤 애니메이션·reduced-motion·디자인은 그대로, 카피만 사전에서 주입한다.
+ * 디자인은 "형광펜 & 코발트"(docs/design/redesign-2026-10.md), 카피는 사전에서 원문 그대로 주입한다.
+ * 연출은 히어로 스캔 한 번뿐이고 나머지 섹션은 타이포·구분선·여백으로 조용히 둔다.
  * `/`(ko)·`/en`(en) 라우트가 이 컴포넌트를 각각의 lang으로 호출한다.
  */
 export function LandingPage({ lang }: { lang: Lang }) {
@@ -51,9 +51,9 @@ export function LandingPage({ lang }: { lang: Lang }) {
 
   return (
     <NotifyProvider copy={copy}>
-      <ScrollProgress />
       <SiteHeader lang={lang} copy={copy} />
-      <main>
+      {/* 영어 페이지는 lang="en"으로 한국어 줄바꿈 규칙(keep-all)과 발음 정보를 끊는다. */}
+      <main lang={lang}>
         <Hero copy={copy} />
         <ProblemSection copy={copy} />
         <StepFlow copy={copy} />

@@ -1,157 +1,47 @@
-'use client';
-
-import Image from 'next/image';
-import {
-  CalendarPlus,
-  Mail,
-  ScanText,
-  ShieldCheck,
-  Tags,
-  type LucideIcon,
-} from 'lucide-react';
-
-import { useActiveSection } from '@/hooks/use-active-section';
+import { CropFrame } from '@/components/brand/CropFrame';
 import type { LandingCopy } from '@/lib/landing-copy';
-
-import { Reveal } from './Reveal';
-
-/**
- * 기능 카드의 시각 메타(아이콘·강조). 언어 비의존이라 카피와 분리해 인덱스로 매핑한다.
- * 순서는 `copy.features.items`와 1:1 대응(읽기→분류→캘린더→주간→안전).
- */
-
-/** 각 기능 카드에 붙는 monospace 카테고리 태그. 인덱스는 copy.features.items와 1:1 대응. */
-const KO_TAGS = ['[OCR]', '[분류]', '[캘린더]', '[리포트]', '[보안]'] as const;
-const EN_TAGS = ['[OCR]', '[SORT]', '[CALENDAR]', '[RECAP]', '[PRIVACY]'] as const;
-
-const FEATURE_META: readonly { Icon: LucideIcon; accent?: boolean }[] = [
-  { Icon: ScanText },
-  { Icon: Tags },
-  { Icon: CalendarPlus },
-  { Icon: Mail },
-  { Icon: ShieldCheck, accent: true },
-] as const;
+import { SCREEN_SIZE, screenSrc } from '@/lib/screens';
 
 /**
- * S4 기능 — 욕구 구체화.
- * 데스크톱(≥1024px): 좌측 스티키 폰 목업 + 우측 5블록 세로 스크롤(active 동기화).
- *   활성 기능에 따라 폰 위 하이라이트 오버레이(색 틴트 + 아이콘 + 라벨)가 crossfade된다.
- * 모바일/태블릿: 스티키 해제 → 카드 스택 폴백.
- * 02 §4에는 섹션 헤딩이 없어 H2를 두지 않는다(카피 변경 금지). 접근성 이름은 aria-label로 보강.
+ * 기능 — 왼쪽에 결과 화면 한 장(스크롤 동안 고정), 오른쪽에 머리카락 구분선으로 나눈 기능 목록.
+ * 기능 사이에 순서가 없으므로 번호를 달지 않는다.
  */
 export function FeatureShowcase({ copy }: { copy: LandingCopy }) {
   const c = copy.features;
-  const bk = copy.isKorean ? 'break-keep' : '';
-  const { setRef, active } = useActiveSection(c.items.length);
+  const lang = copy.isKorean ? 'ko' : 'en';
 
   return (
-    <section
-      aria-label={c.sectionAria}
-      className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-6 sm:py-24"
-    >
-      <div className="grid gap-10 lg:grid-cols-12 lg:gap-12">
-        {/* 좌측 스티키 폰 (데스크톱만) */}
-        <div className="hidden lg:col-span-5 lg:block">
-          <div className="sticky top-28">
-            <div className="relative mx-auto max-w-[260px]">
-              <div className="relative overflow-hidden rounded-3xl border border-(--color-line) bg-(--color-card) shadow-(--shadow-float)">
-                <Image
-                  src={copy.shots.home}
-                  alt={c.phoneAlt}
-                  width={1080}
-                  height={2400}
-                  sizes="22vw"
-                />
-                {/* 활성 기능별 색 틴트 — 폰 화면 위에서 crossfade */}
-                {c.items.map((feature, index) => (
-                  <span
-                    key={feature.title}
-                    aria-hidden="true"
-                    data-active={active === index ? 'true' : 'false'}
-                    className={`feature-overlay pointer-events-none absolute inset-0 mix-blend-multiply ${
-                      FEATURE_META[index].accent
-                        ? 'bg-(--color-accent)/15'
-                        : 'bg-(--color-primary)/15'
-                    }`}
-                  />
-                ))}
-              </div>
-              {/* 활성 기능 라벨 칩 — 모든 레이어를 겹쳐 opacity 교차(실제 crossfade) */}
-              <div className="pointer-events-none absolute inset-x-4 bottom-4">
-                <div className="relative">
-                  {c.items.map((feature, index) => {
-                    const meta = FEATURE_META[index];
-                    const Icon = meta.Icon;
-                    return (
-                      <div
-                        key={feature.title}
-                        data-active={active === index ? 'true' : 'false'}
-                        className={`feature-overlay flex items-center gap-2 rounded-2xl bg-(--color-card)/95 px-4 py-3 shadow-(--shadow-card) backdrop-blur-sm ${
-                          index === 0 ? 'relative' : 'absolute inset-0'
-                        }`}
-                      >
-                        <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                            meta.accent
-                              ? 'bg-(--color-accent-soft) text-(--color-accent)'
-                              : 'bg-(--color-primary-soft) text-(--color-primary)'
-                          }`}
-                        >
-                          <Icon size={18} aria-hidden="true" />
-                        </span>
-                        <span className={`text-sm font-semibold tracking-tight ${bk}`}>
-                          {feature.title}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+    <section aria-label={c.sectionAria} className="border-y border-rule bg-surface">
+      <div className="wrap grid gap-14 py-20 sm:py-24 lg:grid-cols-12 lg:gap-10">
+        <div className="lg:col-span-5">
+          <div className="lg:sticky lg:top-28">
+            <CropFrame className="mx-auto w-[min(68vw,18rem)] [--crop-len:18px] lg:mx-0 lg:w-[19rem]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={screenSrc(lang, 'search')}
+                alt={c.phoneAlt}
+                width={SCREEN_SIZE.width}
+                height={SCREEN_SIZE.height}
+                loading="lazy"
+                className="block w-full rounded-[10px] shadow-[0_0_0_1px_var(--color-rule)]"
+              />
+            </CropFrame>
           </div>
         </div>
 
-        {/* 우측 기능 블록 */}
-        <div className="grid gap-6 lg:col-span-7 sm:grid-cols-2 lg:grid-cols-1">
-          {c.items.map((feature, index) => {
-            const meta = FEATURE_META[index];
-            const Icon = meta.Icon;
-            const tag = copy.isKorean ? KO_TAGS[index] : EN_TAGS[index];
-            return (
-              <article
-                key={feature.title}
-                ref={setRef(index)}
-                className="group rounded-(--radius-block) border border-(--color-line) bg-(--color-card) p-7 shadow-(--shadow-card) transition-all duration-200 ease-(--ease-standard) hover:-translate-y-1 hover:shadow-(--shadow-float)"
-              >
-                <Reveal variant="scale-in">
-                  <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
-                      meta.accent
-                        ? 'bg-(--color-accent-soft) text-(--color-accent)'
-                        : 'bg-(--color-primary-soft) text-(--color-primary)'
-                    }`}
-                  >
-                    <Icon size={24} aria-hidden="true" />
-                  </span>
-                </Reveal>
-                <Reveal as="h3" delay={80} className={`mt-4 flex flex-col gap-1.5 text-lg font-bold tracking-tight ${bk}`}>
-                  <span className="self-start rounded bg-(--color-primary-soft) px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.15em] text-(--color-primary)">
-                    {tag}
-                  </span>
-                  {feature.title}
-                </Reveal>
-                <Reveal
-                  as="p"
-                  variant="fade"
-                  delay={160}
-                  className={`mt-2 text-base leading-relaxed ${bk} text-(--color-ink-soft)`}
-                >
-                  {feature.body}
-                </Reveal>
-              </article>
-            );
-          })}
-        </div>
+        <ul className="lg:col-span-7">
+          {c.items.map((item) => (
+            <li
+              key={item.title}
+              className="border-t border-rule py-8 first:border-t-2 first:border-ink sm:py-10"
+            >
+              <h3 className="text-[clamp(1.25rem,2.2vw,1.625rem)] leading-[1.3] font-bold tracking-[-0.025em]">
+                {item.title}
+              </h3>
+              <p className="mt-3 max-w-[38rem] text-[16px] leading-[1.75] text-ink-2">{item.body}</p>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

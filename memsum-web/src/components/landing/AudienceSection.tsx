@@ -1,63 +1,35 @@
-import { Check } from 'lucide-react';
-
 import type { LandingCopy } from '@/lib/landing-copy';
 
-import { Reveal, RevealGroup } from './Reveal';
-
-/** S5 타깃 — 자기확인·자격부여. card 블록 + 체크 리스트 스태거 + 강조 인용. */
+/**
+ * 대상 — "이런 분" 목록을 큰 글자 구분선 목록으로. 각 줄 앞에는 작은 크롭 모서리(브랜드 장치)를 둔다.
+ * 오른쪽은 한 문장 인용으로 마무리.
+ */
 export function AudienceSection({ copy }: { copy: LandingCopy }) {
   const c = copy.audience;
-  const bk = copy.isKorean ? 'break-keep' : '';
 
   return (
-    <section
-      aria-labelledby="audience-title"
-      className="px-5 sm:px-6"
-    >
-      <div className="mx-auto w-full max-w-5xl rounded-(--radius-block) border border-(--color-line) bg-(--color-card) px-6 py-16 shadow-(--shadow-card) sm:px-12 sm:py-20">
-        <Reveal
-          as="h2"
-          id="audience-title"
-          className={`text-center text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
-        >
-          {c.title}
-        </Reveal>
+    <section aria-labelledby="audience-title" className="wrap py-20 sm:py-24">
+      <h2 id="audience-title" className="t-title max-w-3xl text-[clamp(1.875rem,4.4vw,3rem)]">
+        {c.title}
+      </h2>
 
-        <RevealGroup className="mx-auto mt-10 grid max-w-3xl gap-3">
+      <div className="mt-12 grid gap-14 lg:grid-cols-12 lg:gap-10">
+        <ul className="border-t-2 border-ink lg:col-span-7">
           {c.items.map((item) => (
-            <Reveal
+            <li
               key={item}
-              className="group flex items-start gap-3 rounded-2xl border-l-2 border-transparent py-2 pl-3 transition-colors hover:border-(--color-accent)"
+              className="flex gap-4 border-b border-rule py-5 text-[clamp(1.0625rem,1.8vw,1.25rem)] leading-[1.5] font-semibold tracking-[-0.015em]"
             >
-              <Check
-                size={22}
-                aria-hidden="true"
-                className="mt-0.5 shrink-0 text-(--color-accent)"
-              />
-              <span className={`text-base leading-relaxed ${bk} sm:text-lg`}>
-                {item}
-              </span>
-            </Reveal>
+              <span aria-hidden="true" className="mt-[0.45em] size-3 shrink-0 border-t-2 border-l-2 border-cobalt" />
+              <span>{item}</span>
+            </li>
           ))}
-        </RevealGroup>
+        </ul>
 
-        <Reveal
-          variant="scale-in"
-          delay={120}
-          className="mx-auto mt-12 max-w-2xl rounded-(--radius-block) bg-(--color-primary-soft) p-8 text-center"
-        >
-          <p className={`text-xl font-bold tracking-tight ${bk} sm:text-2xl`}>
-            {c.quoteHeadline}
-          </p>
-          <Reveal
-            as="p"
-            variant="fade"
-            delay={200}
-            className={`mt-3 text-base leading-relaxed ${bk} text-(--color-ink-soft) sm:text-lg`}
-          >
-            {c.quoteSub}
-          </Reveal>
-        </Reveal>
+        <figure className="lg:col-span-5 lg:pt-2">
+          <p className="t-title text-[clamp(1.5rem,3vw,2.125rem)]">{c.quoteHeadline}</p>
+          <p className="mt-5 text-[17px] leading-[1.7] text-ink-2">{c.quoteSub}</p>
+        </figure>
       </div>
     </section>
   );

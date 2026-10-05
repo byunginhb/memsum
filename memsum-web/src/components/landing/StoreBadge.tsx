@@ -9,6 +9,11 @@ import { useNotify } from './NotifyProvider';
 
 type Store = 'appstore' | 'googleplay';
 
+/**
+ * ink: 종이 위 잉크 배지(기본). paper: 잉크 섹션 위 종이 배지. bare: 잉크 알약 바 안의 납작한 배지.
+ */
+type Tone = 'ink' | 'paper' | 'bare';
+
 type StoreBadgeProps = {
   store: Store;
   /** 로케일 카피 사전(라벨·리본 문구 출처). */
@@ -17,20 +22,28 @@ type StoreBadgeProps = {
   ribbon?: string;
   /** 컴팩트 모드(MobileCtaBar용). */
   compact?: boolean;
+  tone?: Tone;
   className?: string;
+};
+
+const TONE_CLASS: Record<Tone, string> = {
+  ink: 'bg-ink text-paper hover:bg-[#23252d]',
+  paper: 'bg-paper text-ink hover:bg-white',
+  bare: 'bg-transparent text-paper hover:bg-white/10',
 };
 
 /**
  * 스토어 배지.
  * - Google Play: 2026-07-03 정식 출시됨 → 실제 스토어 상세 페이지로 링크한다(리본 없음).
  * - App Store: iOS 미출시 → 클릭 시 스토어가 아니라 출시 알림 모달을 연다(정직 규칙 §7).
- *   "출시 알림 받기" 리본으로 이것이 다운로드가 아님을 명시해 오인을 방지한다.
+ *   형광펜 꼬리표("출시 알림 받기")로 이것이 다운로드가 아님을 명시해 오인을 방지한다.
  */
 export function StoreBadge({
   store,
   copy,
   ribbon,
   compact = false,
+  tone = 'ink',
   className,
 }: StoreBadgeProps) {
   const { openNotify } = useNotify();
@@ -42,24 +55,18 @@ export function StoreBadge({
   const ribbonText =
     ribbon ?? (compact ? copy.storeBadge.ribbonCompact : copy.storeBadge.ribbon);
 
-  const badgeClass = `group flex items-center gap-2.5 rounded-2xl bg-(--color-ink) text-white shadow-(--shadow-card) transition-all duration-200 ease-(--ease-standard) hover:-translate-y-1 hover:shadow-(--shadow-float) active:scale-[0.98] ${
-    compact ? 'px-3 py-2' : 'px-5 py-3'
+  const badgeClass = `press flex items-center gap-2 rounded-[10px] sm:gap-2.5 ${TONE_CLASS[tone]} ${
+    compact ? 'h-11 px-3' : 'h-14 px-3.5 pr-4 sm:px-4 sm:pr-5'
   }`;
 
-  // 아이콘·라벨 내부 구성(링크/버튼 양쪽 공용).
   const inner = (
     <>
-      {/* 아이콘은 App Store·Google Play 모두 흰색으로 통일. */}
-      <Icon size={compact ? 20 : 26} aria-hidden="true" />
-      <span className="flex flex-col items-start leading-none">
-        <span
-          className={`${compact ? 'text-[9px]' : 'text-[11px]'} font-medium tracking-wide text-white/80`}
-        >
+      <Icon size={compact ? 18 : 22} strokeWidth={2} aria-hidden="true" />
+      <span lang="en" className="flex flex-col items-start leading-none">
+        <span className={`${compact ? 'text-[8.5px]' : 'text-[10px]'} font-semibold uppercase tracking-[0.06em] opacity-75`}>
           {meta.top}
         </span>
-        <span
-          className={`${compact ? 'text-sm' : 'text-lg'} font-semibold tracking-tight`}
-        >
+        <span className={`${compact ? 'mt-0.5 text-[14px]' : 'mt-1 text-[17px] sm:text-[18px]'} font-bold tracking-[-0.02em]`}>
           {meta.bottom}
         </span>
       </span>
@@ -67,7 +74,7 @@ export function StoreBadge({
   );
 
   return (
-    <div className={`relative inline-block ${className ?? ''}`}>
+    <div className={`relative inline-flex ${className ?? ''}`}>
       {isLive ? (
         <a
           href={PLAY_STORE_URL}
@@ -79,20 +86,15 @@ export function StoreBadge({
           {inner}
         </a>
       ) : (
-        <button
-          type="button"
-          onClick={openNotify}
-          aria-label={meta.aria}
-          className={badgeClass}
-        >
+        <button type="button" onClick={openNotify} aria-label={meta.aria} className={badgeClass}>
           {inner}
         </button>
       )}
-      {/* 리본은 미출시(App Store)에만 — "출시 알림 받기"임을 명시(정직 표기). */}
+      {/* 꼬리표는 미출시(App Store)에만 — "출시 알림 받기"임을 명시(정직 표기). 형광 바탕 + 잉크 글자. */}
       {!isLive ? (
         <span
-          className={`pointer-events-none absolute -right-2 -top-2 rotate-6 rounded-full bg-(--color-accent) px-2 py-0.5 font-semibold text-white shadow-(--shadow-card) ${
-            compact ? 'text-[9px]' : 'text-[10px]'
+          className={`pointer-events-none absolute -top-2.5 -right-2 -rotate-3 rounded-[4px] bg-marker px-1.5 py-0.5 font-bold whitespace-nowrap text-ink ${
+            compact ? 'text-[10px]' : 'text-[11px]'
           }`}
         >
           {ribbonText}

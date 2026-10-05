@@ -1,410 +1,446 @@
 @import 'tailwindcss';
-/* Syne — 수치·섹션마커 전용(라틴·숫자). Pretendard(한글)와 공존. */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap');
 
-/* 브랜드 토큰 — 컨셉 "Scan": 스크린샷 더미를 스캔 바가 훑어 라벨링.
-   고정 브랜드색(라벤더·코랄) 유지 + barely-lavender 뉴트럴. var명 보존(컴포넌트 무수정). */
+/*
+ * "형광펜 & 코발트" — docs/design/redesign-2026-10.md 의 웹 해석.
+ * 재료: 종이(paper), 잉크(ink), 코발트 펜(cobalt), 형광펜(marker), 크롭 모서리, 머리카락 구분선.
+ * 형광펜은 배경 전용이고 그 위 글자는 언제나 잉크색이다.
+ */
 @theme {
-  --color-primary: #7c6fe8; /* 라벤더 — 브랜드 액션(CTA·스캔 바·링크) */
-  --color-primary-soft: #eae7fb; /* 라벤더 틴트 패널 */
-  --color-primary-strong: #6459d4; /* CTA hover/pressed */
-  --color-accent: #f2a65a; /* 코랄 — 섹션당 1회 강조("되찾을 수 있는 것") */
-  --color-accent-soft: #fdf0e3;
-  --color-ink: #1c1826; /* Night — 따뜻한 보라-검정 */
-  --color-ink-soft: #5e5777; /* Slate — 본문(바이올렛 그레이) */
-  --color-ink-faint: #a89ebb; /* Mist — 캡션·메타·푸터 */
-  --color-cream: #f6f4fc; /* Quartz — barely-lavender 배경 (var명 유지) */
-  --color-card: #ffffff;
-  --color-line: #e4dff4; /* 라벤더 틴트 구분선 */
-  --font-sans: 'Pretendard Variable', Pretendard, -apple-system,
-    BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif;
-  /* 수치·섹션마커 — Syne(기하학 굵은 서체). 라틴·숫자 전용, 한글은 Pretendard 폴백 */
-  --font-display: 'Syne', 'Pretendard Variable', sans-serif;
-  /* 데이터 보이스 — OCR 라벨·타임스탬프(시스템 모노, 무설치) */
-  --font-mono: 'SFMono-Regular', ui-monospace, 'SF Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  --color-paper: #f2f3f0;
+  --color-surface: #fafaf8;
+  --color-elevated: #ffffff;
+  --color-muted: #e6e8e3;
+  --color-ink: #0d0e12;
+  --color-ink-2: #565a63;
+  --color-cobalt: #1530ff;
+  --color-cobalt-strong: #0e22cc;
+  --color-cobalt-soft: #dce0ff;
+  --color-marker: #e8ff3a;
+  --color-rule: rgba(13, 14, 18, 0.1);
+  --color-rule-strong: rgba(13, 14, 18, 0.22);
+  --color-danger: #b42318;
+  --color-success: #0b6e3b;
+  /* 잉크 바탕(마지막 섹션·모바일 바) 위 보조색 */
+  --color-paper-2: #9ea2ac;
+  --color-cobalt-on-ink: #7083ff;
+  --color-rule-on-ink: rgba(242, 243, 240, 0.14);
 
-  /* 그림자·라운드 표준 (전 섹션 통일) */
-  --shadow-card: 0 1px 2px rgba(28, 24, 38, 0.05),
-    0 8px 24px rgba(28, 24, 38, 0.07);
-  --shadow-float: 0 12px 40px rgba(124, 111, 232, 0.14); /* 라벤더 글로우 */
-  --shadow-scan: 0 0 16px 6px rgba(124, 111, 232, 0.35); /* 스캔 바 글로우 */
-  --radius-block: 20px; /* 28→20: 덜 부드러움, 덜 템플릿 */
+  --font-sans: 'Wanted Sans Variable', 'Wanted Sans', -apple-system,
+    BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Segoe UI',
+    sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, 'SF Mono', Menlo,
+    monospace;
 
-  /* 모션 토큰 — 앱 디자인시스템 §7 그대로 이식 */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* 표준 진입 */
-  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1); /* 강조 진입 */
-  --ease-decel: cubic-bezier(0.16, 1, 0.3, 1); /* decel — reveal 기본 */
-  --dur-fast: 150ms;
-  --dur-base: 220ms;
-  --dur-slow: 320ms;
-  --dur-lazy: 520ms;
-  --stagger: 80ms; /* 앱 "5줄 리포트 카드" 80ms 간격과 동일 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decel: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-scan: cubic-bezier(0.4, 0, 0.6, 1);
 }
 
 html {
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 body {
-  background: var(--color-cream);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* 가로 오버플로 방지: 장식 요소(글로우 blob·회전 폰·9닷 bleed)나 긴 번역 문자열이
-     좁은 화면에서 페이지 폭을 넘겨도 가로 스크롤/우측 잘림이 생기지 않게 클립한다.
-     overflow-x:hidden 대신 clip을 쓰는 이유: hidden은 스크롤 컨테이너를 만들어
-     sticky 헤더를 깨뜨릴 수 있으나 clip은 그렇지 않다. */
+  font-feature-settings: 'ss01' 0;
+  /* 장식(뒤에 겹친 화면 등)이 좁은 화면 폭을 넘어도 가로 스크롤이 생기지 않게 한다.
+     hidden 대신 clip — sticky 헤더가 깨지지 않는다. */
   overflow-x: clip;
 }
 
-/* ── 포커스 가시성 — 키보드 접근 시 코랄 아웃라인 ─────────────── */
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: 4px;
+/* 한국어는 단어 단위 줄바꿈. 영어 페이지는 lang="en" 래퍼가 이 규칙을 끊는다. */
+:lang(ko) {
+  word-break: keep-all;
+}
+:lang(en) {
+  word-break: normal;
 }
 
-/* ── Reveal 엔진 (IntersectionObserver가 data-revealed 토글) ──── */
-[data-reveal] {
-  opacity: 0;
-  transition: opacity var(--dur-slow) var(--ease-decel),
-    transform var(--dur-slow) var(--ease-decel),
-    filter var(--dur-slow) var(--ease-decel);
-  transition-delay: calc(var(--stagger, 80ms) * var(--i, 0));
-  will-change: opacity, transform;
-}
-[data-reveal='fade-up'] {
-  transform: translateY(24px);
-}
-[data-reveal='scale-in'] {
-  transform: scale(0.94);
-}
-[data-reveal='blur-in'] {
-  filter: blur(8px);
-}
-[data-revealed='true'] {
-  opacity: 1;
-  transform: none;
-  filter: none;
-  /* reveal 완료 후 레이어 승격 해제(메모리·합성 비용 절감). */
-  will-change: auto;
+::selection {
+  background: var(--color-marker);
+  color: var(--color-ink);
 }
 
-/* ── keyframes ─────────────────────────────────────────────── */
-@keyframes hint-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
+/* 키보드 포커스 — 종이 위에선 코발트, 잉크 위에선 형광 링.
+   base 층에 두어 입력칸처럼 자체 포커스 표시(밑줄 색)가 있는 요소는 유틸리티로 덮어쓸 수 있게 한다. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 3px;
+    border-radius: 4px;
   }
-  50% {
-    transform: translateY(6px);
-  }
-}
-@keyframes idle-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-@keyframes dot-settle {
-  from {
-    opacity: 0.4;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@keyframes coral-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 168, 12, 0.5);
-  }
-  100% {
-    box-shadow: 0 0 0 12px rgba(239, 168, 12, 0);
+  .on-ink :focus-visible {
+    outline-color: var(--color-marker);
   }
 }
 
-/* 스크롤 힌트 셰브론 — Hero 하단, 상시 bounce */
-.hint-bounce {
-  animation: hint-bounce 1600ms var(--ease-standard) infinite;
+/* 페이지 공통 폭·여백 — 360px에서 20px, 데스크톱에서 48px 여백 */
+.wrap {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 78rem;
+  padding-inline: 1.25rem;
 }
-/* CTA idle float — FinalCta 배지 */
-.idle-float {
-  animation: idle-float 3000ms var(--ease-standard) infinite;
+@media (min-width: 40rem) {
+  .wrap {
+    padding-inline: 2rem;
+  }
 }
-/* 코랄 펄스 1회 */
-.coral-pulse {
-  animation: coral-pulse 900ms var(--ease-standard) 1;
+@media (min-width: 64rem) {
+  .wrap {
+    padding-inline: 3rem;
+  }
 }
 
-/* 코랄 밑줄 좌→우 grow */
-.coral-underline {
-  background-image: linear-gradient(
-    to right,
-    var(--color-accent),
-    var(--color-accent)
-  );
+/* ── 타입 ───────────────────────────────────────────── */
+.t-display {
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+:lang(ko) .t-display,
+.t-display:lang(ko) {
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+}
+.t-title {
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1.14;
+}
+:lang(ko) .t-title {
+  letter-spacing: -0.03em;
+  line-height: 1.22;
+}
+.t-eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-2);
+  text-wrap: balance;
+}
+/* 머리표에 한글이 섞이면 mono를 쓰지 않는다(디자인 명세 §3). */
+.t-eyebrow:lang(ko) {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 형광펜 <Marked> ─────────────────────────────────
+   줄이 바뀌어도 줄마다 그어지도록 배경+clone으로 칠한다. 글자 높이의 약 70%, 아래쪽 정렬. */
+.marked {
+  background-image: linear-gradient(var(--color-marker), var(--color-marker));
   background-repeat: no-repeat;
-  background-position: 0 100%;
-  background-size: 0% 0.5em;
-  transition: background-size 1000ms var(--ease-standard) 300ms;
-  padding-bottom: 0.04em;
+  background-size: 100% 0.62em;
+  background-position: 0 88%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: var(--color-ink);
+  padding-inline: 0.06em;
+  margin-inline: -0.06em;
 }
-[data-revealed='true'] .coral-underline,
-.coral-underline[data-revealed='true'] {
-  background-size: 100% 0.5em;
+.marked[data-draw] {
+  background-size: 0% 0.62em;
+  animation: marker-draw 520ms var(--ease-decel) forwards;
+  animation-delay: var(--draw-delay, 0ms);
+}
+@keyframes marker-draw {
+  to {
+    background-size: 100% 0.62em;
+  }
 }
 
-/* ── 시그니처: 스캔 바 (Hero) ───────────────────────────────────
-   스크린샷 타일 더미 위를 라벤더 선이 위→아래로 훑고 지나가며,
-   지나간 행의 타일이 선명해지고 OCR 라벨 칩이 떠오른다.
-   JS 없이 CSS만: 스캔 바는 top 0→100% 스윕, 타일/칩은 행별
-   animation-delay(--resolve-delay)로 "스캔 통과 시점"에 깨어난다. */
-@keyframes scan-sweep {
-  from {
-    top: 0%;
-  }
-  to {
-    top: 100%;
-  }
+/* ── 크롭 모서리 ───────────────────────────────────── */
+.crop {
+  position: relative;
+  --crop-len: 18px;
+  --crop-w: 2px;
+  --crop-out: 10px;
+  --crop-color: var(--color-ink);
 }
-@keyframes tile-resolve {
-  to {
-    filter: blur(0) saturate(1);
-    opacity: 1;
-  }
-}
-@keyframes chip-in {
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.scan-bar {
+.crop > .crop-c {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
-  background: var(--color-primary);
-  box-shadow: var(--shadow-scan);
-  animation: scan-sweep 1600ms var(--ease-standard) 300ms forwards;
+  width: var(--crop-len);
+  height: var(--crop-len);
+  border: 0 solid var(--crop-color);
+  pointer-events: none;
 }
-.scan-tile {
-  filter: blur(9px) saturate(0.2);
-  opacity: 0.85;
-  animation: tile-resolve 320ms var(--ease-standard) both;
-  animation-delay: var(--resolve-delay, 0ms);
+.crop > .crop-tl {
+  top: calc(var(--crop-out) * -1);
+  left: calc(var(--crop-out) * -1);
+  border-top-width: var(--crop-w);
+  border-left-width: var(--crop-w);
 }
-.ocr-chip {
-  opacity: 0;
-  transform: scale(0.82);
-  animation: chip-in 200ms var(--ease-standard) both;
-  animation-delay: var(--resolve-delay, 0ms);
+.crop > .crop-tr {
+  top: calc(var(--crop-out) * -1);
+  right: calc(var(--crop-out) * -1);
+  border-top-width: var(--crop-w);
+  border-right-width: var(--crop-w);
 }
-/* reduced-motion: 스캔 생략, 모든 타일 즉시 선명+라벨 */
-@media (prefers-reduced-motion: reduce) {
-  .scan-bar {
-    display: none;
-  }
-  .scan-tile {
-    filter: none !important;
-    opacity: 1 !important;
-    animation: none !important;
-  }
-  .ocr-chip {
-    opacity: 1 !important;
-    transform: none !important;
-    animation: none !important;
-  }
+.crop > .crop-bl {
+  bottom: calc(var(--crop-out) * -1);
+  left: calc(var(--crop-out) * -1);
+  border-bottom-width: var(--crop-w);
+  border-left-width: var(--crop-w);
+}
+.crop > .crop-br {
+  bottom: calc(var(--crop-out) * -1);
+  right: calc(var(--crop-out) * -1);
+  border-bottom-width: var(--crop-w);
+  border-right-width: var(--crop-w);
 }
 
-/* 9닷 정렬 모션 — 각 점이 작게→제자리 settle */
-.dot-settle {
-  animation: dot-settle 420ms var(--ease-emphasized) both;
+/* ── 시그니처: 스캔 ───────────────────────────────────
+   히어로 화면 위로 코발트 선이 위→아래로 훑고(1.4s), 선이 지나간 줄에 형광펜이 차례로 그어진다.
+   마지막으로 헤드라인의 핵심 구절에 형광펜이 그어지며 끝난다(한 번만). */
+.scan-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-rule);
 }
-
-/* StepFlow 연결선 "그리기" — reveal 시 좌→우(가로)·위→아래(세로)로 그려짐.
-   스케일 트랜지션으로 점선 div가 그려지는 느낌. transform만 변경(리플로우 0). */
-.step-connector {
-  transform: scaleX(0);
+.scan-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.scan-mark {
+  position: absolute;
+  background: var(--color-marker);
+  mix-blend-mode: multiply;
+  border-radius: 2px;
   transform-origin: left center;
-  transition: transform 400ms var(--ease-standard);
-  /* 카드 스태거(80ms*3) 직후 재생되도록 약간 지연. */
-  transition-delay: 320ms;
+  transform: rotate(-1.5deg) scaleX(0);
+  animation: scan-mark-draw 360ms var(--ease-decel) forwards;
+  animation-delay: var(--d, 0ms);
 }
-.step-connector[data-drawn='true'] {
-  transform: scaleX(1);
+@keyframes scan-mark-draw {
+  to {
+    transform: rotate(-1.5deg) scaleX(1);
+  }
 }
-.step-connector-v {
-  transform: scaleY(0);
-  transform-origin: top center;
-  transition: transform 400ms var(--ease-standard);
-  transition-delay: 240ms;
-}
-.step-connector-v[data-drawn='true'] {
-  transform: scaleY(1);
-}
-
-/* Features 폰 위 기능별 하이라이트 오버레이 — 두 레이어 opacity 교차(crossfade).
-   key 토글이 아니라 모든 레이어를 겹쳐두고 active만 opacity:1. */
-.feature-overlay {
+.scan-line {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 16%;
+  border-top: 2px solid var(--color-cobalt);
+  background: linear-gradient(
+    to bottom,
+    rgba(21, 48, 255, 0.12),
+    rgba(21, 48, 255, 0)
+  );
+  pointer-events: none;
   opacity: 0;
-  transition: opacity 220ms var(--ease-standard);
+  animation: scan-sweep 1400ms var(--ease-scan) 300ms forwards;
 }
-.feature-overlay[data-active='true'] {
-  opacity: 1;
+@keyframes scan-sweep {
+  0% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    /* 높이 16% → 625%를 내려가면 프레임 바닥 */
+    transform: translateY(625%);
+  }
 }
 
-/* FAQ <details> 네이티브 아코디언 — grid 높이 트랜지션 */
+/* 첫 화면 밖에서 대기 중(ScanStage) — 화면에 들어오면 속성이 빠지며 처음부터 재생된다. */
+[data-armed] .scan-line,
+[data-armed] .scan-mark {
+  animation-name: none;
+}
+
+/* ── FAQ 아코디언 ─────────────────────────────────── */
 .faq-item summary {
-  cursor: pointer;
   list-style: none;
+  cursor: pointer;
 }
 .faq-item summary::-webkit-details-marker {
   display: none;
 }
-.faq-item .faq-answer {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--dur-base) var(--ease-standard);
+.faq-cross {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
-.faq-item .faq-answer > div {
-  overflow: hidden;
+.faq-cross::before,
+.faq-cross::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  transition: transform 200ms var(--ease-standard);
 }
-.faq-item[open] .faq-answer {
-  grid-template-rows: 1fr;
+.faq-cross::after {
+  transform: rotate(90deg);
 }
-/* Plus(닫힘) / Minus(열림) 토글 — JS 없이 [open] 셀렉터로 전환 */
-.faq-item:not([open]) .faq-minus {
-  display: none;
-}
-.faq-item[open] .faq-plus {
-  display: none;
+.faq-item[open] .faq-cross::after {
+  transform: rotate(0deg);
 }
 
-/* ── reduced-motion — 콘텐츠 100% 표시, 모든 모션 정지 ───────── */
+/* ── 누름: 투명도 대신 살짝 작아진다(앱 PressableScale과 같은 감각) ── */
+.press {
+  transition: transform 160ms var(--ease-standard),
+    background-color 160ms var(--ease-standard),
+    color 160ms var(--ease-standard);
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+/* ── 정책 문서(가독성 우선의 문서형) ─────────────────── */
+.legal {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--color-ink);
+}
+.legal h1 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  margin: 0 0 1.5rem;
+}
+.legal h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+  margin: 3rem 0 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-rule);
+}
+/* 문서의 '---' 바로 뒤 제목은 구분선이 겹치지 않게 */
+.legal hr + h2 {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+.legal h3 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  margin: 1.75rem 0 0.5rem;
+}
+.legal p {
+  margin: 0.75rem 0;
+  color: #2a2c33;
+}
+.legal ul,
+.legal ol {
+  margin: 0.75rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.legal ol {
+  list-style: decimal;
+}
+.legal ul ul {
+  margin: 0.25rem 0;
+  list-style: circle;
+}
+.legal li {
+  margin: 0.3rem 0;
+  color: #2a2c33;
+}
+.legal li::marker {
+  color: var(--color-ink-2);
+}
+.legal hr {
+  border: 0;
+  border-top: 1px solid var(--color-rule);
+  margin: 2.5rem 0;
+}
+.legal a {
+  color: var(--color-cobalt);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  word-break: break-all;
+}
+.legal strong {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.legal code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--color-muted);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+/* 넓은 표는 표 안에서만 가로로 밀리고 페이지는 밀리지 않는다. */
+.legal .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 1.25rem 0;
+  border-top: 2px solid var(--color-ink);
+}
+.legal table {
+  width: 100%;
+  min-width: 36rem;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.legal th,
+.legal td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.65rem 0.75rem 0.65rem 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.legal th {
+  font-weight: 700;
+  border-bottom-color: var(--color-rule-strong);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  [data-reveal] {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-    filter: none !important;
+  .scan-line {
+    display: none;
   }
-  .hint-bounce,
-  .idle-float,
-  .coral-pulse,
-  .dot-settle {
-    animation: none !important;
+  .scan-mark {
+    animation: none;
+    transform: rotate(-1.5deg) scaleX(1);
   }
-  .coral-underline {
-    background-size: 100% 0.5em !important;
-    transition: none !important;
+  .marked[data-draw] {
+    animation: none;
+    background-size: 100% 0.62em;
   }
-  .faq-item .faq-answer {
-    transition: none !important;
+  .press,
+  .faq-cross::before,
+  .faq-cross::after {
+    transition: none;
   }
-  /* StepFlow 연결선 — 즉시 완성 상태(그리기 모션 생략). */
-  .step-connector,
-  .step-connector-v {
-    transform: none !important;
-    transition: none !important;
+  .press:active {
+    transform: none;
   }
-  /* Features 폰 오버레이 — 즉시 표시(crossfade 생략). */
-  .feature-overlay {
-    transition: none !important;
-  }
-}
-
-/* 정책 문서(prose) — md 변환 HTML에 적용 */
-.legal h1 {
-  font-size: 1.7rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.35;
-  margin: 0 0 0.6em;
-}
-.legal h2 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin: 2.2em 0 0.6em;
-}
-.legal h3 {
-  font-size: 1.02rem;
-  font-weight: 600;
-  margin: 1.6em 0 0.5em;
-}
-.legal p,
-.legal li {
-  font-size: 0.98rem;
-  line-height: 1.75;
-  color: var(--color-ink);
-}
-.legal p {
-  margin: 0.5em 0;
-}
-.legal ul {
-  list-style: disc;
-  padding-left: 1.3em;
-  margin: 0.6em 0;
-}
-.legal ul ul {
-  list-style: circle;
-  margin: 0.25em 0;
-}
-.legal hr {
-  border: none;
-  border-top: 1px solid var(--color-line);
-  margin: 2em 0;
-}
-.legal a {
-  color: var(--color-primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.legal code {
-  background: var(--color-primary-soft);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.9em;
-}
-.legal strong {
-  font-weight: 700;
-}
-.legal .table-wrap {
-  overflow-x: auto;
-  margin: 1em 0;
-  border: 1px solid var(--color-line);
-  border-radius: 10px;
-  background: var(--color-card);
-}
-.legal table {
-  border-collapse: collapse;
-  width: 100%;
-  min-width: 640px;
-  font-size: 0.88rem;
-}
-.legal th,
-.legal td {
-  border-bottom: 1px solid var(--color-line);
-  padding: 10px 12px;
-  text-align: left;
-  vertical-align: top;
-  line-height: 1.6;
-}
-.legal th {
-  background: #f6f1fb;
-  font-weight: 600;
-}
-.legal tr:last-child td {
-  border-bottom: none;
 }

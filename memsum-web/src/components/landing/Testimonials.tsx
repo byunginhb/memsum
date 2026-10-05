@@ -1,57 +1,36 @@
-import { Quote } from 'lucide-react';
-
 import type { LandingCopy } from '@/lib/landing-copy';
 
-import { Reveal, RevealGroup } from './Reveal';
-
 /**
- * 미스방지 서사 후기 섹션.
- * "정리 자랑"이 아닌 "놓칠 뻔한 걸 막았다" 톤의 경험 예시 카드 3장.
- * 실제 후기 미확보 구간이므로 각 카드에 "경험 예시" 배지를 노출한다(허위 후기 0).
- * 실제 사용자 후기 확보 후 isExample:false 항목으로 교체·혼용할 수 있다.
+ * 미스 방지 서사 — 세 단을 세로 머리카락 선으로 나눈다.
+ * 실제 후기가 아닌 항목(isExample)은 "경험 예시" 꼬리표를 반드시 보인다(허위 후기 정책).
  */
 export function Testimonials({ copy }: { copy: LandingCopy }) {
   const c = copy.testimonials;
-  const bk = copy.isKorean ? 'break-keep' : '';
 
   return (
-    <section aria-labelledby="testimonials-title" className="px-5 sm:px-6">
-      <div className="mx-auto w-full max-w-5xl">
-        <Reveal
-          as="h2"
-          id="testimonials-title"
-          className={`text-center text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
-        >
+    <section aria-labelledby="testimonials-title" className="border-y border-rule bg-surface">
+      <div className="wrap py-20 sm:py-24">
+        <h2 id="testimonials-title" className="t-title max-w-3xl text-[clamp(1.875rem,4.4vw,3rem)]">
           {c.title}
-        </Reveal>
-
-        <RevealGroup stagger={80} className="mt-10 grid gap-5 sm:grid-cols-3">
+        </h2>
+        <ul className="mt-12 grid border-t-2 border-ink md:grid-cols-3">
           {c.items.map((item) => (
-            <Reveal
-              key={item.quote}
-              className="flex flex-col rounded-(--radius-block) border border-(--color-line) bg-(--color-card) p-6 shadow-(--shadow-card)"
+            <li
+              key={item.context}
+              className="flex flex-col border-b border-rule py-8 md:border-b-0 md:border-l md:px-8 md:py-10 md:first:border-l-0 md:first:pl-0"
             >
-              <Quote
-                size={20}
-                aria-hidden="true"
-                className="mb-3 shrink-0 text-(--color-primary)"
-              />
-              <p className={`flex-1 text-base leading-relaxed ${bk} text-(--color-ink)`}>
-                {item.quote}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {item.isExample && (
-                  <span className="inline-block rounded-full border border-(--color-line) px-2.5 py-0.5 text-xs font-medium text-(--color-ink-soft)">
-                    {c.exampleBadge}
-                  </span>
-                )}
-                <span className={`text-xs text-(--color-ink-faint) ${bk}`}>
-                  {item.context}
+              {item.isExample ? (
+                <span className="self-start rounded-[4px] border border-rule-strong px-2 py-0.5 text-[12px] font-semibold text-ink-2">
+                  {c.exampleBadge}
                 </span>
-              </div>
-            </Reveal>
+              ) : null}
+              <blockquote className="mt-5 flex-1">
+                <p className="text-[18px] leading-[1.6] font-semibold tracking-[-0.015em]">{item.quote}</p>
+              </blockquote>
+              <p className="t-eyebrow mt-6">{item.context}</p>
+            </li>
           ))}
-        </RevealGroup>
+        </ul>
       </div>
     </section>
   );

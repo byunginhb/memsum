@@ -1,65 +1,33 @@
 import type { LandingCopy } from '@/lib/landing-copy';
 
-import { Reveal, RevealGroup } from './Reveal';
-
 /**
- * S3 작동 방식 — 컨셉 "Scan": 3열 패널 대신 가로 타임라인.
- * 페이지(Quartz) 위에 얇은 상단선이 지나고, 각 스텝이 그 선에서 아래로 걸린다.
- * 각 카드 뒤에는 Syne 초대형 고스트 숫자(01/02/03)가 은은히 깔린다.
- * 카피는 로케일 사전(`copy.steps`)에서 주입.
+ * 작동 순서 — 실제로 순서가 있는 단계라 01·02·03 번호를 쓴다(구조 장치는 의미 있을 때만).
+ * 세 단은 카드 없이 머리카락 세로 구분선으로만 나눈다. 모바일에선 가로 구분선으로 쌓인다.
  */
 export function StepFlow({ copy }: { copy: LandingCopy }) {
   const c = copy.steps;
-  const bk = copy.isKorean ? 'break-keep' : '';
 
   return (
-    <section
-      id="how-it-works"
-      aria-labelledby="step-title"
-      className="scroll-mt-20 px-5 py-20 sm:px-6 sm:py-24"
-    >
-      <div className="mx-auto w-full max-w-6xl">
-        <Reveal
-          as="h2"
-          id="step-title"
-          className={`text-2xl font-bold tracking-tight ${bk} sm:text-4xl`}
-        >
-          {c.title}
-        </Reveal>
-
-        {/* 가로 타임라인 — 상단 얇은 선에서 스텝이 아래로 걸린다 */}
-        <RevealGroup className="relative mt-14 grid gap-10 border-t border-(--color-line) md:grid-cols-3 md:gap-6">
-          {c.items.map((step, index) => (
-            <Reveal key={step.title} className="relative pt-8">
-              {/* 초대형 고스트 숫자 — Syne, 카드 뒤 은은히 */}
-              <span
-                aria-hidden="true"
-                className="font-display pointer-events-none absolute -top-1 right-1 select-none text-[6.5rem] font-extrabold leading-none"
-                style={{
-                  color:
-                    'color-mix(in srgb, var(--color-primary) 8%, transparent)',
-                }}
-              >
-                0{index + 1}
-              </span>
-              {/* 타임라인 위 라벤더 틱 */}
-              <span
-                aria-hidden="true"
-                className="absolute -top-[5px] left-0 h-2.5 w-2.5 rounded-full bg-(--color-primary)"
-              />
-              <p className="font-mono text-[11px] font-semibold tracking-[0.2em] text-(--color-ink-faint)">
-                STEP 0{index + 1}
-              </p>
-              <h3 className={`relative mt-2 text-lg font-bold tracking-tight ${bk}`}>
-                {step.title}
-              </h3>
-              <p className={`relative mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}>
-                {step.body}
-              </p>
-            </Reveal>
-          ))}
-        </RevealGroup>
-      </div>
+    <section id="how-it-works" aria-labelledby="steps-title" className="wrap py-20 sm:py-24">
+      <h2 id="steps-title" className="t-title text-[clamp(1.875rem,4.4vw,3rem)]">
+        {c.title}
+      </h2>
+      <ol className="mt-12 grid border-t-2 border-ink md:grid-cols-3">
+        {c.items.map((step, i) => (
+          <li
+            key={step.title}
+            className="border-b border-rule py-8 md:border-b-0 md:border-l md:px-8 md:py-10 md:first:border-l-0 md:first:pl-0"
+          >
+            <span className="t-mono block text-[13px] text-cobalt">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <h3 className="mt-6 text-[clamp(1.375rem,2.4vw,1.75rem)] leading-[1.25] font-black tracking-[-0.03em]">
+              {step.title}
+            </h3>
+            <p className="mt-3 text-[16px] leading-[1.7] text-ink-2">{step.body}</p>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

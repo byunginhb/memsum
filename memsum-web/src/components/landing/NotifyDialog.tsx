@@ -26,7 +26,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
   const c = copy.notifyDialog;
-  const bk = copy.isKorean ? 'break-keep' : '';
+  const lang = copy.isKorean ? 'ko' : 'en';
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -162,7 +162,8 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
   return createPortal(
     <div
       ref={rootRef}
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      lang={lang}
+      className="fixed inset-0 z-[60] flex items-end justify-center p-3 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="notify-title"
@@ -174,43 +175,43 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
         type="button"
         aria-label={c.closeAria}
         tabIndex={-1}
-        className="absolute inset-0 bg-(--color-ink)/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-ink/45"
         onClick={onClose}
       />
       <div
         ref={dialogRef}
-        className="relative w-full max-w-md rounded-(--radius-block) border border-(--color-line) bg-(--color-card) p-7 shadow-(--shadow-float)"
+        className="relative w-full max-w-md rounded-[24px] bg-elevated p-6 shadow-[0_24px_60px_rgba(13,14,18,0.25)] sm:p-8"
       >
         <button
           type="button"
           aria-label={c.closeAria}
           onClick={onClose}
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-(--color-ink-soft) transition-colors hover:bg-(--color-primary-soft) hover:text-(--color-ink)"
+          className="press absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full text-ink-2 hover:bg-muted hover:text-ink"
         >
           <X size={18} aria-hidden="true" />
         </button>
 
         {submitted ? (
-          <div className="py-4 text-center">
-            <span className="coral-pulse mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">
-              <Check size={24} aria-hidden="true" />
+          <div className="pt-2">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-marker text-ink">
+              <Check size={22} strokeWidth={2.5} aria-hidden="true" />
             </span>
             <h2
               id="notify-title"
-              className={`mt-4 text-xl font-bold tracking-tight ${bk}`}
+              className="t-title mt-5 pr-8 text-[22px]"
             >
               {c.successTitle}
             </h2>
             <p
               id="notify-desc"
-              className={`mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}
+              className="mt-3 text-[15px] leading-relaxed text-ink-2"
             >
               {c.successDescription}
             </p>
             <button
               type="button"
               onClick={onClose}
-              className="mt-6 w-full rounded-full bg-(--color-primary) px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-strong)"
+              className="press mt-7 h-12 w-full rounded-full bg-cobalt px-6 text-[15px] font-bold text-white hover:bg-cobalt-strong"
             >
               {c.close}
             </button>
@@ -219,13 +220,13 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
           <form onSubmit={handleSubmit} noValidate>
             <h2
               id="notify-title"
-              className={`text-xl font-bold tracking-tight ${bk}`}
+              className="t-title pr-10 text-[22px]"
             >
               {c.formTitle}
             </h2>
             <p
               id="notify-desc"
-              className={`mt-2 text-sm leading-relaxed ${bk} text-(--color-ink-soft)`}
+              className="mt-3 text-[15px] leading-relaxed text-ink-2"
             >
               {c.formDescription}
             </p>
@@ -255,17 +256,17 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
               disabled={submitting}
               aria-invalid={error ? 'true' : 'false'}
               aria-describedby={error ? 'notify-error' : undefined}
-              className="mt-5 w-full rounded-2xl border border-(--color-line) bg-(--color-cream) px-4 py-3 text-base text-(--color-ink) outline-none transition-colors focus:border-(--color-primary) disabled:opacity-60"
+              className="mt-6 h-12 w-full rounded-none border-0 border-b-2 border-rule-strong bg-transparent px-0 text-[17px] text-ink outline-none transition-colors placeholder:text-ink-2/60 focus:border-cobalt focus-visible:outline-none disabled:opacity-60 aria-[invalid=true]:border-danger"
             />
             {error ? (
-              <p id="notify-error" className={`mt-2 text-sm ${bk}`}>
-                <span className="text-(--color-accent)">{error}</span>
+              <p id="notify-error" className="mt-2 text-[14px] leading-relaxed">
+                <span className="font-semibold text-danger">{error}</span>
                 {fallback ? (
-                  <span className="text-(--color-ink-soft)">
+                  <span className="text-ink-2">
                     {' '}
                     {errorHelpBefore}
                     <a
-                      className="font-semibold text-(--color-primary) underline underline-offset-2"
+                      className="font-semibold text-cobalt underline underline-offset-2"
                       href={mailtoHref}
                     >
                       {SUPPORT_EMAIL}
@@ -278,11 +279,11 @@ export function NotifyDialog({ open, onClose, copy }: NotifyDialogProps) {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-4 w-full rounded-full bg-(--color-primary) px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-(--color-primary-strong) active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="press mt-6 h-12 w-full rounded-full bg-cobalt px-6 text-[15px] font-bold text-white hover:bg-cobalt-strong disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? c.submitting : c.submit}
             </button>
-            <p className={`mt-3 text-center text-xs leading-relaxed ${bk} text-(--color-ink-faint)`}>
+            <p className="mt-4 text-[12.5px] leading-relaxed text-ink-2">
               {c.promise}
             </p>
           </form>

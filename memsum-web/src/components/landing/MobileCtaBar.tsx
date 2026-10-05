@@ -6,10 +6,12 @@ import type { LandingCopy } from '@/lib/landing-copy';
 
 import { StoreBadge } from './StoreBadge';
 
+/** 히어로를 벗어났다고 보는 스크롤 비율(뷰포트 높이 대비). */
+const SHOW_AFTER_VIEWPORT = 0.8;
+
 /**
- * 모바일 상시 전환 유도 바.
- * 히어로를 벗어나면(스크롤 > 80vh) slide-up 등장. safe-area 패딩.
- * 모바일 전용(lg:hidden). 컴팩트 배지 리본은 가장 좁아 ribbonCompact를 쓴다.
+ * 모바일 상시 전환 유도 바 — 앱 탭바처럼 바닥에서 떨어진 잉크색 알약.
+ * 히어로를 벗어나면 아래에서 올라온다. 모바일 전용(lg:hidden).
  */
 export function MobileCtaBar({ copy }: { copy: LandingCopy }) {
   const [visible, setVisible] = useState(false);
@@ -20,7 +22,7 @@ export function MobileCtaBar({ copy }: { copy: LandingCopy }) {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
-        setVisible(window.scrollY > window.innerHeight * 0.8);
+        setVisible(window.scrollY > window.innerHeight * SHOW_AFTER_VIEWPORT);
         ticking = false;
       });
     };
@@ -31,14 +33,17 @@ export function MobileCtaBar({ copy }: { copy: LandingCopy }) {
 
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-40 border-t border-(--color-line) bg-(--color-card)/90 backdrop-blur-md transition-transform duration-300 ease-(--ease-standard) lg:hidden ${
-        visible ? 'translate-y-0' : 'translate-y-full'
+      className={`on-ink fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 transition-transform duration-300 ease-(--ease-standard) motion-reduce:transition-none lg:hidden ${
+        visible ? 'translate-y-0' : 'pointer-events-none translate-y-[140%]'
       }`}
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+      aria-hidden={visible ? undefined : true}
+      inert={visible ? undefined : true}
     >
-      <div className="flex items-center justify-center gap-3 px-4 py-3">
-        <StoreBadge store="appstore" copy={copy} compact />
-        <StoreBadge store="googleplay" copy={copy} compact />
+      <div className="flex items-center gap-1 rounded-full bg-ink p-1.5 pr-3 pl-3 shadow-[0_10px_30px_rgba(13,14,18,0.28)]">
+        <StoreBadge store="googleplay" copy={copy} compact tone="bare" />
+        <span aria-hidden="true" className="h-6 w-px bg-rule-on-ink" />
+        <StoreBadge store="appstore" copy={copy} compact tone="bare" />
       </div>
     </div>
   );

@@ -8,35 +8,31 @@ import { useNotify } from './NotifyProvider';
 
 type NotifyButtonProps = {
   copy: LandingCopy;
-  /** primary 보라 패널(FinalCta) 위에서는 흰색 버튼으로 대비를 준다. */
-  onPurple?: boolean;
+  /** 잉크 섹션 위에서는 코발트 대신 밝은 코발트 글자 링크형으로. */
+  onInk?: boolean;
   className?: string;
 };
 
 /**
- * 출시 알림 신청 모달을 여는 명시적 CTA 버튼.
- * 스토어 배지를 누르지 않아도 신청할 수 있도록 별도로 제공한다
- * (StoreBadge와 동일한 모달을 useNotify로 연다).
+ * 출시 알림 신청 모달을 여는 명시적 CTA.
+ * 스토어 배지를 누르지 않아도 신청할 수 있도록 별도로 제공한다(StoreBadge와 같은 모달).
+ * 다운로드(Google Play)가 주 행동이라 이 버튼은 밑줄 링크형 보조 행동으로 둔다.
  */
-export function NotifyButton({
-  copy,
-  onPurple = false,
-  className,
-}: NotifyButtonProps) {
+export function NotifyButton({ copy, onInk = false, className }: NotifyButtonProps) {
   const { openNotify } = useNotify();
 
   return (
     <button
       type="button"
       onClick={openNotify}
-      className={`group inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-semibold shadow-(--shadow-card) transition-all duration-200 ease-(--ease-standard) hover:-translate-y-1 hover:shadow-(--shadow-float) active:scale-[0.98] ${
-        onPurple
-          ? 'bg-white text-(--color-primary) hover:bg-white'
-          : 'bg-(--color-primary) text-white hover:bg-(--color-primary-strong)'
+      className={`press group inline-flex min-h-11 items-center gap-2 text-[15px] font-bold ${
+        onInk ? 'text-cobalt-on-ink' : 'text-cobalt'
       } ${className ?? ''}`}
     >
-      <Bell size={18} aria-hidden="true" />
-      {copy.notifyDialog.openCta}
+      <Bell size={17} strokeWidth={2.25} aria-hidden="true" />
+      <span className="underline decoration-2 underline-offset-[6px] decoration-current/30 group-hover:decoration-current">
+        {copy.notifyDialog.openCta}
+      </span>
     </button>
   );
 }

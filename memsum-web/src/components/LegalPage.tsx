@@ -24,9 +24,10 @@ export function LegalPage({
   return (
     <>
       <SiteHeader lang={lang} />
-      <main className="mx-auto w-full max-w-3xl px-5 pt-6">
+      {/* 문서형: 한 단, 읽기 좋은 줄 길이(약 68자), 넉넉한 행간. 장식 없음. */}
+      <main lang={lang} className="wrap pt-10 pb-24 sm:pt-16">
         <article
-          className="legal"
+          className="legal mx-auto max-w-[44rem]"
           // 신뢰 가능한 자체 md를 escape 변환한 HTML — 외부 입력 없음.
           dangerouslySetInnerHTML={{ __html: html }}
         />
