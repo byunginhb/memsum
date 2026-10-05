@@ -34,6 +34,7 @@ def main():
     ap.add_argument("--store-dir", default="docs/store")
     ap.add_argument("--aab")
     ap.add_argument("--mapping")
+    ap.add_argument("--version-code", type=int, help="이미 올린 번들(예: 내부 테스트)을 --track 으로 승격. --aab 와 함께 쓰지 않는다")
     ap.add_argument("--release-name")
     # why internal 기본: 기본값이 production이면 --track을 빠뜨린 검증용 실행이 --commit 한 번에 전체 배포된다.
     ap.add_argument("--track", default="internal")
@@ -58,6 +59,7 @@ def main():
     eid = e.insert(packageName=P, body={}).execute()["id"]
     print("edit", eid)
     try:
+        vc = None
         if a.aab:
             req = e.bundles().upload(packageName=P, editId=eid, media_body=MediaFileUpload(a.aab, mimetype="application/octet-stream", resumable=True, chunksize=8 << 20))
             resp = None
@@ -69,6 +71,10 @@ def main():
             if a.mapping:
                 e.deobfuscationfiles().upload(packageName=P, editId=eid, apkVersionCode=vc, deobfuscationFileType="proguard",
                                               media_body=MediaFileUpload(a.mapping, mimetype="application/octet-stream", resumable=True, chunksize=8 << 20)).execute()
+        elif a.version_code:
+            vc = a.version_code
+            print("승격할 versionCode", vc)
+        if vc is not None:
             rel = {"name": a.release_name or str(vc), "versionCodes": [str(vc)], "status": "completed"}
             if a.user_fraction is not None:
                 rel["status"] = "inProgress"
@@ -76,7 +82,7 @@ def main():
             if notes: rel["releaseNotes"] = notes
             e.tracks().update(packageName=P, editId=eid, track=a.track, body={"track": a.track, "releases": [rel]}).execute()
             print(f"{a.track} 릴리스 {rel['name']} ({rel['status']}{', ' + str(a.user_fraction) if a.user_fraction is not None else ''})")
-        elif notes:
+        elif notes:  # 번들 없이 출시 노트만 갱신
             t = e.tracks().get(packageName=P, editId=eid, track=a.track).execute()
             rels = t.get("releases", [])
             if rels:

@@ -54,3 +54,7 @@ coverage/
 # 하네스 런타임 상태 (커밋 제외)
 .claude/
 .omc/
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
