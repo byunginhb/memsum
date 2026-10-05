@@ -1,3 +1,4 @@
+import { RevealText } from '@/components/brand/RevealText';
 import type { LandingCopy } from '@/lib/landing-copy';
 
 /**
@@ -8,13 +9,13 @@ export function AudienceSection({ copy }: { copy: LandingCopy }) {
   const c = copy.audience;
 
   return (
-    <section aria-labelledby="audience-title" className="wrap py-20 sm:py-24">
-      <h2 id="audience-title" className="t-title max-w-3xl text-[clamp(1.875rem,4.4vw,3rem)]">
-        {c.title}
+    <section aria-labelledby="audience-title" className="wrap pt-16 pb-24 sm:pt-20 sm:pb-32">
+      <h2 id="audience-title" data-rv="title" className="t-title max-w-3xl text-[clamp(1.875rem,4.4vw,3rem)]">
+        <RevealText text={c.title} />
       </h2>
 
       <div className="mt-12 grid gap-14 lg:grid-cols-12 lg:gap-10">
-        <ul className="border-t-2 border-ink lg:col-span-7">
+        <ul data-rv="stagger" className="border-t-2 border-ink lg:col-span-7">
           {c.items.map((item) => (
             <li
               key={item}
@@ -26,7 +27,7 @@ export function AudienceSection({ copy }: { copy: LandingCopy }) {
           ))}
         </ul>
 
-        <figure className="lg:col-span-5 lg:pt-2">
+        <figure data-rv="" className="lg:col-span-4 lg:col-start-9 lg:self-end [--rv-d:360ms]">
           <p className="t-title text-[clamp(1.5rem,3vw,2.125rem)]">{c.quoteHeadline}</p>
           <p className="mt-5 text-[17px] leading-[1.7] text-ink-2">{c.quoteSub}</p>
         </figure>

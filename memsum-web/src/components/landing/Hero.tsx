@@ -53,7 +53,8 @@ export function Hero({ copy }: { copy: LandingCopy }) {
   const boxes = homeScanBoxes(lang);
 
   return (
-    <section aria-labelledby="hero-title" className="relative">
+    // data-fx="exit": 히어로를 벗어나는 동안 0→1 — 두 화면이 다른 속도로 올라가는 미세 시차.
+    <section aria-labelledby="hero-title" className="relative" data-fx="exit" data-fx-tau="90">
       <div className="wrap grid gap-14 pt-8 pb-14 sm:pt-14 lg:grid-cols-12 lg:items-center lg:gap-10 lg:pt-16 lg:pb-20">
         <div className="lg:col-span-7">
           <p className="t-eyebrow">{c.eyebrow}</p>
@@ -94,7 +95,7 @@ export function Hero({ copy }: { copy: LandingCopy }) {
         {/* 스캔 연출 — 홈 화면 위로 스캔. 왼쪽 아래에는 방금 찍은 스크린샷 미리보기처럼 5줄 리포트 화면이 떠 있다. */}
         <div className="relative flex justify-center lg:col-span-5 lg:justify-end">
           <ScanStage className="relative w-[min(74vw,20rem)] lg:mr-2 lg:w-[21rem]">
-            <CropFrame className="[--crop-len:22px] [--crop-out:12px] [--crop-w:2.5px]">
+            <CropFrame className="hero-par-home [--crop-len:22px] [--crop-out:12px] [--crop-w:2.5px]">
               <div className="scan-frame">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -129,7 +130,7 @@ export function Hero({ copy }: { copy: LandingCopy }) {
               alt={c.reportAlt}
               width={SCREEN_SIZE.width}
               height={SCREEN_SIZE.height}
-              className="absolute bottom-[-7%] left-[-9%] w-[36%] rounded-[8px] border-[3px] border-elevated bg-elevated shadow-[0_12px_32px_rgba(13,14,18,0.22)] lg:left-[-16%]"
+              className="hero-par-report absolute bottom-[-7%] left-[-9%] w-[36%] rounded-[8px] border-[3px] border-elevated bg-elevated shadow-[0_12px_32px_rgba(13,14,18,0.22)] lg:left-[-16%]"
             />
           </ScanStage>
         </div>
@@ -138,13 +139,13 @@ export function Hero({ copy }: { copy: LandingCopy }) {
       <div className="wrap">
         <a
           href="#how-it-works"
-          className="group flex items-center justify-between border-t border-rule py-4 text-[14px] font-semibold text-ink-2 hover:text-ink"
+          className="group flex items-center justify-between border-t border-rule py-4 text-[14px] font-semibold text-ink-2 transition-colors duration-200 hover:text-ink"
         >
           <span>{c.scrollHint}</span>
           <ArrowDown
             size={18}
             aria-hidden="true"
-            className="transition-transform duration-200 group-hover:translate-y-0.5"
+            className="transition-transform duration-500 ease-(--ease-spring) group-hover:translate-y-1"
           />
         </a>
       </div>

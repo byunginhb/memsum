@@ -1,5 +1,6 @@
 import { Info } from 'lucide-react';
 
+import { RevealText } from '@/components/brand/RevealText';
 import type { LandingCopy } from '@/lib/landing-copy';
 
 /**
@@ -10,19 +11,19 @@ export function ParcelSection({ copy }: { copy: LandingCopy }) {
   const c = copy.parcel;
 
   return (
-    <section aria-labelledby="parcel-title" className="wrap py-20 sm:py-24">
-      <div className="grid gap-12 border-t border-rule pt-12 lg:grid-cols-12 lg:gap-10">
+    <section aria-labelledby="parcel-title" className="wrap py-20 sm:py-28">
+      <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-5">
           <p className="t-eyebrow">{c.eyebrow}</p>
-          <h2 id="parcel-title" className="t-title mt-4 text-[clamp(1.875rem,4.4vw,3rem)]">
-            {c.title}
+          <h2 id="parcel-title" data-rv="title" className="t-title mt-4 text-[clamp(1.875rem,4.4vw,3rem)]">
+            <RevealText text={c.title} />
           </h2>
-          <p className="mt-6 text-[17px] leading-[1.7] text-ink-2">{c.sub}</p>
+          <p data-rv="" className="mt-6 text-[17px] leading-[1.7] text-ink-2">{c.sub}</p>
           <p className="mt-6 border-l-2 border-cobalt pl-4 text-[15px] font-semibold">{c.carriers}</p>
         </div>
 
         <div className="lg:col-span-7">
-          <dl className="border-t-2 border-ink">
+          <dl data-rv="stagger" className="border-t-2 border-ink">
             {c.bullets.map((b) => (
               <div
                 key={b.title}

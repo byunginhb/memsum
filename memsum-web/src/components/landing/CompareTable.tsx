@@ -1,4 +1,8 @@
+import { RevealText } from '@/components/brand/RevealText';
 import type { LandingCopy } from '@/lib/landing-copy';
+
+/** 제목에서 형광펜을 그을 구절(카피 원문의 일부). */
+const TITLE_MARK = { ko: '“정리하지 마세요”', en: '“Don’t sort”' } as const;
 
 /**
  * 비교 — 진짜 표. 굵은 잉크 윗선과 머리카락 행 구분선만, Memsum 열은 코발트 머리와 잉크 본문으로 앞세운다.
@@ -6,14 +10,15 @@ import type { LandingCopy } from '@/lib/landing-copy';
  */
 export function CompareTable({ copy }: { copy: LandingCopy }) {
   const c = copy.compare;
+  const lang = copy.isKorean ? 'ko' : 'en';
 
   return (
-    <section aria-labelledby="compare-title" className="wrap py-20 sm:py-24">
-      <h2 id="compare-title" className="t-title max-w-3xl text-[clamp(1.875rem,4.4vw,3rem)]">
-        {c.title}
+    <section aria-labelledby="compare-title" className="wrap py-24 sm:py-32">
+      <h2 id="compare-title" data-rv="title" className="t-title max-w-3xl text-[clamp(1.875rem,4.4vw,3rem)]">
+        <RevealText text={c.title} mark={TITLE_MARK[lang]} />
       </h2>
 
-      <div className="mt-12 overflow-x-auto">
+      <div data-rv="rows" className="mt-12 overflow-x-auto lg:mt-16">
         <table className="w-full min-w-[20rem] border-collapse text-left">
           <thead>
             <tr className="border-b-2 border-ink">

@@ -1,6 +1,14 @@
+import { Marked } from '@/components/brand/Marked';
+import { RevealText } from '@/components/brand/RevealText';
 import type { LandingCopy } from '@/lib/landing-copy';
 
 import { CountUp } from './CountUp';
+
+/** 형광펜을 그을 구절(카피 원문의 일부 — 문구는 그대로). */
+const CLOSING_MARK = {
+  ko: '정리를 시키는 도구가 문제였어요.',
+  en: "It's the tools that made you do the sorting.",
+} as const;
 
 /** 예시 페르소나의 스크린샷 수(문제 제기 장치). */
 const EXAMPLE_SCREENSHOTS = 1847;
@@ -11,22 +19,23 @@ const EXAMPLE_SCREENSHOTS = 1847;
  */
 export function ProblemSection({ copy }: { copy: LandingCopy }) {
   const c = copy.problem;
+  const lang = copy.isKorean ? 'ko' : 'en';
 
   return (
-    <section aria-labelledby="problem-title" className="wrap py-20 sm:py-24">
+    <section aria-labelledby="problem-title" className="wrap pt-24 pb-20 sm:pt-32 sm:pb-24">
       <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
         <div className="lg:col-span-5">
-          <h2 id="problem-title" className="t-title text-[clamp(1.875rem,4.4vw,3rem)]">
-            {c.title}
+          <h2 id="problem-title" data-rv="title" className="t-title text-[clamp(1.875rem,4.4vw,3rem)]">
+            <RevealText text={c.title} />
           </h2>
-          <p className="mt-6 max-w-md text-[17px] leading-[1.7] text-ink-2">
+          <p data-rv="" className="mt-6 max-w-md text-[17px] leading-[1.7] text-ink-2">
             {c.bodyLine1}
             <br />
             {c.bodyLine2}
           </p>
         </div>
 
-        <div className="lg:col-span-7">
+        <div data-rv="" className="lg:col-span-7 [--rv-d:240ms]">
           <p className="t-eyebrow">{c.counterIntro}</p>
           <p className="mt-3 flex items-baseline gap-2 border-y border-ink py-5 sm:gap-3">
             <CountUp
@@ -41,19 +50,19 @@ export function ProblemSection({ copy }: { copy: LandingCopy }) {
         </div>
       </div>
 
-      <div className="mt-20 grid gap-6 border-t border-rule pt-10 lg:grid-cols-12 lg:gap-10">
-        <blockquote className="lg:col-span-7">
-          <p className="t-title text-[clamp(1.625rem,3.6vw,2.5rem)]">{c.quote}</p>
+      <div className="mt-24 grid gap-6 lg:mt-32 lg:grid-cols-12 lg:gap-10">
+        <blockquote data-rv="title" className="lg:col-span-7 lg:col-start-2">
+          <p className="t-title text-[clamp(1.75rem,4vw,2.875rem)]">
+            <RevealText text={c.quote} />
+          </p>
         </blockquote>
-        <p className="text-[17px] leading-[1.7] text-ink-2 lg:col-span-5 lg:pt-2">{c.underQuote}</p>
+        <p data-rv="" className="text-[17px] leading-[1.7] text-ink-2 lg:col-span-4 lg:pt-3">{c.underQuote}</p>
       </div>
 
-      <div className="mt-16 max-w-3xl">
+      <div data-rv="" className="mt-20 max-w-3xl lg:mt-28 lg:ml-auto">
         <p className="text-[17px] leading-[1.7] text-ink-2">{c.leadIn}</p>
         <p className="mt-3 text-[clamp(1.25rem,2.6vw,1.75rem)] leading-[1.45] font-bold tracking-[-0.02em]">
-          <span className="underline decoration-cobalt decoration-[3px] underline-offset-[8px]">
-            {c.coralUnderline}
-          </span>
+          <Marked text={c.coralUnderline} mark={CLOSING_MARK[lang]} scroll />
         </p>
       </div>
     </section>

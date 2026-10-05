@@ -55,7 +55,7 @@ export function StoreBadge({
   const ribbonText =
     ribbon ?? (compact ? copy.storeBadge.ribbonCompact : copy.storeBadge.ribbon);
 
-  const badgeClass = `press flex items-center gap-2 rounded-[10px] sm:gap-2.5 ${TONE_CLASS[tone]} ${
+  const badgeClass = `press lift flex items-center gap-2 rounded-[10px] sm:gap-2.5 ${TONE_CLASS[tone]} ${
     compact ? 'h-11 px-3' : 'h-14 px-3.5 pr-4 sm:px-4 sm:pr-5'
   }`;
 

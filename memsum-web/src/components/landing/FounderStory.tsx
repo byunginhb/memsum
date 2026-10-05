@@ -10,14 +10,14 @@ export function FounderStory({ copy }: { copy: LandingCopy }) {
   const c = copy.founder;
 
   return (
-    <section aria-label={c.role} className="border-y border-rule bg-surface">
-      <figure className="wrap grid gap-10 py-20 sm:py-24 lg:grid-cols-12 lg:gap-10">
-        <blockquote className="lg:col-span-8 lg:col-start-3">
+    <section aria-label={c.role} className="surface-soft">
+      <figure className="wrap grid gap-10 py-28 sm:py-36 lg:grid-cols-12 lg:gap-10">
+        <blockquote data-rv="" className="lg:col-span-8 lg:col-start-3 [--rv-d:0ms]">
           <p className="text-[clamp(1.375rem,3vw,2.125rem)] leading-[1.5] font-bold tracking-[-0.025em]">
             {c.quote}
           </p>
         </blockquote>
-        <figcaption className="flex flex-wrap items-center gap-6 lg:col-span-8 lg:col-start-3">
+        <figcaption data-rv="" className="flex flex-wrap items-center gap-6 lg:col-span-8 lg:col-start-3 [--rv-d:260ms]">
           <FounderAvatar name={c.name} photoAlt={c.photoAlt} />
           <div className="min-w-0">
             <p lang="en" className="text-[17px] font-bold">

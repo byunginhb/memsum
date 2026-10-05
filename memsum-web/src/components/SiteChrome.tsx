@@ -20,6 +20,11 @@ type ChromeProps = {
   copy?: LandingCopy;
 };
 
+type FooterProps = ChromeProps & {
+  /** ink: 랜딩처럼 잉크 면(마지막 권유)에 이어 붙을 때. 기본은 종이. */
+  tone?: 'paper' | 'ink';
+};
+
 /** 헤더가 배경·구분선을 얻는 스크롤 거리(px). */
 const SCROLLED_AT = 40;
 
@@ -66,7 +71,7 @@ function LangToggle({ copy }: { copy: LandingCopy }) {
 
 /**
  * 공통 상단 바 — 브랜드 마크 + 워드마크(홈 링크) · 정책 링크 · 언어 토글.
- * 스크롤하면 종이색 바탕과 머리카락 구분선이 생기고 컴팩트 CTA("받기")가 나타난다.
+ * 스크롤하면 종이색 바탕이 깔리며 64→52px로 부드럽게 줄어들고(transform, globals.css .site-hdr) 컴팩트 CTA("받기")가 나타난다.
  */
 export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
   const c = resolveCopy(lang, copy);
@@ -107,14 +112,12 @@ export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
   return (
     <header
       lang={c.isKorean ? 'ko' : 'en'}
-      className={`sticky top-0 z-40 border-b transition-colors duration-200 ${
-        scrolled
-          ? 'border-rule bg-paper/92 backdrop-blur-md'
-          : 'border-transparent bg-paper/0'
-      }`}
+      data-scrolled={scrolled ? '' : undefined}
+      className="site-hdr sticky top-0 z-40"
     >
-      <div className="wrap flex h-16 items-center justify-between gap-4">
-        <Link href={homeHref} className="flex items-center gap-2.5 rounded-sm">
+      <span aria-hidden="true" className="site-hdr-bg" />
+      <div className="site-hdr-row wrap relative flex h-16 items-center justify-between gap-4">
+        <Link href={homeHref} className="site-hdr-brand flex items-center gap-2.5 rounded-sm">
           <BrandMark size={30} />
           <span className="text-[19px] font-black tracking-[-0.03em]">Memsum</span>
         </Link>
@@ -132,8 +135,8 @@ export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
             onClick={handleGet}
             tabIndex={scrolled ? 0 : -1}
             aria-hidden={scrolled ? undefined : true}
-            className={`press hidden h-9 rounded-full bg-cobalt px-4 text-[13px] font-bold text-white hover:bg-cobalt-strong sm:inline-block ${
-              scrolled ? 'opacity-100' : 'pointer-events-none opacity-0'
+            className={`press site-hdr-cta hidden h-9 rounded-full bg-cobalt px-4 text-[13px] font-bold text-white hover:bg-cobalt-strong sm:inline-block ${
+              scrolled ? 'opacity-100' : 'pointer-events-none translate-y-1 scale-95 opacity-0'
             }`}
           >
             {c.header.getIt}
@@ -145,18 +148,28 @@ export function SiteHeader({ lang = 'ko', copy }: ChromeProps) {
 }
 
 /** 공통 푸터 — 법적 링크·문의처·저작권. */
-export function SiteFooter({ lang = 'ko', copy }: ChromeProps) {
+export function SiteFooter({ lang = 'ko', copy, tone = 'paper' }: FooterProps) {
   const c = resolveCopy(lang, copy);
+  const onInk = tone === 'ink';
   // 법적 링크는 현재 로케일 우선. 다른 로케일 정책 링크도 함께 노출(접근성·SEO).
   const privacyHref = c.isKorean ? '/privacy' : '/en/privacy';
   const termsHref = c.isKorean ? '/terms' : '/en/terms';
-  const linkClass = 'hover:text-ink underline-offset-4 hover:underline';
+  const strong = onInk ? 'text-paper' : 'text-ink';
+  // Tailwind 가 읽을 수 있게 클래스 이름은 통째로 쓴다.
+  const linkClass = `${onInk ? 'hover:text-paper' : 'hover:text-ink'} underline-offset-4 hover:underline`;
 
   return (
-    <footer lang={c.isKorean ? 'ko' : 'en'} className="border-t border-rule">
-      <div className="wrap grid gap-8 pt-10 pb-28 text-[13px] text-ink-2 sm:grid-cols-[auto_1fr] sm:items-start lg:pb-12">
-        <div className="flex items-center gap-2.5 text-ink">
-          <BrandMark size={24} />
+    <footer
+      lang={c.isKorean ? 'ko' : 'en'}
+      className={onInk ? 'on-ink border-t border-rule-on-ink bg-ink' : 'border-t border-rule'}
+    >
+      <div
+        className={`wrap grid gap-8 pt-10 pb-28 text-[13px] sm:grid-cols-[auto_1fr] sm:items-start lg:pb-12 ${
+          onInk ? 'text-paper-2' : 'text-ink-2'
+        }`}
+      >
+        <div className={`flex items-center gap-2.5 ${strong}`}>
+          <BrandMark size={24} onInk={onInk} />
           <span className="text-base font-black tracking-[-0.03em]">Memsum</span>
         </div>
         <div className="grid gap-3 sm:justify-items-end sm:text-right">
@@ -181,7 +194,7 @@ export function SiteFooter({ lang = 'ko', copy }: ChromeProps) {
           </nav>
           <p>
             {c.footer.contact}{' '}
-            <a className="t-mono text-ink underline underline-offset-4" href={`mailto:${SUPPORT_EMAIL}`}>
+            <a className={`t-mono underline underline-offset-4 ${strong}`} href={`mailto:${SUPPORT_EMAIL}`}>
               {SUPPORT_EMAIL}
             </a>
           </p>
