@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import { JetBrains_Mono } from 'next/font/google';
 
 import { getLandingCopy } from '@/lib/landing-copy';
-import { GOOGLE_SITE_VERIFICATION, SITE_NAME, SITE_URL } from '@/lib/site';
+import {
+  GOOGLE_SITE_VERIFICATION,
+  NAVER_SITE_VERIFICATION,
+  SITE_NAME,
+  SITE_URL,
+} from '@/lib/site';
 
 import './globals.css';
 
@@ -24,21 +29,22 @@ export const metadata: Metadata = {
     template: koMeta.titleTemplate,
   },
   description: koMeta.description,
-  verification: { google: GOOGLE_SITE_VERIFICATION },
-  // hreflang — 한/영 페이지를 상호 대안으로 선언. x-default는 한국어(기본 도메인 루트).
-  alternates: {
-    languages: {
-      ko: SITE_URL,
-      en: `${SITE_URL}/en`,
-      'x-default': SITE_URL,
-    },
+  verification: {
+    google: GOOGLE_SITE_VERIFICATION,
+    // 토큰이 생기기 전에는 빈 메타를 내보내지 않는다.
+    ...(NAVER_SITE_VERIFICATION
+      ? { other: { 'naver-site-verification': NAVER_SITE_VERIFICATION } }
+      : {}),
   },
+  // canonical·hreflang은 레이아웃에 두지 않는다 — 상속되면 404 등 다른 페이지가 랜딩의
+  // hreflang을 잘못 달게 된다. 각 page.tsx가 src/lib/seo.ts의 buildPageMetadata로 선언한다.
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
     title: koMeta.ogTitle,
     description: koMeta.ogDescription,
-    images: ['/og.png'],
+    locale: 'ko_KR',
+    images: [{ url: '/og.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',

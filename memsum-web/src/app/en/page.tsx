@@ -1,39 +1,34 @@
 import { LandingPage } from '@/components/landing/LandingPage';
+import { JsonLd } from '@/components/seo/JsonLd';
 import { getLandingCopy } from '@/lib/landing-copy';
-import { SITE_URL } from '@/lib/site';
+import { buildPageMetadata } from '@/lib/seo';
+import { buildLandingJsonLd } from '@/lib/structured-data';
 
 import type { Metadata } from 'next';
 
-const enCopy = getLandingCopy('en');
+const enMeta = getLandingCopy('en').meta;
 
-/** 영어 랜딩(`/en`) 메타데이터 — final.md §0의 영어 원문 그대로. */
-export const metadata: Metadata = {
-  title: {
-    default: enCopy.meta.titleDefault,
-    template: enCopy.meta.titleTemplate,
-  },
-  description: enCopy.meta.description,
-  alternates: {
-    canonical: '/en',
-    languages: {
-      ko: SITE_URL,
-      en: `${SITE_URL}/en`,
-      'x-default': SITE_URL,
-    },
-  },
-  openGraph: {
-    type: 'website',
-    siteName: 'Memsum',
-    title: enCopy.meta.ogTitle,
-    description: enCopy.meta.ogDescription,
-    images: ['/og.en.png'],
-  },
-  twitter: {
-    card: 'summary_large_image',
-  },
-};
+/**
+ * 영어 랜딩(`/en`) 메타데이터 — final.md §0의 영어 원문 그대로.
+ * absoluteTitle: 레이아웃 템플릿이 붙어 "… | Memsum"이 중복되던 문제를 막는다.
+ */
+export const metadata: Metadata = buildPageMetadata({
+  lang: 'en',
+  paths: { ko: '/', en: '/en' },
+  title: enMeta.titleDefault,
+  absoluteTitle: true,
+  description: enMeta.description,
+  ogTitle: enMeta.ogTitle,
+  ogDescription: enMeta.ogDescription,
+  ogImageAlt: enMeta.ogTitle,
+});
 
 /** 영어 랜딩(`/en`). */
 export default function HomeEnPage() {
-  return <LandingPage lang="en" />;
+  return (
+    <>
+      <LandingPage lang="en" />
+      <JsonLd data={buildLandingJsonLd('en')} />
+    </>
+  );
 }

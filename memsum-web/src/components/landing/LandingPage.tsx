@@ -1,6 +1,5 @@
 import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { getLandingCopy, type Lang } from '@/lib/landing-copy';
-import { OPERATOR_NAME, SITE_NAME, SITE_URL } from '@/lib/site';
 
 import { AudienceSection } from './AudienceSection';
 import { CompareTable } from './CompareTable';
@@ -26,28 +25,7 @@ import { Testimonials } from './Testimonials';
 export function LandingPage({ lang }: { lang: Lang }) {
   const copy = getLandingCopy(lang);
 
-  // JSON-LD — 로케일별 description으로 검색 노출 최적화.
-  const appJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'MobileApplication',
-    name: SITE_NAME,
-    operatingSystem: 'iOS, Android',
-    applicationCategory: 'ProductivityApplication',
-    description: copy.meta.appJsonLdDescription,
-    url: copy.isKorean ? SITE_URL : `${SITE_URL}/en`,
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'KRW' },
-    author: { '@type': 'Person', name: OPERATOR_NAME },
-  };
-
-  const faqJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: copy.faq.items.map((item) => ({
-      '@type': 'Question',
-      name: item.q,
-      acceptedAnswer: { '@type': 'Answer', text: item.a },
-    })),
-  };
+  // 구조화 데이터(JSON-LD)는 라우트(page.tsx)에서 src/lib/structured-data.ts로 렌더한다.
 
   return (
     <NotifyProvider copy={copy}>
@@ -68,15 +46,6 @@ export function LandingPage({ lang }: { lang: Lang }) {
       <SiteFooter lang={lang} copy={copy} tone="ink" />
       <ScrollFx />
       <MobileCtaBar copy={copy} />
-      <script
-        type="application/ld+json"
-        // 구조화 데이터는 우리가 만든 정적 객체라 안전하다.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-      />
     </NotifyProvider>
   );
 }
