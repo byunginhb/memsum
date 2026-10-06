@@ -13,6 +13,7 @@ import { ParcelCarrierSelectSheet } from '@/features/parcel/components/ParcelCar
 import { ParcelManualInputSheet } from '@/features/parcel/components/ParcelManualInputSheet';
 import { startParcelTracking } from '@/features/parcel/start-tracking';
 import type { ParcelCarrier } from '@/features/parcel/types';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { extractParcel, isLikelyParcelSms, maskInvoice, resolveCarrier } from '@/lib/parcel';
 import { ParcelNotConfiguredError, recommendCarrier } from '@/lib/parcel-api';
 import { getLocale, t } from '@/i18n';
@@ -50,7 +51,7 @@ export function ParcelCaptureBlock({ ocrText, captureId }: ParcelCaptureBlockPro
   const [isSelectOpen, setSelectOpen] = useState(false);
   const [isManualOpen, setManualOpen] = useState(false);
 
-  const enabled = getLocale() === 'ko' && parcelTracking && isLikelyParcelSms(ocrText);
+  const enabled = PARCEL_ENABLED && getLocale() === 'ko' && parcelTracking && isLikelyParcelSms(ocrText);
   const extraction = useMemo(() => (enabled ? extractParcel(ocrText) : null), [enabled, ocrText]);
 
   // 확정된 택배사로 추적 시작 → store 반영 → 상세로 이동.

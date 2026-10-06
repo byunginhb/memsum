@@ -266,7 +266,7 @@ function DetectDemo(): ReactNode {
   );
 }
 
-/** 3페이지 권한 버튼 — 사진(자동 감지)과 알림(일정·택배·리포트)을 차례로 묻는다. */
+/** 3페이지 권한 버튼 — 사진(자동 감지)과 알림(일정·리포트)을 차례로 묻는다. */
 function PermissionAsk(): ReactNode {
   const [result, setResult] = useState<PermissionResult>('idle');
 

@@ -32,6 +32,7 @@ import { usePhotoImport } from '@/hooks/use-photo-import';
 import { useWeeklyStats } from '@/hooks/use-weekly-stats';
 import { getLocale, t } from '@/i18n';
 import type { CategoryKey } from '@/lib/categories';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { useParcelStore } from '@/stores/parcel-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
@@ -84,7 +85,8 @@ export default function HomeScreen(): ReactNode {
   const parcelTracking = useSettingsStore((s) => s.parcelTracking);
   const tracks = useParcelStore((s) => s.tracks);
   const refreshParcels = useParcelStore((s) => s.refresh);
-  const parcelsEnabled = getLocale() === 'ko' && parcelTracking;
+  // 택배 조회는 기능 스위치(PARCEL_ENABLED)로 꺼 둘 수 있다 — 꺼지면 행·헤드라인 모두 빠진다.
+  const parcelsEnabled = PARCEL_ENABLED && getLocale() === 'ko' && parcelTracking;
 
   useEffect(() => {
     if (parcelsEnabled) void refreshParcels();

@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { shouldRefresh } from '@/features/parcel/polling';
 import { refreshParcelTracking } from '@/features/parcel/start-tracking';
 import { getLocale } from '@/i18n';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { useParcelStore } from '@/stores/parcel-store';
 import { useSettingsStore } from '@/stores/settings-store';
 
@@ -33,7 +34,7 @@ export function useParcelAutoRefresh(): void {
 
   const runPoll = useCallback(async (): Promise<void> => {
     // ko + 토글 ON 게이트. 한국어 외에는 폴링하지 않는다.
-    if (getLocale() !== 'ko' || !parcelTracking) return;
+    if (!PARCEL_ENABLED || getLocale() !== 'ko' || !parcelTracking) return;
     if (pollingInFlight) return;
     pollingInFlight = true;
     try {
@@ -87,6 +88,7 @@ export function useParcelAutoRefresh(): void {
       const request = response.notification.request;
       const url = (request.content.data as { url?: string } | undefined)?.url;
       // 우리가 발송한 택배 알림(/parcel/...)만 처리한다.
+      if (!PARCEL_ENABLED) return;
       if (typeof url !== 'string' || !url.startsWith('/parcel/')) return;
       if (handledResponses.current.has(request.identifier)) return;
       handledResponses.current.add(request.identifier);

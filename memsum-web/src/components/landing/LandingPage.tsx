@@ -10,7 +10,6 @@ import { Hero } from './Hero';
 import { HowItWorks } from './HowItWorks';
 import { MobileCtaBar } from './MobileCtaBar';
 import { NotifyProvider } from './NotifyProvider';
-import { ParcelSection } from './ParcelSection';
 import { ProblemSection } from './ProblemSection';
 import { ScrollFx } from './ScrollFx';
 import { Testimonials } from './Testimonials';
@@ -35,7 +34,6 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <Hero copy={copy} />
         <ProblemSection copy={copy} />
         <HowItWorks copy={copy} />
-        {copy.isKorean && <ParcelSection copy={copy} />}
         <AudienceSection copy={copy} />
         <FounderStory copy={copy} />
         <CompareTable copy={copy} />

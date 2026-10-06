@@ -4,3 +4,4 @@ More ways to keep you from missing things.
 - Plans with a vague date are marked "Check date" and never auto-added.
 - Try it with one of your own screenshots right from onboarding.
 - A refreshed design across the app.
+- Clearer onboarding text and better stability.

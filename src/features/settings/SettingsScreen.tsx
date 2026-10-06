@@ -19,6 +19,7 @@ import { spacing } from '@/design/tokens';
 import { ParcelOnboardingSheet } from '@/features/parcel/components/ParcelOnboardingSheet';
 import { getLocale, t } from '@/i18n';
 import { deleteAllUserData } from '@/lib/account';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCaptureStore } from '@/stores/capture-store';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -92,8 +93,8 @@ export function SettingsScreen(): ReactNode {
   const [isDeleting, setIsDeleting] = useState(false);
   const photoPermission = usePhotoPermission();
 
-  // 택배 토글은 한국(ko) 로케일에서만 노출한다.
-  const showParcelSection = getLocale() === 'ko';
+  // 택배 토글은 기능 스위치가 켜져 있고 한국(ko) 로케일일 때만 노출한다.
+  const showParcelSection = PARCEL_ENABLED && getLocale() === 'ko';
 
   // 자동 감지가 켜져 있지만 권한이 막혀 실제로는 동작하지 않는 상태.
   const autoCaptureBlocked = autoCapture && photoPermission === 'denied';

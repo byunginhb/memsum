@@ -16,6 +16,7 @@ import { useAutoCapture } from '@/hooks/use-auto-capture';
 import { useEventReminders } from '@/hooks/use-event-reminders';
 import { useParcelAutoRefresh } from '@/hooks/use-parcel-auto-refresh';
 import { useWeeklyReportNotification } from '@/hooks/use-weekly-report-notification';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 
@@ -71,7 +72,7 @@ export default function RootLayout() {
               {/* 이벤트 전날 리마인드 — 설정 토글·시각과 하루 1건 묶음 예약을 동기화. UI 없음. */}
               <EventReminderGate />
               {/* 택배 자동 새로고침(ko + 토글 ON) — 포그라운드 복귀 시 폴링 + 알림 탭 라우팅. UI 없음. */}
-              <ParcelGate />
+              {PARCEL_ENABLED ? <ParcelGate /> : null}
               <OnboardingGate>
                 <Stack screenOptions={{ headerShown: false }} />
               </OnboardingGate>

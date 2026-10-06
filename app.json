@@ -2,7 +2,7 @@
   "expo": {
     "name": "Memsum",
     "slug": "memsum",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": [
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "app.memsum",
-      "versionCode": 9,
+      "versionCode": 10,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#1530FF",

@@ -15,6 +15,7 @@ import type {
   ParcelTrack,
   ParcelTrackResult,
 } from '@/features/parcel/types';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { getSupabase } from '@/lib/supabase';
 
 const FUNCTION_NAME = 'track-parcel';
@@ -45,6 +46,8 @@ async function extractFunctionError(error: unknown): Promise<Error> {
 }
 
 async function requireSession(): Promise<void> {
+  // 기능 스위치가 꺼져 있으면 track-parcel을 절대 부르지 않는다(서버 함수도 삭제된 상태).
+  if (!PARCEL_ENABLED) throw new ParcelNotConfiguredError();
   const supabase = getSupabase();
   const {
     data: { session },
@@ -159,6 +162,7 @@ const ROW_COLUMNS =
 
 /** 추적 등록(중복은 기존 행 반환). */
 export async function createParcelTrack(input: CreateParcelInput): Promise<ParcelTrack> {
+  if (!PARCEL_ENABLED) throw new ParcelNotConfiguredError();
   const supabase = getSupabase();
   const {
     data: { session },
@@ -189,6 +193,7 @@ export async function createParcelTrack(input: CreateParcelInput): Promise<Parce
 
 /** 활성/최근(완료 포함, 중단 제외) 추적 목록. */
 export async function listParcelTracks(): Promise<ParcelTrack[]> {
+  if (!PARCEL_ENABLED) return [];
   if (preview) return [...preview.parcels];
   const supabase = getSupabase();
   const { data, error } = await supabase

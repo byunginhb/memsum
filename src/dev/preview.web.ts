@@ -19,6 +19,7 @@ import type { ParcelTrack } from "@/features/parcel/types";
 import type { WeeklyReport } from "@/features/report/types";
 import type { CategoryKey } from "@/lib/categories";
 import { getLocale } from "@/i18n";
+import { PARCEL_ENABLED } from "@/lib/features";
 import type { CaptureDraftWithBoxes } from "@/stores/capture-store";
 import type { OcrBox } from "../../modules/vision-ocr";
 
@@ -934,9 +935,10 @@ function seedPersisted(onboarding: boolean): void {
     reportCoachmarkSeen: true,
   });
   // 택배 조회는 국내 택배사만 지원 — 영어 화면에는 택배를 보이지 않는다.
+  // 기능 스위치(PARCEL_ENABLED)가 꺼져 있으면 한국어 화면에서도 숨긴다.
   merge("memsum-settings", {
     nickname: EN ? "Sarah" : "수현",
-    parcelTracking: !EN,
+    parcelTracking: PARCEL_ENABLED && !EN,
     parcelOnboarded: true,
   });
 }
@@ -950,7 +952,7 @@ function create(): PreviewSource | null {
     categoryGroups: groupsOf(captures),
     weekCount: WEEK_COUNT,
     report: buildReport(),
-    parcels: EN ? [] : buildParcels(),
+    parcels: PARCEL_ENABLED && !EN ? buildParcels() : [],
     calendarEmail:
       query.get("calendar") === "0"
         ? null

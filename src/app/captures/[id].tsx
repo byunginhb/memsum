@@ -43,6 +43,7 @@ import type { CaptureListItem } from '@/features/captures/types';
 import { useCapture } from '@/hooks/use-capture';
 import { getLocale, t } from '@/i18n';
 import { deleteCapture } from '@/lib/captures';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { extractParcel, isLikelyParcelSms, maskInvoice } from '@/lib/parcel';
 import { maskForCategory } from '@/lib/sensitive-mask';
 import { useCaptureStore } from '@/stores/capture-store';
@@ -294,7 +295,7 @@ function ExtractedBlock({ item }: { item: CaptureListItem }): ReactNode {
   const { colors } = useTheme();
   const parcel = useMemo(
     () =>
-      getLocale() === 'ko' && isLikelyParcelSms(item.ocrText) ? extractParcel(item.ocrText) : null,
+      PARCEL_ENABLED && getLocale() === 'ko' && isLikelyParcelSms(item.ocrText) ? extractParcel(item.ocrText) : null,
     [item.ocrText],
   );
   const event = item.hasEvent ? item.event : null;

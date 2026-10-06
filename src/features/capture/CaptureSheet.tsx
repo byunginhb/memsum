@@ -29,6 +29,7 @@ import { SkeletonBlock } from '@/features/home/Skeleton';
 import { StaggerIn } from '@/features/home/StaggerIn';
 import { ParcelCaptureBlock } from '@/features/parcel/components/ParcelCaptureBlock';
 import { t } from '@/i18n';
+import { PARCEL_ENABLED } from '@/lib/features';
 import { useCaptureStore } from '@/stores/capture-store';
 
 import { ExtractedEventRow } from './ExtractedEventRow';
@@ -330,9 +331,11 @@ function ResultView({ draft, result, onClose }: ResultViewProps): ReactNode {
         ) : null}
 
         {/* 택배 문자면 추적 시작 블록(ko + 설정 ON일 때만 — 컴포넌트가 스스로 가린다). */}
-        <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
-          <ParcelCaptureBlock ocrText={ocrText} captureId={result.capture_id} />
-        </StaggerIn>
+        {PARCEL_ENABLED ? (
+          <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>
+            <ParcelCaptureBlock ocrText={ocrText} captureId={result.capture_id} />
+          </StaggerIn>
+        ) : null}
 
         {ocrText ? (
           <StaggerIn index={next()} baseDelay={RESULT_BASE_DELAY} offset={RESULT_RISE}>

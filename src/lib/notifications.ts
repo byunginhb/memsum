@@ -10,6 +10,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { t } from '@/i18n';
+import { PARCEL_ENABLED } from '@/lib/features';
 
 // 주간 리포트 알림 채널(Android). 주 1회의 하이라이트라 헤드업(HIGH)으로 띄운다.
 const CHANNEL_WEEKLY = 'weekly-report';
@@ -61,10 +62,15 @@ async function ensureChannels(): Promise<void> {
       name: t('weeklyNotif.channelName'),
       importance: Notifications.AndroidImportance.HIGH,
     });
-    await Notifications.setNotificationChannelAsync(CHANNEL_PARCEL, {
-      name: t('push.parcel.channelName'),
-      importance: Notifications.AndroidImportance.HIGH,
-    });
+    if (PARCEL_ENABLED) {
+      await Notifications.setNotificationChannelAsync(CHANNEL_PARCEL, {
+        name: t('push.parcel.channelName'),
+        importance: Notifications.AndroidImportance.HIGH,
+      });
+    } else {
+      // 꺼진 기능의 채널이 기존 설치의 알림 설정 화면에 남지 않게 지운다(없으면 무동작).
+      await Notifications.deleteNotificationChannelAsync(CHANNEL_PARCEL);
+    }
     await Notifications.setNotificationChannelAsync(CHANNEL_EVENT_REMINDER, {
       name: '일정 리마인드',
       importance: Notifications.AndroidImportance.HIGH,
@@ -156,6 +162,7 @@ async function presentParcelNotification(
   body: string,
   trackId: string,
 ): Promise<boolean> {
+  if (!PARCEL_ENABLED) return false;
   try {
     const granted = await ensureNotificationPermission();
     if (!granted) return false;

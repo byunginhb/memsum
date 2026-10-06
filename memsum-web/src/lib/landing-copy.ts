@@ -193,21 +193,6 @@ export type LandingCopy = {
       isExample: boolean;
     }[];
   };
-
-  /**
-   * 택배 추적 기능 섹션 — 한국 한정 기능이므로 한국어 랜딩에서만 노출.
-   * 영어 값은 타입 충족용으로만 채우고 `/en`에서는 렌더하지 않는다.
-   */
-  parcel: {
-    eyebrow: string;
-    title: string;
-    sub: string;
-    /** 지원 택배사 나열 문구 */
-    carriers: string;
-    bullets: readonly { title: string; body: string }[];
-    /** 정직 범위 고지 — "알림 기준 배송 상태" 등 */
-    disclaimer: string;
-  };
 };
 
 const KO: LandingCopy = {
@@ -425,8 +410,8 @@ const KO: LandingCopy = {
       },
       {
         quote:
-          '택배 문자를 캡처했더니 운송장을 읽어서, 따로 확인하러 앱 들어갈 필요가 없었어요.',
-        context: '택배 추적 · 문자 캡처 후',
+          '청첩장을 캡처했더니 날짜와 장소를 읽어 둬서, 버튼 한 번으로 캘린더에 넣었어요.',
+        context: '청첩장 · 캘린더 등록',
         isExample: true,
       },
       {
@@ -479,28 +464,6 @@ const KO: LandingCopy = {
     closeAria: '닫기',
     mailtoSubject: 'Memsum 출시 알림 신청',
     mailtoBody: '출시되면 가장 먼저 써보고 싶어요.\n\n신청 이메일: {email}',
-  },
-
-  parcel: {
-    eyebrow: '한국 한정 기능',
-    title: '택배 문자도 그냥 캡처하세요.',
-    sub: '운송장을 따로 메모할 필요 없어요. 택배 문자 스크린샷 하나면 Memsum이 운송장을 읽어 배송 상태를 추적하고, 출발하면·도착하면 바로 알려드려요.',
-    carriers: 'CJ대한통운·한진·롯데·우체국 등 한국 주요 택배사 지원',
-    bullets: [
-      {
-        title: '택배 문자, 캡처 한 장으로 끝',
-        body: '문자 스크린샷을 찍으면 운송장 번호와 택배사를 자동으로 읽어요. 직접 입력할 필요 없어요.',
-      },
-      {
-        title: '배송 상태를 한눈에',
-        body: '집하·배송 출발·배달 완료 등 현재 배송 상태를 앱 안에서 바로 확인할 수 있어요.',
-      },
-      {
-        title: '출발하면·도착하면 알림',
-        body: '배송이 출발하거나 완료되면 알림으로 알려드려요. 택배 앱을 따로 켜서 확인할 필요가 없어요.',
-      },
-    ],
-    disclaimer: '도착 예정일 예측은 제공하지 않아요. 한국 택배사 API 기준으로 현재 배송 상태만 안내합니다.',
   },
 };
 
@@ -720,8 +683,8 @@ const EN: LandingCopy = {
       },
       {
         quote:
-          'I screenshotted a delivery text and Memsum read the tracking number. No need to open a separate tracking app.',
-        context: 'Parcel tracking · after capturing SMS',
+          'I screenshotted a wedding invitation, and Memsum picked out the date and venue. One tap and it was in my calendar.',
+        context: 'Wedding invitation · added to calendar',
         isExample: true,
       },
       {
@@ -775,29 +738,6 @@ const EN: LandingCopy = {
     mailtoSubject: 'Memsum launch notification request',
     mailtoBody:
       "I'd like to be first to use Memsum when it launches.\n\nMy email: {email}",
-  },
-
-  // 택배 기능은 한국 한정이므로 영어 값은 타입 충족용만. /en에서는 렌더하지 않는다.
-  parcel: {
-    eyebrow: 'Korea only',
-    title: 'Just screenshot the delivery text.',
-    sub: 'Memsum reads the tracking number and shows you the delivery status — no manual entry needed.',
-    carriers: 'CJ Logistics, Hanjin, Lotte, Korea Post, and more',
-    bullets: [
-      {
-        title: 'One screenshot does it',
-        body: 'Memsum reads the tracking number and carrier from your SMS screenshot automatically.',
-      },
-      {
-        title: 'Delivery status at a glance',
-        body: 'See the current delivery status right inside the app — pickup, in transit, delivered.',
-      },
-      {
-        title: 'Notified when it ships and arrives',
-        body: "Get a notification when your package ships and when it's delivered. No need to open a separate tracking app.",
-      },
-    ],
-    disclaimer: 'Estimated arrival dates are not provided. Only current delivery status is shown, based on Korean carrier APIs.',
   },
 };
 
