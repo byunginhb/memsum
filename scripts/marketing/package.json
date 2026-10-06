@@ -1,0 +1,15 @@
+{
+  "name": "memsum-marketing-assets",
+  "private": true,
+  "description": "홍보 자산 재생성 전용 의존성(앱 번들과 무관). npm --prefix scripts/marketing i 후 사용.",
+  "type": "module",
+  "scripts": {
+    "stills": "node gen-stills.mjs",
+    "reel": "node gen-reel.mjs",
+    "all": "node gen-stills.mjs && node gen-reel.mjs"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright": "^1.63.0"
+  }
+}
